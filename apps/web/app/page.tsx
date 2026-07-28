@@ -321,7 +321,7 @@ function MarqueeStrip() {
   ];
   return (
     <div className="relative z-20 bg-zinc-950 overflow-hidden py-3.5 -mt-[1px]">
-      <div className="flex gap-0 animate-marquee whitespace-nowrap w-max">
+      <div className="flex gap-0 animate-marquee whitespace-nowrap w-max" style={{ animationDuration: '90s' }}>
         {items.map((item, i) => (
           <span key={i} className="inline-flex items-center gap-8 px-6 text-[11px] font-bold uppercase tracking-[0.18em] text-white/50">
             {item}
@@ -399,7 +399,7 @@ function CategoryQuickNav() {
     <section className="border-y border-zinc-200 dark:border-zinc-800 py-1.5 lg:py-2 bg-white dark:bg-zinc-950 overflow-hidden">
       <LogoLoop
         logos={logos}
-        speed={90}
+        speed={30}
         direction="right"
         logoHeight={56}
         gap={40}
