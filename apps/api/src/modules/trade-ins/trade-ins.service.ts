@@ -212,7 +212,7 @@ export class TradeInsService {
     private async issueShippingLabel(tradeIn: { id: string; reference: string; contact: unknown; trackingNumber: string | null; labelUrl: string | null }) {
         const contact = tradeIn.contact as Record<string, string>;
         if (!contact?.email) {
-            throw new Error('No customer email on file — cannot send shipping label');
+            throw new BadRequestException('No customer email on file — cannot send shipping label');
         }
 
         let trackingNumber = tradeIn.trackingNumber;

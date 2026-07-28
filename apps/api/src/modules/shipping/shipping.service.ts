@@ -111,7 +111,7 @@ export class ShippingService {
         if (!shipmentRes.ok) {
             const err = await shipmentRes.text();
             this.logger.error(`Shippo shipment creation failed: ${err}`);
-            throw new Error(`Shippo API error: ${shipmentRes.status}`);
+            throw new BadRequestException(`Shippo API error: ${shipmentRes.status} - ${err}`);
         }
 
         const shipment = await shipmentRes.json() as {
@@ -121,7 +121,7 @@ export class ShippingService {
 
         if (!shipment.rates || shipment.rates.length === 0) {
             this.logger.error('No shipping rates returned by Shippo');
-            throw new Error('No shipping rates available');
+            throw new BadRequestException('No shipping rates available from Shippo — check the carrier account is active for this mode');
         }
 
         // Step 2: Prefer the configured service level, but keep the rest as fallbacks —
@@ -150,7 +150,7 @@ export class ShippingService {
             if (!txRes.ok) {
                 const err = await txRes.text();
                 this.logger.warn(`Shippo transaction failed for rate ${rate.servicelevel.token} (HTTP ${txRes.status}): ${err}`);
-                lastFailure = `Shippo transaction error: ${txRes.status}`;
+                lastFailure = `Shippo transaction error: ${txRes.status} - ${err}`;
                 continue;
             }
 
@@ -172,13 +172,13 @@ export class ShippingService {
         }
 
         this.logger.error(`All Shippo rate attempts failed for shipment ${shipment.object_id}: ${lastFailure}`);
-        throw new Error(lastFailure);
+        throw new BadRequestException(lastFailure);
     }
 
     /** Re-downloads a previously purchased label's PDF — used to resend a label email without buying a new one. */
     async fetchLabelPdf(labelUrl: string): Promise<Buffer> {
         const pdfRes = await fetch(labelUrl);
-        if (!pdfRes.ok) throw new Error('Failed to download label PDF from Shippo');
+        if (!pdfRes.ok) throw new BadRequestException('Failed to download label PDF from Shippo');
         return Buffer.from(await pdfRes.arrayBuffer());
     }
 
