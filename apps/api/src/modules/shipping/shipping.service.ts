@@ -158,11 +158,13 @@ export class ShippingService {
                 status:          string;
                 tracking_number: string;
                 label_url:       string;
+                messages?:       Array<{ source?: string; code?: string; text: string }>;
             };
 
             if (tx.status !== 'SUCCESS') {
+                const detail = tx.messages?.map(m => m.text).filter(Boolean).join('; ');
                 this.logger.warn(`Shippo transaction not successful for rate ${rate.servicelevel.token}: ${JSON.stringify(tx)}`);
-                lastFailure = 'Shippo label generation failed';
+                lastFailure = detail ? `Shippo label generation failed: ${detail}` : 'Shippo label generation failed';
                 continue;
             }
 
