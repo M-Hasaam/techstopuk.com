@@ -1,11 +1,54 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo, type CSSProperties, type ReactNode } from 'react';
 import './LogoLoop.css';
 
 const ANIMATION_CONFIG = { SMOOTH_TAU: 0.25, MIN_COPIES: 2, COPY_HEADROOM: 2 };
 
-const toCssLength = value => (typeof value === 'number' ? `${value}px` : (value ?? undefined));
+type LogoImageItem = {
+  src: string;
+  srcSet?: string;
+  sizes?: string;
+  width?: number;
+  height?: number;
+  alt?: string;
+  title?: string;
+  href?: string;
+  ariaLabel?: string;
+};
 
-const useResizeObserver = (callback, elements, dependencies) => {
+type LogoNodeItem = {
+  node: ReactNode;
+  href?: string;
+  ariaLabel?: string;
+  title?: string;
+};
+
+export type LogoLoopItem = LogoImageItem | LogoNodeItem;
+
+export interface LogoLoopProps {
+  logos: LogoLoopItem[];
+  speed?: number;
+  direction?: 'left' | 'right' | 'up' | 'down';
+  width?: number | string;
+  logoHeight?: number;
+  gap?: number;
+  pauseOnHover?: boolean;
+  hoverSpeed?: number;
+  fadeOut?: boolean;
+  fadeOutColor?: string;
+  scaleOnHover?: boolean;
+  renderItem?: (item: LogoLoopItem, key: string) => ReactNode;
+  ariaLabel?: string;
+  className?: string;
+  style?: CSSProperties;
+}
+
+const toCssLength = (value?: number | string) => (typeof value === 'number' ? `${value}px` : (value ?? undefined));
+
+const useResizeObserver = (
+  callback: () => void,
+  elements: React.RefObject<HTMLElement | null>[],
+  dependencies: unknown[]
+) => {
   useEffect(() => {
     if (!window.ResizeObserver) {
       const handleResize = () => callback();
@@ -23,10 +66,15 @@ const useResizeObserver = (callback, elements, dependencies) => {
     return () => {
       observers.forEach(observer => observer?.disconnect());
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [callback, elements, dependencies]);
 };
 
-const useImageLoader = (seqRef, onLoad, dependencies) => {
+const useImageLoader = (
+  seqRef: React.RefObject<HTMLElement | null>,
+  onLoad: () => void,
+  dependencies: unknown[]
+) => {
   useEffect(() => {
     const images = seqRef.current?.querySelectorAll('img') ?? [];
     if (images.length === 0) {
@@ -39,7 +87,7 @@ const useImageLoader = (seqRef, onLoad, dependencies) => {
       if (remainingImages === 0) onLoad();
     };
     images.forEach(img => {
-      const htmlImg = img;
+      const htmlImg = img as HTMLImageElement;
       if (htmlImg.complete) {
         handleImageLoad();
       } else {
@@ -53,12 +101,21 @@ const useImageLoader = (seqRef, onLoad, dependencies) => {
         img.removeEventListener('error', handleImageLoad);
       });
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onLoad, seqRef, dependencies]);
 };
 
-const useAnimationLoop = (trackRef, targetVelocity, seqWidth, seqHeight, isHovered, hoverSpeed, isVertical) => {
-  const rafRef = useRef(null);
-  const lastTimestampRef = useRef(null);
+const useAnimationLoop = (
+  trackRef: React.RefObject<HTMLElement | null>,
+  targetVelocity: number,
+  seqWidth: number,
+  seqHeight: number,
+  isHovered: boolean,
+  hoverSpeed: number | undefined,
+  isVertical: boolean
+) => {
+  const rafRef = useRef<number | null>(null);
+  const lastTimestampRef = useRef<number | null>(null);
   const offsetRef = useRef(0);
   const velocityRef = useRef(0);
 
@@ -76,7 +133,7 @@ const useAnimationLoop = (trackRef, targetVelocity, seqWidth, seqHeight, isHover
       track.style.transform = transformValue;
     }
 
-    const animate = timestamp => {
+    const animate = (timestamp: number) => {
       if (lastTimestampRef.current === null) {
         lastTimestampRef.current = timestamp;
       }
@@ -132,10 +189,10 @@ export const LogoLoop = memo(
     ariaLabel = 'Partner logos',
     className,
     style
-  }) => {
-    const containerRef = useRef(null);
-    const trackRef = useRef(null);
-    const seqRef = useRef(null);
+  }: LogoLoopProps) => {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const trackRef = useRef<HTMLDivElement>(null);
+    const seqRef = useRef<HTMLUListElement>(null);
 
     const [seqWidth, setSeqWidth] = useState(0);
     const [seqHeight, setSeqHeight] = useState(0);
@@ -153,7 +210,7 @@ export const LogoLoop = memo(
 
     const targetVelocity = useMemo(() => {
       const magnitude = Math.abs(speed);
-      let directionMultiplier;
+      let directionMultiplier: number;
       if (isVertical) {
         directionMultiplier = direction === 'up' ? 1 : -1;
       } else {
@@ -195,11 +252,12 @@ export const LogoLoop = memo(
     useAnimationLoop(trackRef, targetVelocity, seqWidth, seqHeight, isHovered, effectiveHoverSpeed, isVertical);
 
     const cssVariables = useMemo(
-      () => ({
-        '--logoloop-gap': `${gap}px`,
-        '--logoloop-logoHeight': `${logoHeight}px`,
-        ...(fadeOutColor && { '--logoloop-fadeColor': fadeOutColor })
-      }),
+      () =>
+        ({
+          '--logoloop-gap': `${gap}px`,
+          '--logoloop-logoHeight': `${logoHeight}px`,
+          ...(fadeOutColor && { '--logoloop-fadeColor': fadeOutColor })
+        }) as CSSProperties,
       [gap, logoHeight, fadeOutColor]
     );
 
@@ -225,7 +283,7 @@ export const LogoLoop = memo(
     }, [effectiveHoverSpeed]);
 
     const renderLogoItem = useCallback(
-      (item, key) => {
+      (item: LogoLoopItem, key: string) => {
         if (renderItem) {
           return (
             <li className="logoloop__item" key={key} role="listitem">
@@ -292,15 +350,16 @@ export const LogoLoop = memo(
     );
 
     const containerStyle = useMemo(
-      () => ({
-        width: isVertical
-          ? toCssLength(width) === '100%'
-            ? undefined
-            : toCssLength(width)
-          : (toCssLength(width) ?? '100%'),
-        ...cssVariables,
-        ...style
-      }),
+      () =>
+        ({
+          width: isVertical
+            ? toCssLength(width) === '100%'
+              ? undefined
+              : toCssLength(width)
+            : (toCssLength(width) ?? '100%'),
+          ...cssVariables,
+          ...style
+        }) as CSSProperties,
       [width, cssVariables, style, isVertical]
     );
 
