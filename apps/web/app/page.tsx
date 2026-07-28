@@ -89,6 +89,7 @@ import DeviceSearchBox from "../components/DeviceSearchBox";
 import { useCart } from "../context/cart-context";
 import ProductImage from "../components/ProductImage";
 import { isOtherProduct } from "../lib/other-categories";
+import LogoLoop from "../components/LogoLoop";
 const Footer = dynamic(() => import("../components/Footer"));
 
 // ─── Promo Carousel Banner ───────────────────────────────────────────────────
@@ -148,7 +149,7 @@ function PromoCarouselBanner() {
 
   return (
     <section
-      className="w-full h-[80svh] lg:min-h-[75vh] bg-zinc-950 relative overflow-hidden flex flex-col justify-between pt-[120px] pb-8 lg:pt-[140px] lg:pb-12"
+      className="w-full h-[80svh] lg:min-h-[75vh] bg-zinc-950 relative overflow-hidden flex flex-col justify-between pt-[80px] pb-8 lg:pt-[100px] lg:pb-12"
     >
       {/* Background Images */}
       <div className="absolute inset-0 z-0">
@@ -366,41 +367,44 @@ function CategoryQuickNav() {
     return `${n}+ items`;
   };
 
-  return (
-    <section className="border-y border-zinc-200 dark:border-zinc-800 py-3 lg:py-4 bg-white dark:bg-zinc-950 overflow-hidden">
-      <div className="flex items-center overflow-hidden w-full relative">
-        <div className="flex items-center gap-6 lg:gap-10 animate-marquee whitespace-nowrap w-max hover:[animation-play-state:paused]" style={{ animationDirection: 'reverse' }}>
-          {[...categories, ...categories, ...categories, ...categories].map((c, index) => {
-            const count = formatCount(c.productCount);
-            const Icon = CATEGORY_ICONS[c.slug] ?? Package;
+  const logos = categories.map((c) => {
+    const count = formatCount(c.productCount);
+    const Icon = CATEGORY_ICONS[c.slug] ?? Package;
 
-            return (
-              <div key={`${c.id}-${index}`} className="flex items-center gap-6 lg:gap-10">
-                <Link
-                  href={`/shop/${c.slug}`}
-                  className="group flex items-center gap-3 lg:gap-4 cursor-pointer"
-                >
-                  <Icon className="h-6 w-6 lg:h-8 lg:w-8 text-accent drop-shadow-sm group-hover:scale-110 transition-transform duration-300" strokeWidth={2} />
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl lg:text-3xl font-black text-zinc-400 dark:text-zinc-600 group-hover:text-zinc-900 dark:group-hover:text-white uppercase tracking-tighter transition-colors duration-300">
-                      {c.displayName || c.name}
-                    </span>
-                    {count && (
-                      <span className="text-xs lg:text-sm font-bold text-accent/60 group-hover:text-accent transition-colors uppercase tracking-widest">
-                        {count}
-                      </span>
-                    )}
-                  </div>
-                </Link>
-                {/* Colorful minimal separator */}
-                <span className="text-2xl lg:text-3xl font-black text-accent/20">
-                  /
+    return {
+      ariaLabel: c.displayName || c.name,
+      node: (
+        <div className="flex items-center gap-6 lg:gap-10">
+          <Link href={`/shop/${c.slug}`} className="flex items-center gap-3 lg:gap-4 cursor-pointer">
+            <Icon className="h-6 w-6 lg:h-8 lg:w-8 text-accent drop-shadow-sm" strokeWidth={2} />
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl lg:text-3xl font-black text-zinc-400 dark:text-zinc-600 uppercase">
+                {c.displayName || c.name}
+              </span>
+              {count && (
+                <span className="text-xs lg:text-sm font-bold text-accent/60 uppercase tracking-widest">
+                  {count}
                 </span>
-              </div>
-            );
-          })}
+              )}
+            </div>
+          </Link>
+          {/* Colorful minimal separator */}
+          <span className="text-2xl lg:text-3xl font-black text-accent/20">/</span>
         </div>
-      </div>
+      ),
+    };
+  });
+
+  return (
+    <section className="border-y border-zinc-200 dark:border-zinc-800 py-1.5 lg:py-2 bg-white dark:bg-zinc-950 overflow-hidden">
+      <LogoLoop
+        logos={logos}
+        speed={90}
+        direction="right"
+        logoHeight={56}
+        gap={40}
+        ariaLabel="Shop by category"
+      />
     </section>
   );
 }
