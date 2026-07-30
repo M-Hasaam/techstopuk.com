@@ -5,7 +5,7 @@ import { StorageService } from '../../common/services/storage.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductPricingService } from '../product-pricing/product-pricing.service';
-import { evaluateActive }        from '../product-pricing/product-pricing.helpers';
+import { evaluateActive, computeTradeInOffer, round5 } from '../product-pricing/product-pricing.helpers';
 
 function slugify(text: string): string {
     return text
@@ -36,14 +36,25 @@ export class ProductsService {
         private readonly productPricing:  ProductPricingService,
     ) {}
 
-    private async presignAndFlatten(product: any) {
+    private async presignAndFlatten(
+        product: any,
+        tradeInConfig?: { tradeInRatio: number; tradeInMargin: number },
+    ) {
         const images = await Promise.all(
             (product.images as string[]).map((img: string) => this.storage.resolveImageUrl(img)),
         );
         const { catalog, otherBrand, otherSubcategory, ...rest } = product;
 
+        // What we'd offer a customer trading in this exact model/condition — same
+        // formula as the trade-in wizard's anchor, driven off this product's own resale price.
+        const cfg = tradeInConfig ?? await this.productPricing.getTradeInFormulaConfig();
+        const tradeInPrice = rest.price && rest.price > 0
+            ? round5(computeTradeInOffer(rest.price, cfg.tradeInRatio) * (1 - cfg.tradeInMargin / 100))
+            : null;
+
         return {
             ...rest,
+            tradeInPrice,
             images: images.filter(Boolean) as string[],
             brand:    catalog?.brandCategory?.brand?.name    ?? otherBrand?.name       ?? '',
             model:    catalog?.model                          ?? '',
@@ -231,7 +242,8 @@ export class ProductsService {
             this.prisma.product.count({ where }),
         ]);
 
-        const items = await Promise.all(rawItems.map(p => this.presignAndFlatten(p)));
+        const tradeInConfig = await this.productPricing.getTradeInFormulaConfig();
+        const items = await Promise.all(rawItems.map(p => this.presignAndFlatten(p, tradeInConfig)));
         return { items, total, page, limit: safeLimit, pages: Math.ceil(total / safeLimit) };
     }
 

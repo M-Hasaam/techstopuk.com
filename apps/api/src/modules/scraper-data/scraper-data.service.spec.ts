@@ -20,6 +20,10 @@ describe('ScraperDataService', () => {
             },
             deviceCatalog: { findMany: jest.fn<() => Promise<any>>().mockResolvedValue([]) },
             product: { findMany: jest.fn<() => Promise<any>>().mockResolvedValue([]) },
+            pricingConfig: {
+                findUnique: jest.fn<() => Promise<any>>().mockResolvedValue(null),
+                upsert: jest.fn<() => Promise<any>>().mockResolvedValue({}),
+            },
         };
 
         const module: TestingModule = await Test.createTestingModule({

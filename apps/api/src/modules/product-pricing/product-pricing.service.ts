@@ -240,6 +240,14 @@ export class ProductPricingService {
         return null;
     }
 
+    async getTradeInFormulaConfig(): Promise<{ tradeInRatio: number; tradeInMargin: number }> {
+        const configs = await this.getAllConfigs();
+        return {
+            tradeInRatio:  configs['tradein_ratio']      ?? 0.5,
+            tradeInMargin: configs['tradein_margin_pct'] ?? 0,
+        };
+    }
+
     async getFlaggedProducts() {
         return this.prisma.product.findMany({
             where:   { pricingStatus: 'flagged' },

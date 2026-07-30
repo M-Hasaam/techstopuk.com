@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Query, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Query, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { IsInt, Min } from 'class-validator';
 import { ScraperDataService } from './scraper-data.service';
 import { ScraperCronService } from '../scraper-cron/scraper-cron.service';
@@ -8,6 +8,10 @@ import { Roles } from '../../common/decorators/roles.decorator';
 
 class SetScheduleDto {
     @IsInt() @Min(0) hours!: number;
+}
+
+class SetThresholdDto {
+    @IsInt() @Min(1) hours!: number;
 }
 
 @Controller('scraper')
@@ -72,6 +76,22 @@ export class ScraperDataController {
     @HttpCode(HttpStatus.OK)
     cleanup(@Query('force') force?: string) {
         return this.service.cleanupStuckRuns(force === 'true');
+    }
+
+    @Delete('purge')
+    purgeAll() {
+        return this.service.purgeAll();
+    }
+
+    @Get('stuck-threshold')
+    getStuckThreshold() {
+        return this.service.getStuckThresholdHours();
+    }
+
+    @Post('stuck-threshold')
+    @HttpCode(HttpStatus.OK)
+    setStuckThreshold(@Body() body: SetThresholdDto) {
+        return this.service.setStuckThresholdHours(Number(body.hours));
     }
 
     @Get('schedule')

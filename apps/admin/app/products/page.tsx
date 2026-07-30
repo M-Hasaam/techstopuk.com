@@ -494,6 +494,7 @@ export default function ProductsPage() {
                 <th className="text-left px-4 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Category</th>
                 <th className="text-left px-4 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Condition</th>
                 <th className="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Price</th>
+                <th className="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400 whitespace-nowrap">Trade-in</th>
                 <th className="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-zinc-400">Stock</th>
                 <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-zinc-400">Status</th>
                 <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-zinc-400">Active</th>
@@ -529,6 +530,9 @@ export default function ProductsPage() {
                   <td className="px-4 py-4 text-right font-bold font-mono">
                     {p.price != null ? `£${p.price}` : <span className="text-zinc-400 italic text-xs font-normal">No price</span>}
                     {p.comparePrice && <span className="text-zinc-300 line-through ml-2 text-xs">£{p.comparePrice}</span>}
+                  </td>
+                  <td className="px-4 py-4 text-right font-bold font-mono text-zinc-500">
+                    {p.tradeInPrice != null ? `£${p.tradeInPrice}` : <span className="text-zinc-300 italic text-xs font-normal">—</span>}
                   </td>
                   <td className={`px-4 py-4 text-right font-bold font-mono ${p.stock === 0 ? "text-red-500" : p.stock <= 2 ? "text-amber-500" : ""}`}>
                     {p.stock}

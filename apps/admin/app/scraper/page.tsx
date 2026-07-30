@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { scraperApi, healthApi, type ScrapedPriceRow, type ScraperStats, type ScraperRun } from "../../lib/api";
-import { Play, RefreshCw, Search, TrendingUp, CheckCircle2, AlertCircle, Clock, XCircle, Loader2, Zap } from "lucide-react";
+import { Play, RefreshCw, Search, TrendingUp, CheckCircle2, AlertCircle, AlertTriangle, Clock, XCircle, Loader2, Zap, Trash2 } from "lucide-react";
 
 function fmt(v: number | null) {
   return v !== null ? `£${v.toFixed(0)}` : <span className="text-zinc-300">—</span>;
@@ -84,6 +84,7 @@ export default function ScraperPage() {
   const [refreshingTable, setRefreshingTable] = useState(false);
   const tableHasData = useRef(false);
   const prevRunsRef  = useRef<ScraperRun[]>([]);
+  const prevStatsTotalRef = useRef<number | null>(null);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState("");
   const [stopping, setStopping] = useState(false);
@@ -93,12 +94,22 @@ export default function ScraperPage() {
   const scrapeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanMsg, setCleanMsg] = useState("");
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false);
+  const [purgeInput, setPurgeInput] = useState("");
+  const [purging, setPurging] = useState(false);
+  const [purgeError, setPurgeError] = useState("");
+  const [purgeMsg, setPurgeMsg] = useState("");
   const [serviceOnline, setServiceOnline] = useState<boolean | null>(null);
   const [scheduleHours, setScheduleHours] = useState<number | null>(null);
   const [scheduleInputVal, setScheduleInputVal] = useState("1");
   const [scheduleUnit, setScheduleUnit] = useState<"hours" | "days" | "weeks">("hours");
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [scheduleMsg, setScheduleMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [stuckThresholdHours, setStuckThresholdHours] = useState<number | null>(null);
+  const [thresholdInputVal, setThresholdInputVal] = useState("3");
+  const [thresholdUnit, setThresholdUnit] = useState<"hours" | "days" | "weeks">("hours");
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [thresholdMsg, setThresholdMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const loadStats = useCallback(() => {
     scraperApi.stats().then(setStats).catch(() => {});
@@ -112,6 +123,15 @@ export default function ScraperPage() {
         setScheduleInputVal(val);
         setScheduleUnit(unit);
       }
+    }).catch(() => {});
+  }, []);
+
+  const loadStuckThreshold = useCallback(() => {
+    scraperApi.getStuckThreshold().then(r => {
+      setStuckThresholdHours(r.hours);
+      const { val, unit } = hoursToForm(r.hours);
+      setThresholdInputVal(val);
+      setThresholdUnit(unit);
     }).catch(() => {});
   }, []);
 
@@ -146,7 +166,8 @@ export default function ScraperPage() {
     loadStats();
     loadRuns();
     loadSchedule();
-  }, [loadStats, loadRuns, loadSchedule, router]);
+    loadStuckThreshold();
+  }, [loadStats, loadRuns, loadSchedule, loadStuckThreshold, router]);
 
   // One-shot health check on mount so serviceOnline resolves immediately
   // rather than waiting up to 15s for the first poll tick.
@@ -160,6 +181,17 @@ export default function ScraperPage() {
     loadPrices();
   }, [loadPrices]);
 
+  // Clearing the search box (backspace/select-all-delete) should drop the active filter
+  // immediately — otherwise the committed `search` term stays applied to the table even
+  // though the input looks empty, and the stats above (which ignore `search`) stop matching
+  // what the table shows.
+  useEffect(() => {
+    if (searchInput === "" && search !== "") {
+      setSearch("");
+      setCatalogPage(1);
+    }
+  }, [searchInput, search]);
+
   // Detect full-run completion → refresh the price table exactly once.
   // This avoids calling loadPrices() on every poll tick (which re-fetches
   // 2000 rows and causes the whole table to re-render/flicker).
@@ -172,6 +204,19 @@ export default function ScraperPage() {
     }
     prevRunsRef.current = runs;
   }, [runs, loadPrices]);
+
+  // Stats poll every 8-15s regardless of whether a tracked run is active — e.g. rows
+  // scraped one at a time via the per-row "Scrape" button, or scraped from another
+  // tab/cron trigger, bump stats.total without ever setting a RUNNING ScraperRun row,
+  // so the run-completion effect above never fires. Without this, the table can sit
+  // stale indefinitely while the stats cards above (which poll independently) move on.
+  useEffect(() => {
+    if (!SCRAPER_ENABLED || !stats) return;
+    if (prevStatsTotalRef.current !== null && stats.total !== prevStatsTotalRef.current) {
+      loadPrices();
+    }
+    prevStatsTotalRef.current = stats.total;
+  }, [stats, loadPrices]);
 
   // Auto-poll: 8s while a run is active, 15s when idle (fast enough to feel
   // real-time without hammering the server).
@@ -244,6 +289,26 @@ export default function ScraperPage() {
     }
   }
 
+  async function handlePurgeAll() {
+    setPurging(true);
+    setPurgeError("");
+    try {
+      const res = await scraperApi.purgeAll();
+      setShowPurgeConfirm(false);
+      setPurgeInput("");
+      setAllRows([]);
+      setCatalogPage(1);
+      setPurgeMsg(`Cleared ${res.deletedPrices} price${res.deletedPrices !== 1 ? "s" : ""} and ${res.deletedRuns} run${res.deletedRuns !== 1 ? "s" : ""}.`);
+      loadStats();
+      loadRuns();
+      setTimeout(() => setPurgeMsg(""), 6000);
+    } catch (e: any) {
+      setPurgeError(e.message ?? "Failed to clear scraper data.");
+    } finally {
+      setPurging(false);
+    }
+  }
+
   async function handleSaveSchedule(hoursOverride?: number) {
     const hours = hoursOverride ?? formToHours(scheduleInputVal, scheduleUnit);
     setSavingSchedule(true);
@@ -260,6 +325,22 @@ export default function ScraperPage() {
     } finally {
       setSavingSchedule(false);
       setTimeout(() => setScheduleMsg(null), 4000);
+    }
+  }
+
+  async function handleSaveThreshold() {
+    const hours = formToHours(thresholdInputVal, thresholdUnit);
+    setSavingThreshold(true);
+    setThresholdMsg(null);
+    try {
+      await scraperApi.setStuckThreshold(hours);
+      setStuckThresholdHours(hours);
+      setThresholdMsg({ ok: true, text: `Saved — runs older than ${humanizeHours(hours)} are considered stuck.` });
+    } catch (e: any) {
+      setThresholdMsg({ ok: false, text: e.message ?? "Failed to save threshold." });
+    } finally {
+      setSavingThreshold(false);
+      setTimeout(() => setThresholdMsg(null), 4000);
     }
   }
 
@@ -365,8 +446,11 @@ export default function ScraperPage() {
     ? Math.round((stats.withMarketPrice / stats.total) * 100)
     : 0;
 
-  const catalogRows = allRows.filter(r => r.storage !== "");
-  const otherRows   = allRows.filter(r => r.storage === "");
+  // isOther is deviceKey-based (computed server-side) — storage can't be used to split:
+  // several real catalog devices (controllers, AirPods, headphones) have no storage
+  // variants, so their rows also carry storage: '', identical in shape to an "other" row.
+  const catalogRows = allRows.filter(r => !r.isOther);
+  const otherRows   = allRows.filter(r => r.isOther);
   const catalogPages = Math.max(1, Math.ceil(catalogRows.length / CATALOG_PAGE_SIZE));
   const pagedCatalog = catalogRows.slice((catalogPage - 1) * CATALOG_PAGE_SIZE, catalogPage * CATALOG_PAGE_SIZE);
 
@@ -506,6 +590,16 @@ export default function ScraperPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Clear all scraped data — blocked while a run is active to avoid confusing an in-flight scrape */}
+          <button
+            onClick={() => setShowPurgeConfirm(true)}
+            disabled={isRunActive}
+            title={isRunActive ? "Stop the active run before clearing data" : "Delete all scraped prices and run history"}
+            className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-zinc-200 text-zinc-500 text-sm font-bold hover:border-red-200 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="h-4 w-4" /> Clear Data
+          </button>
+
           {/* Stop button — only while genuinely running (not stalled — service is offline) */}
           {isRunActive && !isStalled && (
             <button
@@ -554,6 +648,13 @@ export default function ScraperPage() {
           {runMsg.toLowerCase().includes("fail") ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
           {runMsg}
           {!runMsg.toLowerCase().includes("fail") && <span className="font-normal text-emerald-600 ml-1">— prices will update in the background.</span>}
+        </div>
+      )}
+
+      {/* Purge message toast */}
+      {purgeMsg && (
+        <div className="flex items-center gap-3 rounded-2xl px-5 py-3 text-sm font-bold bg-emerald-50 border border-emerald-100 text-emerald-700">
+          <CheckCircle2 className="h-4 w-4 shrink-0" /> {purgeMsg}
         </div>
       )}
 
@@ -631,10 +732,66 @@ export default function ScraperPage() {
         </div>
       </div>
 
+      {/* Stuck Run Threshold */}
+      <div className="bg-white rounded-3xl border border-zinc-100 shadow-sm p-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="font-bold text-base">Stuck Run Threshold</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">How long a run can go without finishing before it's offered up to mark as failed</p>
+          </div>
+          {stuckThresholdHours !== null && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {humanizeHours(stuckThresholdHours)}
+            </span>
+          )}
+        </div>
+
+        <div className="mt-5 flex items-center gap-3 flex-wrap">
+          <span className="text-sm font-medium text-zinc-500 shrink-0">Consider stuck after</span>
+
+          <input
+            type="number"
+            min="1"
+            value={thresholdInputVal}
+            onChange={e => setThresholdInputVal(e.target.value)}
+            className="w-20 h-10 px-3 rounded-xl border-2 border-zinc-200 text-sm font-bold outline-none focus:border-amber-500 transition-colors text-center"
+          />
+
+          <select
+            value={thresholdUnit}
+            onChange={e => setThresholdUnit(e.target.value as "hours" | "days" | "weeks")}
+            className="h-10 px-3 pr-8 rounded-xl border-2 border-zinc-200 text-sm font-bold outline-none focus:border-amber-500 transition-colors bg-white appearance-none cursor-pointer"
+          >
+            <option value="hours">Hours</option>
+            <option value="days">Days</option>
+            <option value="weeks">Weeks</option>
+          </select>
+
+          <button
+            onClick={handleSaveThreshold}
+            disabled={savingThreshold}
+            className="h-10 px-5 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-colors disabled:opacity-60 flex items-center gap-2"
+          >
+            {savingThreshold ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Save
+          </button>
+
+          {thresholdMsg && (
+            <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl ${
+              thresholdMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+            }`}>
+              {thresholdMsg.ok ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertCircle className="h-3.5 w-3.5" />}
+              {thresholdMsg.text}
+            </span>
+          )}
+        </div>
+      </div>
+
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          <StatCard label="Total devices" value={stats.total} />
+          <StatCard label="Total devices" value={stats.total} sub={`${stats.catalog.total} catalog + ${stats.others.total} other`} />
           <StatCard label="With market price" value={stats.withMarketPrice} sub={`${coverage}% coverage`} />
           <StatCard label="CeX" value={stats.withCex} sub={`${stats.total ? Math.round(stats.withCex / stats.total * 100) : 0}%`} />
           <StatCard label="Envirofone" value={stats.withEnvirofone ?? 0} sub={`${stats.total ? Math.round((stats.withEnvirofone ?? 0) / stats.total * 100) : 0}%`} />
@@ -643,6 +800,45 @@ export default function ScraperPage() {
             value={stats.lastScrapedAt ? new Date(stats.lastScrapedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : "Never"}
             sub={stats.lastScrapedAt ? new Date(stats.lastScrapedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : undefined}
           />
+        </div>
+      )}
+
+      {/* Stats — catalog vs other breakdown */}
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {([
+            { label: "Catalog Devices", sub: "Phones, tablets, laptops & consoles", group: stats.catalog },
+            { label: "Other Products", sub: "Accessories, cables, games & more", group: stats.others },
+          ] as const).map(({ label, sub, group }) => (
+            <div key={label} className="bg-white rounded-2xl border border-zinc-100 shadow-sm p-5">
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">{label}</p>
+              <p className="text-[11px] text-zinc-400 mb-3">{sub}</p>
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <p className="text-xl font-bold tracking-tight">{group.total}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Total</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold tracking-tight">{group.withMarketPrice}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Priced · {group.total ? Math.round(group.withMarketPrice / group.total * 100) : 0}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold tracking-tight">{group.withCex}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    CeX · {group.total ? Math.round(group.withCex / group.total * 100) : 0}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold tracking-tight">{group.withEnvirofone}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                    Envirofone · {group.total ? Math.round(group.withEnvirofone / group.total * 100) : 0}%
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -671,13 +867,22 @@ export default function ScraperPage() {
               <span className="text-xs font-bold text-zinc-500">{stopMsg}</span>
             )}
             {(() => {
-              const oneHourAgo = Date.now() - 60 * 60 * 1000;
-              const oldStuckCount = runs.filter(r => r.status === "RUNNING" && new Date(r.startedAt).getTime() < oneHourAgo).length;
-              // Show immediately if stalled (service offline), otherwise only after 1h
+              // Mirrors the admin-configurable "Stuck Run Threshold" setting above —
+              // falls back to 3h if it hasn't loaded yet, matching the backend default.
+              const thresholdMs = (stuckThresholdHours ?? 3) * 60 * 60 * 1000;
+              const thresholdAgo = Date.now() - thresholdMs;
+              const oldStuckCount = runs.filter(r => r.status === "RUNNING" && new Date(r.startedAt).getTime() < thresholdAgo).length;
+              // Show immediately if stalled (service offline), otherwise only once genuinely old
               const showCleanup = isStalled || oldStuckCount > 0;
               const isForce = isStalled;
+              const handleClick = () => {
+                const warning = isForce
+                  ? `Mark ${oldStuckCount || "the"} run(s) as failed? The scraper service is offline, so this just clears the stuck record — it won't stop anything real.`
+                  : `Mark ${oldStuckCount} run(s) as failed?\n\nThis only updates the record — if the scraper is actually still working, it'll keep running in the background with no way to track its progress here. Only do this if you're sure it's genuinely abandoned (e.g. the service crashed).`;
+                if (window.confirm(warning)) handleCleanup(isForce);
+              };
               return showCleanup ? (
-                <button onClick={() => handleCleanup(isForce)} disabled={cleaning}
+                <button onClick={handleClick} disabled={cleaning}
                   className="flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl hover:bg-amber-100 transition-colors disabled:opacity-50">
                   <AlertCircle className="h-3.5 w-3.5" />
                   {cleaning ? "Cleaning…" : isStalled ? "Clear stuck run" : `${oldStuckCount} stuck — fix`}
@@ -872,6 +1077,46 @@ export default function ScraperPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Clear Data confirm */}
+      {showPurgeConfirm && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 w-full max-w-sm shadow-2xl">
+            <div className="h-14 w-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto mb-5">
+              <AlertTriangle className="h-6 w-6 text-red-500" />
+            </div>
+            <h3 className="font-bold text-lg mb-1 text-center">Clear all scraper data?</h3>
+            <p className="text-sm text-zinc-500 mb-5 text-center">
+              This permanently deletes every scraped price and past run record. This cannot be undone —
+              you&apos;ll need to run the scraper again to repopulate prices.
+            </p>
+            <p className="text-xs font-bold text-zinc-500 mb-2">Type <span className="font-mono bg-zinc-100 px-1.5 py-0.5 rounded">delete all</span> to confirm</p>
+            <input
+              type="text"
+              value={purgeInput}
+              onChange={e => { setPurgeInput(e.target.value); setPurgeError(""); }}
+              placeholder="delete all"
+              className="w-full h-11 rounded-xl border-2 border-zinc-200 px-4 text-sm font-medium outline-none focus:border-red-400 transition-colors mb-4"
+            />
+            {purgeError && <p className="text-xs text-red-600 font-medium mb-3 text-center">{purgeError}</p>}
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowPurgeConfirm(false); setPurgeInput(""); setPurgeError(""); }}
+                className="flex-1 h-11 rounded-2xl border-2 border-zinc-200 font-bold text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePurgeAll}
+                disabled={purgeInput !== "delete all" || purging}
+                className="flex-1 h-11 rounded-2xl bg-red-500 text-white font-bold text-sm hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {purging ? "Clearing…" : "Clear Data"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -258,6 +258,14 @@ export interface ScrapedPriceRow {
   envirofonePrice: number | null;
   marketPrice: number | null;
   scrapedAt: string;
+  isOther?: boolean;
+}
+
+export interface ScraperGroupStats {
+  total: number;
+  withMarketPrice: number;
+  withCex: number;
+  withEnvirofone: number;
 }
 
 export interface ScraperStats {
@@ -268,6 +276,8 @@ export interface ScraperStats {
   withMM: number;
   withEnvirofone: number;
   lastScrapedAt: string | null;
+  catalog: ScraperGroupStats;
+  others: ScraperGroupStats;
 }
 
 export interface ScraperRun {
@@ -343,10 +353,17 @@ export const scraperApi = {
 
   cleanup: (force = false) => apiFetch<{ cleaned: number }>(`/scraper/cleanup${force ? '?force=true' : ''}`, { method: 'POST' }),
 
+  purgeAll: () => apiFetch<{ deletedPrices: number; deletedRuns: number }>('/scraper/purge', { method: 'DELETE' }),
+
   getSchedule: () => apiFetch<{ hours: number }>('/scraper/schedule'),
 
   setSchedule: (hours: number) =>
     apiFetch<{ hours: number }>('/scraper/schedule', { method: 'POST', body: JSON.stringify({ hours }) }),
+
+  getStuckThreshold: () => apiFetch<{ hours: number }>('/scraper/stuck-threshold'),
+
+  setStuckThreshold: (hours: number) =>
+    apiFetch<{ hours: number }>('/scraper/stuck-threshold', { method: 'POST', body: JSON.stringify({ hours }) }),
 };
 
 // ── Product Pricing ───────────────────────────────────────────────────────────
@@ -624,6 +641,7 @@ export interface Product {
   storage: string;
   price: number | null;
   comparePrice?: number;
+  tradeInPrice?: number | null;
   stock: number;
   images: string[];
   rawImages?: string[];
