@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Query, HttpCode, HttpStatus, ConflictException } from '@nestjs/common';
 import { ScraperService } from './scraper.service.js';
 
 @Controller('scraper')
@@ -12,8 +12,19 @@ export class ScraperController {
         const limitNum = limit ? Number(limit) : undefined;
 
         if (isSync) {
-            const results = await this.scraperService.runScraper(limitNum);
-            return { message: 'Scraper finished (synchronous).', results };
+            try {
+                const results = await this.scraperService.runScraper(limitNum);
+                return { message: 'Scraper finished (synchronous).', results };
+            } catch (err: any) {
+                if (err?.message === 'A scraper run is already in progress.') {
+                    throw new ConflictException(err.message);
+                }
+                throw err;
+            }
+        }
+
+        if (this.scraperService.isBusy()) {
+            throw new ConflictException('A scraper run is already in progress.');
         }
 
         this.scraperService.runScraper(limitNum).catch(err => {

@@ -60,6 +60,7 @@ const PROXY_ROTATE_EVERY = Number(process.env.SCRAPER_PROXY_ROTATE_EVERY) || 25;
 export class ScraperService implements OnApplicationBootstrap {
     private readonly logger = new Logger(ScraperService.name);
     private stopRequested = false;
+    private isRunning = false;
 
     constructor(
         private readonly prisma: PrismaService,
@@ -93,6 +94,11 @@ export class ScraperService implements OnApplicationBootstrap {
         this.logger.log(`Rotating context/proxy (${reason})…`);
         await context.close();
         return this.openContext(browser);
+    }
+
+    /** Whether a scraper run (fresh or auto-resumed) is currently in progress. */
+    isBusy(): boolean {
+        return this.isRunning;
     }
 
     /** Signal the running scraper to stop after the current device finishes. */
@@ -172,6 +178,22 @@ export class ScraperService implements OnApplicationBootstrap {
     }
 
     async runScraper(limit?: number, skipKeys?: Set<string>): Promise<Record<string, DevicePrices>> {
+        // A resumed run (from onApplicationBootstrap) keeps executing this same loop in the
+        // background — without this guard, a manually-triggered run overlaps it and both hammer
+        // CeX/Envirofone concurrently, which is what causes a flood of Algolia timeouts.
+        if (this.isRunning) {
+            this.logger.warn('runScraper() called while a run is already in progress — ignoring.');
+            throw new Error('A scraper run is already in progress.');
+        }
+        this.isRunning = true;
+        try {
+            return await this.runScraperImpl(limit, skipKeys);
+        } finally {
+            this.isRunning = false;
+        }
+    }
+
+    private async runScraperImpl(limit?: number, skipKeys?: Set<string>): Promise<Record<string, DevicePrices>> {
         const isResume = skipKeys && skipKeys.size > 0;
         this.logger.log(isResume
             ? `Resuming scraper — skipping ${skipKeys!.size} already-done devices…`
@@ -287,10 +309,10 @@ export class ScraperService implements OnApplicationBootstrap {
 
                 const num = `[${String(i + 1).padStart(2, '0')}/${String(total).padStart(2, '0')}]`;
 
-                let cex = await this.scrapeCeX(context, item.brand, item.model, item.storage);
+                let cex = await this.scrapeCeX(context, item.brand, item.model, item.storage, !item.cexOnly);
                 if (!cex && item.storage) {
                     await this.delay(500);
-                    cex = await this.scrapeCeX(context, item.brand, item.model, '');
+                    cex = await this.scrapeCeX(context, item.brand, item.model, '', !item.cexOnly);
                 }
                 await this.delay(500);
                 const ref = cex?.sellPrice ?? undefined;
@@ -386,9 +408,20 @@ export class ScraperService implements OnApplicationBootstrap {
     // ─── CeX (Playwright + Algolia interception) ──────────────────────────────
     // CeX loads search results from Algolia (search.webuy.io). By intercepting
     // that network response we get clean JSON with all prices — no HTML parsing.
-    private async scrapeCeX(context: BrowserContext, brand: string, model: string, storage: string): Promise<CompetitorPrices | null> {
+    private async scrapeCeX(
+        context: BrowserContext, brand: string, model: string, storage: string,
+        isMainDevice = true,
+    ): Promise<CompetitorPrices | null> {
         // CeX uses "Plus" not "+": "Galaxy S24+" → "Galaxy S24 Plus"
-        const normModel = model.replace(/\+/g, 'Plus');
+        // CeX (like Sony) has no listing called "Disc Edition" — only the no-drive
+        // "Digital Edition" gets a qualifier; the base console is just "PlayStation 5".
+        // Searching/matching "Disc Edition" literally only surfaces unrelated
+        // aftermarket "Disc Edition Covers" accessories, never the actual console.
+        const normModel = model
+            .replace(/\+/g, 'Plus')
+            .replace(/\bdisc edition\b/gi, '')
+            .replace(/\s+/g, ' ')
+            .trim();
         const query = [brand, normModel, storage].filter(Boolean).join(' ');
         const page = await context.newPage();
         try {
@@ -406,7 +439,22 @@ export class ScraperService implements OnApplicationBootstrap {
                 return json?.results?.[0]?.hits ?? [];
             };
 
-            let hits = await fetchHits(query);
+            // CeX/Algolia intermittently just doesn't respond within the timeout — not
+            // a "no results" case, so the simplified-query fallback below (which only
+            // triggers on an empty hit array) never gets a chance to run. One retry
+            // catches most of these transient stalls before we give up on the device.
+            const fetchHitsWithRetry = async (q: string): Promise<any[]> => {
+                try {
+                    return await fetchHits(q);
+                } catch (e: any) {
+                    const isTimeout = e.name === 'TimeoutError' || e.message?.includes('Timeout');
+                    if (!isTimeout) throw e;
+                    await this.delay(1500);
+                    return fetchHits(q);
+                }
+            };
+
+            let hits = await fetchHitsWithRetry(query);
 
             // Retry with a simplified query when Algolia returns nothing.
             // Strips words CeX commonly omits: connectivity ("5G","4G"), "Edition", "Wireless".
@@ -424,13 +472,23 @@ export class ScraperService implements OnApplicationBootstrap {
             if (hits.length === 0) return null;
 
             // ── Matching ───────────────────────────────────────────────────────
-            const modelL  = model.toLowerCase();
+            // Use normModel (not the raw catalog model) so "Disc Edition" is already
+            // stripped here too — otherwise "disc" would stay a required word and
+            // reject the real console listing just like it rejected the search above.
+            const modelL  = normModel.toLowerCase();
             const storageN = (storage ?? '').toLowerCase().replace(/\s+/g, '');
 
-            // Normalize model: strip parens, "+" → "plus", collapse spaces
+            // Normalize model: drop a bare release year in parens e.g. "(2020)" — CeX
+            // identifies MacBooks by Apple's internal model number, not release year, so
+            // keeping "2020" as a required word would reject every real match. Strip
+            // remaining parens, "+" → "plus", "11-inch"/"11 inch" → "11" (CeX box names
+            // use bare `11"` — literal "inch" never appears), collapse spaces.
             const modelN = modelL
+                .replace(/\(\d{4}\)/g, '')
                 .replace(/\+/g, 'plus')
                 .replace(/[()]/g, '')
+                .replace(/(\d)-inch\b/gi, '$1')
+                .replace(/\binch\b/gi, '')
                 .replace(/\s+/g, ' ')
                 .trim();
 
@@ -438,8 +496,26 @@ export class ScraperService implements OnApplicationBootstrap {
             const OPTIONAL = new Set(['5g', '4g', 'lte', 'wireless', 'edition']);
 
             // Words that differentiate product tiers — reject a CeX result that
-            // has one of these UNLESS our model also contains it.
-            const TIER_WORDS = new Set(['ultra', 'plus', 'max', 'mini', 'lite', 'fe', 'air', 'slim', 'pro']);
+            // has one of these UNLESS our model also contains it. "digital" catches
+            // PS5 Digital Edition — since "Disc Edition" is stripped to a bare
+            // "PlayStation 5" above, without this a Digital Edition console (cheaper,
+            // no disc drive) could tie/outscore the real disc-drive console it should match.
+            const TIER_WORDS = new Set(['ultra', 'plus', 'max', 'mini', 'lite', 'fe', 'air', 'slim', 'pro', 'digital']);
+
+            // Generic guard against matching an accessory *for* the device instead of the
+            // device itself (the PS5 "Disc Edition Covers" incident, generalized) — a phone
+            // case, tempered glass, charging cable etc. can otherwise pass the required-word
+            // check just by having the brand/model in its title. Skipped for isMainDevice=false
+            // (the "Other Products" catalog, e.g. "Xbox Wireless Controller"), since those
+            // entries genuinely ARE accessories and would always false-positive here.
+            const ACCESSORY_WORDS = new Set([
+                'case', 'cover', 'skin', 'sleeve', 'pouch', 'bag',
+                'protector', 'tempered',
+                'dock', 'stand', 'mount', 'holder',
+                'charger', 'charging', 'cable', 'adapter',
+                'strap', 'faceplate', 'lens',
+                'warranty', 'insurance', 'subscription', 'membership',
+            ]);
 
             const modelWords    = modelN.split(/\s+/).filter(w => w.length > 1);
             const requiredWords = modelWords.filter(w => !OPTIONAL.has(w));
@@ -448,7 +524,10 @@ export class ScraperService implements OnApplicationBootstrap {
             const score = (h: any): number => {
                 const raw   = (h.boxName ?? '').toLowerCase();
                 const nameN = raw.replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
-                const nameWords = new Set(nameN.split(/\s+/));
+                // Strip punctuation stuck to each token (CeX names read like "...Case, Black" —
+                // without this, "case," never equals "case" and the whole-word checks below
+                // silently never match anything that isn't followed by whitespace).
+                const nameWords = new Set(nameN.split(/\s+/).map((w: string) => w.replace(/[^a-z0-9]/g, '')));
 
                 // Every required word must appear somewhere in the CeX name
                 if (!requiredWords.every(w => nameN.includes(w))) return -999;
@@ -457,6 +536,12 @@ export class ScraperService implements OnApplicationBootstrap {
                 // e.g. searching "Galaxy S21" must not match "Galaxy S21 Ultra"
                 const unexpectedTier = [...TIER_WORDS].some(t => nameWords.has(t) && !modelWordSet.has(t));
                 if (unexpectedTier) return -999;
+
+                // Reject accessories-for-the-device when we're matching the device itself
+                if (isMainDevice) {
+                    const isAccessory = [...ACCESSORY_WORDS].some(w => nameWords.has(w) && !modelWordSet.has(w));
+                    if (isAccessory) return -999;
+                }
 
                 const nameFlat = raw.replace(/\s+/g, '');
                 return (storageN && nameFlat.includes(storageN) ? 2 : 0)
@@ -569,10 +654,10 @@ export class ScraperService implements OnApplicationBootstrap {
                 const fullName = storage ? `${brand} ${model} ${storage}` : `${brand} ${model}`;
                 this.logger.log(`  → ${fullName}`);
 
-                let cex = await this.scrapeCeX(context, brand, model, storage);
+                let cex = await this.scrapeCeX(context, brand, model, storage, !!device);
                 if (!cex && storage) {
                     await this.delay(500);
-                    cex = await this.scrapeCeX(context, brand, model, '');
+                    cex = await this.scrapeCeX(context, brand, model, '', !!device);
                 }
                 await this.delay(500);
                 const ref2 = cex?.sellPrice ?? undefined;
