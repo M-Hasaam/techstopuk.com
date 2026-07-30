@@ -68,7 +68,7 @@ export default function DeviceSearchBox({
         const dbModels: TradeInModel[] = items.map(item => ({
           name:     item.name,
           brand:    item.brand,
-          category: item.category, // already stored as wizard category ID (Phone, Tablet, etc.)
+          category: CAT_NAME_TO_ID[item.category] ?? item.category,
         }));
 
         // Merge: DB models first, then any static models not already in the DB
