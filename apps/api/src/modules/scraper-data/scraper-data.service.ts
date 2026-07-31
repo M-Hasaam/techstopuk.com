@@ -1,11 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { ScraperCronService } from '../scraper-cron/scraper-cron.service';
 
 @Injectable()
 export class ScraperDataService {
     private readonly logger = new Logger(ScraperDataService.name);
 
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(
+        private readonly prisma: PrismaService,
+        @Inject(forwardRef(() => ScraperCronService))
+        private readonly cron: ScraperCronService,
+    ) {}
 
     /**
      * "Other" scraped rows (accessories, games, etc.) are keyed as `${otherBrand.name} ${product.name}`
@@ -203,6 +208,7 @@ export class ScraperDataService {
                 await this.cleanupStuckRuns(true);
                 return { ok: false, message: `Scraper service returned ${res.status}. Check scraper logs.` };
             }
+            this.cron.notifyManualRunTriggered();
             return { ok: true, message: 'Scraper started in the background.' };
         } catch (err: any) {
             const isTimeout = err?.name === 'TimeoutError';

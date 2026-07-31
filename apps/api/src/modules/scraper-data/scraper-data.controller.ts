@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Delete, Query, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { IsInt, Min } from 'class-validator';
+import { IsInt, IsBoolean, Min } from 'class-validator';
 import { ScraperDataService } from './scraper-data.service';
 import { ScraperCronService } from '../scraper-cron/scraper-cron.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -12,6 +12,10 @@ class SetScheduleDto {
 
 class SetThresholdDto {
     @IsInt() @Min(1) hours!: number;
+}
+
+class SetAutoPriceDto {
+    @IsBoolean() enabled!: boolean;
 }
 
 @Controller('scraper')
@@ -103,5 +107,16 @@ export class ScraperDataController {
     @HttpCode(HttpStatus.OK)
     setSchedule(@Body() body: SetScheduleDto) {
         return this.cron.setSchedule(Number(body.hours));
+    }
+
+    @Get('auto-price')
+    getAutoPrice() {
+        return this.cron.getAutoPriceAfterScrape();
+    }
+
+    @Post('auto-price')
+    @HttpCode(HttpStatus.OK)
+    setAutoPrice(@Body() body: SetAutoPriceDto) {
+        return this.cron.setAutoPriceAfterScrape(body.enabled);
     }
 }

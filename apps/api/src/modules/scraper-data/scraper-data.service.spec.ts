@@ -2,13 +2,19 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { ScraperDataService } from './scraper-data.service';
 import { PrismaService } from '../database/prisma.service';
+import { ScraperCronService } from '../scraper-cron/scraper-cron.service';
 
 describe('ScraperDataService', () => {
     let service: ScraperDataService;
     let prismaMock: any;
+    let cronMock: any;
     let fetchMock: jest.Mock<any>;
 
     beforeEach(async () => {
+        cronMock = {
+            notifyManualRunTriggered: jest.fn(),
+        };
+
         prismaMock = {
             scrapedPrice: {
                 findMany: jest.fn<() => Promise<any>>().mockResolvedValue([]),
@@ -30,6 +36,7 @@ describe('ScraperDataService', () => {
             providers: [
                 ScraperDataService,
                 { provide: PrismaService, useValue: prismaMock },
+                { provide: ScraperCronService, useValue: cronMock },
             ],
         }).compile();
 

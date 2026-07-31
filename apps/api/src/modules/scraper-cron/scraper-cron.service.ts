@@ -3,6 +3,7 @@ import { PrismaService }         from '../database/prisma.service';
 import { ProductPricingService } from '../product-pricing/product-pricing.service';
 
 const CONFIG_KEY = 'scraper_schedule_hours';
+const AUTO_PRICE_CONFIG_KEY = 'auto_price_after_manual_run';
 
 @Injectable()
 export class ScraperCronService implements OnModuleInit, OnModuleDestroy {
@@ -45,6 +46,53 @@ export class ScraperCronService implements OnModuleInit, OnModuleDestroy {
         if (h > 0) this.startInterval(h);
         this.logger.log(h === 0 ? 'Auto-scraper disabled.' : `Auto-scraper rescheduled: every ${h}h`);
         return { hours: h };
+    }
+
+    async getAutoPriceAfterScrape(): Promise<{ enabled: boolean }> {
+        const row = await this.prisma.pricingConfig
+            .findUnique({ where: { key: AUTO_PRICE_CONFIG_KEY } })
+            .catch(() => null);
+        return { enabled: (row?.value ?? 0) === 1 };
+    }
+
+    async setAutoPriceAfterScrape(enabled: boolean): Promise<{ enabled: boolean }> {
+        await this.prisma.pricingConfig.upsert({
+            where:  { key: AUTO_PRICE_CONFIG_KEY },
+            update: { value: enabled ? 1 : 0, label: 'Auto-price catalog after a manual scraper run completes' },
+            create: { key: AUTO_PRICE_CONFIG_KEY, value: enabled ? 1 : 0, label: 'Auto-price catalog after a manual scraper run completes' },
+        });
+        this.logger.log(`Auto-price-after-manual-run ${enabled ? 'enabled' : 'disabled'}.`);
+        return { enabled };
+    }
+
+    /** Fire-and-forget: called right after a manual "Run Now" is triggered. If the
+     *  toggle is on, waits for that run to finish (polling ScraperRun), then auto-prices. */
+    notifyManualRunTriggered(): void {
+        this.watchAndAutoPrice().catch(err => this.logger.error(`Auto-price watcher failed: ${err?.message}`));
+    }
+
+    private async watchAndAutoPrice(): Promise<void> {
+        const { enabled } = await this.getAutoPriceAfterScrape();
+        if (!enabled) return;
+
+        // Give the scraper a moment to create its RUNNING row before we look for it.
+        await new Promise(r => setTimeout(r, 5_000));
+        const run = await this.prisma.scraperRun.findFirst({
+            where:   { status: 'RUNNING' },
+            orderBy: { startedAt: 'desc' },
+        });
+        if (!run) return;
+
+        const pollMs   = 15_000;
+        const deadline = Date.now() + 4 * 60 * 60 * 1000; // 4h safety cap — large catalogs can run over an hour
+        while (Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, pollMs));
+            const current = await this.prisma.scraperRun.findUnique({ where: { id: run.id } });
+            if (!current || current.status !== 'RUNNING') break;
+        }
+
+        this.logger.log('Manual scraper run finished — auto-pricing catalog (toggle enabled)…');
+        this.productPricing.startPriceCatalog();
     }
 
     // ── internals ─────────────────────────────────────────────────────────────

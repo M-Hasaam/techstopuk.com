@@ -357,6 +357,14 @@ export const scraperApi = {
 
   stop: () => apiFetch<{ ok: boolean; message: string }>('/scraper/stop', { method: 'POST' }),
 
+  getAutoPrice: () => apiFetch<{ enabled: boolean }>('/scraper/auto-price'),
+
+  setAutoPrice: (enabled: boolean) =>
+    apiFetch<{ enabled: boolean }>('/scraper/auto-price', {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    }),
+
   cleanup: (force = false) => apiFetch<{ cleaned: number }>(`/scraper/cleanup${force ? '?force=true' : ''}`, { method: 'POST' }),
 
   purgeAll: () => apiFetch<{ deletedPrices: number; deletedRuns: number }>('/scraper/purge', { method: 'DELETE' }),
