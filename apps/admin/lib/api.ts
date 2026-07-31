@@ -762,7 +762,7 @@ export interface DeviceCatalogItem {
   brandCategory: {
     id: string;
     brand: { id: string; name: string; slug: string; logo?: string };
-    category: { id: string; name: string; slug: string };
+    category: { id: string; name: string };
   };
   model: string;
   storageOptions: string[];
@@ -779,7 +779,7 @@ export interface BrandCategoryOption {
   brandId: string;
   brand: { id: string; name: string; slug: string };
   categoryId: string;
-  category: { id: string; name: string; slug: string };
+  category: { id: string; name: string };
   /** null = fall back to brand.name when displaying */
   alias: string | null;
   images: string[];

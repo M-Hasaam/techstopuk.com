@@ -97,10 +97,10 @@ export default function BrandDetailPage() {
   const unassigned = allCats.filter((c) => !assignedCatIds.has(c.id));
 
   const mainBcs = bcs.filter((bc) =>
-    MAIN_CATEGORIES_SLUGS.has(bc.category.slug.toLowerCase())
+    MAIN_CATEGORIES_SLUGS.has(bc.category.name.toLowerCase())
   );
   const otherBcs = bcs.filter((bc) =>
-    !MAIN_CATEGORIES_SLUGS.has(bc.category.slug.toLowerCase())
+    !MAIN_CATEGORIES_SLUGS.has(bc.category.name.toLowerCase())
   );
 
   const renderBcItem = (bc: BrandCategoryOption, idx: number) => {

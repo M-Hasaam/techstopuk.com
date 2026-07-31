@@ -927,7 +927,7 @@ export default function ProductsPage() {
                                     <span className="text-zinc-700">{dev.model}</span>
                                   </div>
                                   <div className="flex items-center gap-2 shrink-0">
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{dev.brandCategory.category.slug}</span>
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">{dev.brandCategory.category.name}</span>
                                     {!dev.isActive && <span className="text-[10px] font-bold uppercase tracking-widest text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded">inactive</span>}
                                   </div>
                                 </button>

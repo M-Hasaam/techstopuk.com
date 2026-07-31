@@ -31,7 +31,7 @@ function priceRange(prices: (number | null)[]): string | null {
 
 // Helpers to extract flat brand/category from the nested response
 function brandName(d: DeviceCatalogItem) { return d.brandCategory?.brand?.name ?? ""; }
-function categorySlug(d: DeviceCatalogItem) { return d.brandCategory?.category?.slug ?? ""; }
+function categoryLabel(d: DeviceCatalogItem) { return d.brandCategory?.category?.name ?? ""; }
 
 export default function CatalogPage() {
   const router = useRouter();
@@ -52,7 +52,7 @@ export default function CatalogPage() {
   const currentPageRef = useRef(1);
   const debouncedSearchRef = useRef("");
   const filterCatRef = useRef("all");
-  const sentinelRef  = useRef<HTMLDivElement>(null);
+  const sentinelObserverRef = useRef<IntersectionObserver | null>(null);
 
   debouncedSearchRef.current = debouncedSearch;
   filterCatRef.current = filterCat;
@@ -159,15 +159,22 @@ export default function CatalogPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      entries => { if (entries[0]?.isIntersecting) loadMore(); },
-      { rootMargin: "200px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
+  // Callback ref (not useRef + useEffect) — this fires exactly when the sentinel
+  // div actually mounts/unmounts in the DOM. A plain ref + effect keyed on `loadMore`
+  // (a stable useCallback reference) only ran once on initial mount, before the
+  // sentinel existed yet (it's behind the `!loading` branch) — so the observer was
+  // never attached and infinite scroll silently never fired.
+  const sentinelCallbackRef = useCallback((node: HTMLDivElement | null) => {
+    sentinelObserverRef.current?.disconnect();
+    sentinelObserverRef.current = null;
+    if (node) {
+      const observer = new IntersectionObserver(
+        entries => { if (entries[0]?.isIntersecting) loadMore(); },
+        { rootMargin: "200px" }
+      );
+      observer.observe(node);
+      sentinelObserverRef.current = observer;
+    }
   }, [loadMore]);
 
   async function handleScrape() {
@@ -403,7 +410,7 @@ export default function CatalogPage() {
                   {debouncedSearch || filterCat !== "all" ? "No devices match your filters." : "No devices yet. Add your first device."}
                 </div>
               ) : devices.map(device => {
-                const slug = categorySlug(device);
+                const slug = categoryLabel(device);
                 const range = devicePriceRange(device);
                 return (
                   <motion.div key={device.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -451,7 +458,7 @@ export default function CatalogPage() {
                 );
               })}
             </AnimatePresence>
-            <div ref={sentinelRef} className="h-1" />
+            <div ref={sentinelCallbackRef} className="h-1" />
             {loadingMore && (
               <div className="flex justify-center py-4">
                 <Loader2 className="h-5 w-5 animate-spin text-zinc-300" />
