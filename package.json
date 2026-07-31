@@ -24,6 +24,7 @@
     "scraper:dev": "npm run --workspace @ai-ecommerce/scraper dev",
     "scraper:start": "npm run --workspace @ai-ecommerce/scraper start:prod",
     "ensure:docker": "node scripts/ensure-docker.js",
+    "kill": "node scripts/kill-port.js",
     "infra:up": "npm run ensure:docker && docker compose -f docker-compose.infra.yml up -d",
     "infra:down": "docker compose -f docker-compose.infra.yml down --remove-orphans",
     "infra:logs": "docker compose -f docker-compose.infra.yml logs -f",
