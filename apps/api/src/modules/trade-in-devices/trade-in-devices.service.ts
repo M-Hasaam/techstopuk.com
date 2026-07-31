@@ -12,11 +12,36 @@ export interface CreateTradeInDeviceDto {
 export class TradeInDevicesService {
     constructor(private readonly prisma: PrismaService) {}
 
-    findAll(activeOnly = false) {
-        return this.prisma.tradeInDevice.findMany({
+    async findAll(activeOnly = false) {
+        const devices = await this.prisma.tradeInDevice.findMany({
             where: activeOnly ? { isActive: true } : undefined,
             orderBy: [{ category: 'asc' }, { brand: 'asc' }, { name: 'asc' }],
         });
+
+        // Cross-reference against the pricing catalog so the search box can show
+        // an "auto-priced" badge for devices with a real, confirmed price — same
+        // tradeInMode computation DeviceCatalogService uses for the wizard's list.
+        return Promise.all(devices.map(async (d) => {
+            const hasScrapedPrice = await this.prisma.scrapedPrice.findFirst({
+                where: {
+                    brand: { equals: d.brand, mode: 'insensitive' },
+                    model: { equals: d.name,  mode: 'insensitive' },
+                    marketPrice: { gt: 0 },
+                },
+                select: { id: true },
+            });
+            if (hasScrapedPrice) return { ...d, tradeInMode: 'auto' as const };
+
+            const catalogEntry = await this.prisma.deviceCatalog.findFirst({
+                where: {
+                    model: { equals: d.name, mode: 'insensitive' },
+                    brandCategory: { brand: { name: { equals: d.brand, mode: 'insensitive' } } },
+                },
+                select: { manualMarketPrice: true },
+            });
+            const tradeInMode = catalogEntry?.manualMarketPrice ? 'manual_price' as const : 'unpriced' as const;
+            return { ...d, tradeInMode };
+        }));
     }
 
     async create(dto: CreateTradeInDeviceDto) {

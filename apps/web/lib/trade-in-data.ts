@@ -4,37 +4,26 @@ export interface TradeInModel {
   name: string;
   category: string;
   brand: string;
+  tradeInMode?: 'auto' | 'manual_price' | 'unpriced';
+  /** Present only when this suggestion is a real, cataloged device — lets the
+   *  picker route straight into that device's real trade-in flow instead of
+   *  treating it as an unlisted/manual entry. */
+  catalogId?: string;
+  attributeOptions?: { label: string; options: string[] }[];
+  storageOptions?: string[];
+  /** Common abbreviations customers actually type (e.g. "ps5" for "PlayStation 5 ...")
+   *  — fuzzy search alone doesn't bridge that gap against the full canonical name. */
+  aliases?: string[];
 }
 
-// Comprehensive model list used for search across all pages
+// Devices NOT already in DeviceCatalog — every entry here should be a genuine gap
+// (a brand/model the catalog doesn't carry yet), never a duplicate of a real catalog
+// device. See "Other Search Devices" in admin catalog management before adding more.
 export const TRADE_IN_MODELS: TradeInModel[] = [
   // ── Phones ──────────────────────────────────────────────────────────────
-  { name: "iPhone 15 Pro Max",      category: "Phone", brand: "Apple" },
-  { name: "iPhone 15 Pro",          category: "Phone", brand: "Apple" },
-  { name: "iPhone 15 Plus",         category: "Phone", brand: "Apple" },
-  { name: "iPhone 15",              category: "Phone", brand: "Apple" },
-  { name: "iPhone 14 Pro Max",      category: "Phone", brand: "Apple" },
-  { name: "iPhone 14 Pro",          category: "Phone", brand: "Apple" },
-  { name: "iPhone 14 Plus",         category: "Phone", brand: "Apple" },
-  { name: "iPhone 14",              category: "Phone", brand: "Apple" },
-  { name: "iPhone 13 Pro Max",      category: "Phone", brand: "Apple" },
-  { name: "iPhone 13 Pro",          category: "Phone", brand: "Apple" },
-  { name: "iPhone 13",              category: "Phone", brand: "Apple" },
-  { name: "iPhone 12 Pro Max",      category: "Phone", brand: "Apple" },
-  { name: "iPhone 12 Pro",          category: "Phone", brand: "Apple" },
-  { name: "iPhone 12",              category: "Phone", brand: "Apple" },
-  { name: "iPhone 11 Pro Max",      category: "Phone", brand: "Apple" },
-  { name: "iPhone 11 Pro",          category: "Phone", brand: "Apple" },
-  { name: "iPhone 11",              category: "Phone", brand: "Apple" },
-  { name: "Galaxy S24 Ultra",       category: "Phone", brand: "Samsung" },
   { name: "Galaxy S24+",            category: "Phone", brand: "Samsung" },
-  { name: "Galaxy S24",             category: "Phone", brand: "Samsung" },
-  { name: "Galaxy S23 Ultra",       category: "Phone", brand: "Samsung" },
   { name: "Galaxy S23+",            category: "Phone", brand: "Samsung" },
-  { name: "Galaxy S23",             category: "Phone", brand: "Samsung" },
-  { name: "Galaxy S22 Ultra",       category: "Phone", brand: "Samsung" },
   { name: "Galaxy S22+",            category: "Phone", brand: "Samsung" },
-  { name: "Galaxy S22",             category: "Phone", brand: "Samsung" },
   { name: "Galaxy S21 Ultra",       category: "Phone", brand: "Samsung" },
   { name: "Galaxy S21+",            category: "Phone", brand: "Samsung" },
   { name: "Galaxy S21",             category: "Phone", brand: "Samsung" },
@@ -42,14 +31,10 @@ export const TRADE_IN_MODELS: TradeInModel[] = [
   { name: "Galaxy A34",             category: "Phone", brand: "Samsung" },
   { name: "Galaxy Z Fold 5",        category: "Phone", brand: "Samsung" },
   { name: "Galaxy Z Flip 5",        category: "Phone", brand: "Samsung" },
-  { name: "Pixel 8 Pro",            category: "Phone", brand: "Google" },
-  { name: "Pixel 8",                category: "Phone", brand: "Google" },
   { name: "Pixel 7 Pro",            category: "Phone", brand: "Google" },
-  { name: "Pixel 7",                category: "Phone", brand: "Google" },
   { name: "Pixel 6 Pro",            category: "Phone", brand: "Google" },
   { name: "Pixel 6",                category: "Phone", brand: "Google" },
   { name: "OnePlus 12",             category: "Phone", brand: "OnePlus" },
-  { name: "OnePlus 11",             category: "Phone", brand: "OnePlus" },
   { name: "OnePlus 10 Pro",         category: "Phone", brand: "OnePlus" },
   { name: "Nothing Phone (2)",      category: "Phone", brand: "Nothing" },
   { name: "Nothing Phone (1)",      category: "Phone", brand: "Nothing" },
@@ -79,15 +64,6 @@ export const TRADE_IN_MODELS: TradeInModel[] = [
   { name: "Fairphone 5",            category: "Phone", brand: "Fairphone" },
   { name: "Fairphone 4",            category: "Phone", brand: "Fairphone" },
   // ── Laptops ─────────────────────────────────────────────────────────────
-  { name: 'MacBook Pro 16" M3 Max', category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Pro 16" M3 Pro', category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Pro 14" M3 Max', category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Pro 14" M3 Pro', category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Air 15" M3',     category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Air 13" M3',     category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Air 15" M2',     category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Air 13" M2',     category: "Laptop", brand: "Apple" },
-  { name: 'MacBook Air 13" M1',     category: "Laptop", brand: "Apple" },
   { name: "XPS 15 (2024)",          category: "Laptop", brand: "Dell" },
   { name: "XPS 13 (2024)",          category: "Laptop", brand: "Dell" },
   { name: "Inspiron 15",            category: "Laptop", brand: "Dell" },
@@ -98,25 +74,17 @@ export const TRADE_IN_MODELS: TradeInModel[] = [
   { name: "Spectre x360 14",        category: "Laptop", brand: "HP" },
   { name: "EliteBook 840 G11",      category: "Laptop", brand: "HP" },
   { name: "Pavilion 15",            category: "Laptop", brand: "HP" },
-  { name: "ZenBook 14 OLED",        category: "Laptop", brand: "ASUS" },
   { name: "ROG Zephyrus G14 2024",  category: "Laptop", brand: "ASUS" },
   { name: "Surface Pro 11",         category: "Laptop", brand: "Microsoft" },
   { name: "Surface Pro 10",         category: "Laptop", brand: "Microsoft" },
   { name: "Surface Laptop 5",       category: "Laptop", brand: "Microsoft" },
   // ── Consoles ────────────────────────────────────────────────────────────
-  { name: "PS5 Disc Edition",       category: "Console", brand: "Sony PlayStation" },
-  { name: "PS5 Digital Edition",    category: "Console", brand: "Sony PlayStation" },
-  { name: "PS4 Pro",                category: "Console", brand: "Sony PlayStation" },
-  { name: "PS4 Slim",               category: "Console", brand: "Sony PlayStation" },
-  { name: "PS4",                    category: "Console", brand: "Sony PlayStation" },
-  { name: "PS3 Slim",               category: "Console", brand: "Sony PlayStation" },
+  // Every PlayStation/Xbox generation except the two below is already a real
+  // DeviceCatalog entry (under "Sony"/"Microsoft", not "Sony PlayStation"/"Microsoft
+  // Xbox") — this list only needs to fill the genuine gaps: the original PS3 ("Fat",
+  // pre-Slim) and original Xbox 360 (pre-"S" slim revision) were never added to the
+  // catalog, so they'd otherwise have no searchable entry at all.
   { name: "PS3",                    category: "Console", brand: "Sony PlayStation" },
-  { name: "Xbox Series X",          category: "Console", brand: "Microsoft Xbox" },
-  { name: "Xbox Series S",          category: "Console", brand: "Microsoft Xbox" },
-  { name: "Xbox One X",             category: "Console", brand: "Microsoft Xbox" },
-  { name: "Xbox One S",             category: "Console", brand: "Microsoft Xbox" },
-  { name: "Xbox One",               category: "Console", brand: "Microsoft Xbox" },
-  { name: "Xbox 360 S",             category: "Console", brand: "Microsoft Xbox" },
   { name: "Xbox 360",               category: "Console", brand: "Microsoft Xbox" },
   { name: "Nintendo Switch OLED",   category: "Console", brand: "Nintendo" },
   { name: "Nintendo Switch (V2)",   category: "Console", brand: "Nintendo" },
@@ -128,10 +96,6 @@ export const TRADE_IN_MODELS: TradeInModel[] = [
   { name: 'iPad Air 11" M2',        category: "Tablet", brand: "Apple" },
   { name: "iPad mini 7th Gen",      category: "Tablet", brand: "Apple" },
   { name: 'iPad Pro 13" M2',        category: "Tablet", brand: "Apple" },
-  { name: 'iPad Pro 11" M2',        category: "Tablet", brand: "Apple" },
-  { name: "iPad Air 5th Gen",       category: "Tablet", brand: "Apple" },
-  { name: "iPad 10th Gen",          category: "Tablet", brand: "Apple" },
-  { name: "iPad 9th Gen",           category: "Tablet", brand: "Apple" },
   { name: "Galaxy Tab S10 Ultra",   category: "Tablet", brand: "Samsung" },
   { name: "Galaxy Tab S10+",        category: "Tablet", brand: "Samsung" },
   { name: "Galaxy Tab S10",         category: "Tablet", brand: "Samsung" },
@@ -149,13 +113,8 @@ export const TRADE_IN_MODELS: TradeInModel[] = [
   { name: "Fitbit Sense 2",         category: "Smartwatch", brand: "Fitbit" },
   { name: "Fitbit Versa 4",         category: "Smartwatch", brand: "Fitbit" },
   // ── Audio ────────────────────────────────────────────────────────────────
-  { name: "AirPods Max",            category: "Audio", brand: "Apple" },
-  { name: "AirPods Pro 2",          category: "Audio", brand: "Apple" },
   { name: "AirPods Pro",            category: "Audio", brand: "Apple" },
   { name: "AirPods 3rd Gen",        category: "Audio", brand: "Apple" },
-  { name: "WH-1000XM5",             category: "Audio", brand: "Sony" },
-  { name: "WF-1000XM5",             category: "Audio", brand: "Sony" },
-  { name: "WH-1000XM4",             category: "Audio", brand: "Sony" },
   { name: "QuietComfort Ultra",     category: "Audio", brand: "Bose" },
   { name: "QuietComfort Earbuds II",category: "Audio", brand: "Bose" },
 ];

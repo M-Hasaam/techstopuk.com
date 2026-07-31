@@ -358,7 +358,7 @@ export const catalogApi = {
 
   // All tradeable models for search — used by DeviceSearchBox (from admin-managed trade_in_devices table)
   listTradeInModels: () =>
-    apiFetch<{ name: string; brand: string; category: string }[]>('/trade-in-devices'),
+    apiFetch<{ name: string; brand: string; category: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced' }[]>('/trade-in-devices'),
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────

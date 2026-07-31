@@ -414,7 +414,11 @@ export default function TradeInPage() {
     Laptop: "laptops", Audio: "audio", Smartwatch: "smartwatches",
   };
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
-  const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced' }[]>([]);
+  const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]>([]);
+  // Real per-device attributes (e.g. RAM for a specific MacBook) pulled from the catalog entry
+  // the customer actually selected — takes priority over the generic per-category spec list
+  // below so search-picked and wizard-picked devices show identical, accurate specs.
+  const [catalogAttributeOptions, setCatalogAttributeOptions] = useState<{ label: string; options: string[] }[]>([]);
 
   // Custom / unlisted device state
   const [brandFilter, setBrandFilter] = useState("");
@@ -441,8 +445,8 @@ export default function TradeInPage() {
     const brandSlug = state.brand.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true&categorySlug=${catSlug}&brandSlug=${brandSlug}`)
       .then(r => r.json())
-      .then((entries: { model: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced' }[]) =>
-        setDynamicModelData(entries.map(e => ({ model: e.model, tradeInMode: e.tradeInMode ?? 'unpriced' })))
+      .then((entries: { model: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]) =>
+        setDynamicModelData(entries.map(e => ({ model: e.model, tradeInMode: e.tradeInMode ?? 'unpriced', attributeOptions: e.attributeOptions ?? [] })))
       )
       .catch(() => {});
   }, [state.category, state.brand]);
@@ -837,20 +841,25 @@ export default function TradeInPage() {
       setShowCustomBrand(false);
       setCustomBrandInput("");
       setAiSpecs([]);
+      setCatalogAttributeOptions([]);
       setPhase(1);
       setIsWizardActive(true);
       scrollToTop();
     });
   };
 
-  const handleSelectSuggestion = (suggestion: { name: string; category: string; brand: string }) => {
+  const handleSelectSuggestion = (suggestion: {
+    name: string; category: string; brand: string;
+    catalogId?: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced';
+    attributeOptions?: { label: string; options: string[] }[];
+  }) => {
     guardedOpen(() => {
       // Open wizard immediately at phase 2 with unpriced as safe default
       setState({
         category: suggestion.category,
         brand: suggestion.brand,
         model: suggestion.name,
-        tradeInMode: "unpriced", // safe default — upgraded below if catalog has pricing
+        tradeInMode: suggestion.tradeInMode ?? "unpriced", // upgraded below if not already known
         specs: {},
         condition: "",
         answers: {},
@@ -861,11 +870,17 @@ export default function TradeInPage() {
           phone: user?.phone || "", address: user?.address || "", postcode: "",
         },
       });
+      setCatalogAttributeOptions(suggestion.attributeOptions ?? []);
       setPhase(2);
       setIsWizardActive(true);
       scrollToTop();
 
-      // In background: check device catalog for real tradeInMode
+      // Suggestion already came from the real catalog (DeviceSearchBox merges it in
+      // directly) — no need to re-resolve it by name.
+      if (suggestion.catalogId || suggestion.tradeInMode) return;
+
+      // Fallback for callers passing only name/category/brand (e.g. the hardcoded
+      // "Popular" quick links) — best-effort catalog lookup by exact model match.
       const catSlugMap: Record<string, string> = {
         Phone: "phones", Tablet: "tablets", Console: "gaming",
         Laptop: "laptops", Audio: "audio", Smartwatch: "smartwatches",
@@ -875,10 +890,11 @@ export default function TradeInPage() {
       if (catSlug) {
         fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true&categorySlug=${catSlug}&brandSlug=${brandSlug}`)
           .then(r => r.json())
-          .then((entries: { model: string; tradeInMode?: string }[]) => {
+          .then((entries: { model: string; tradeInMode?: string; attributeOptions?: { label: string; options: string[] }[] }[]) => {
             const match = entries.find(e => e.model.toLowerCase() === suggestion.name.toLowerCase());
             if (match?.tradeInMode && match.tradeInMode !== "unpriced") {
               setState(s => ({ ...s, tradeInMode: match.tradeInMode as "auto" | "manual_price" | "unpriced" }));
+              setCatalogAttributeOptions(match.attributeOptions ?? []);
             }
           })
           .catch(() => {}); // stays unpriced on error → manual review
@@ -1614,7 +1630,7 @@ export default function TradeInPage() {
                               {(() => {
                                 const modelPool = dynamicModelData.length > 0
                                   ? dynamicModelData
-                                  : (MODELS[state.category]?.[state.brand] ?? []).map(m => ({ model: m, tradeInMode: 'unpriced' as const }));
+                                  : (MODELS[state.category]?.[state.brand] ?? []).map(m => ({ model: m, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }));
 
                                 const fuse = new Fuse(modelPool, {
                                   keys: ['model'],
@@ -1653,12 +1669,13 @@ export default function TradeInPage() {
                                     {/* Suggestion list */}
                                     {suggestions.length > 0 && (
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                                        {suggestions.map(({ model, tradeInMode }) => (
+                                        {suggestions.map(({ model, tradeInMode, attributeOptions }) => (
                                           <motion.button
                                             key={model}
                                             whileHover={{ x: 4 }}
                                             onClick={() => {
                                               setState(s => ({ ...s, model, tradeInMode }));
+                                              setCatalogAttributeOptions(attributeOptions ?? []);
                                               goToPhase(2);
                                             }}
                                             className="flex items-center justify-between px-5 py-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white hover:bg-zinc-50 dark:hover:bg-zinc-950 bg-white dark:bg-zinc-900 text-xs font-bold text-left transition-all hover:shadow-sm group text-zinc-800 dark:text-zinc-200"
@@ -1715,7 +1732,10 @@ export default function TradeInPage() {
 
                     {/* ── PHASE 2: Configuration & Grading ── */}
                     {phase === 2 && (() => {
-                      const specsToShow = aiSpecs.length > 0 ? aiSpecs : currentSpecs;
+                      // Real per-device attributes (from the catalog entry actually selected) win over
+                      // AI-guessed specs, which in turn win over the generic per-category fallback list.
+                      const specsToShow = catalogAttributeOptions.length > 0 ? catalogAttributeOptions
+                        : aiSpecs.length > 0 ? aiSpecs : currentSpecs;
                       const specsComplete = specsToShow.length === 0 || specsToShow.every(s => !!state.specs[s.label]);
                       const canProceedPhase2 = specsComplete && !!state.condition;
                       return (

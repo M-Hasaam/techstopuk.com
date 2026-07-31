@@ -35,13 +35,25 @@ interface DeviceSearchBoxProps {
 
 const FUSE_OPTIONS = {
   keys: [
-    { name: "name",     weight: 0.7 },
-    { name: "brand",    weight: 0.25 },
+    { name: "name",     weight: 0.6 },
+    { name: "aliases",  weight: 0.2 },
+    { name: "brand",    weight: 0.15 },
     { name: "category", weight: 0.05 },
   ],
   threshold: 0.4,
   ignoreLocation: true,
 };
+
+// Common abbreviations customers actually type that don't fuzzy-match the full
+// canonical catalog name well enough on their own (e.g. "ps5" vs "PlayStation 5
+// Digital Edition"). Generic pattern, not hardcoded per-device — covers every
+// PlayStation generation/variant automatically.
+function generateAliases(name: string): string[] {
+  const aliases: string[] = [];
+  const ps = name.match(/^PlayStation (\d)/i);
+  if (ps) aliases.push(`ps${ps[1]}`);
+  return aliases;
+}
 
 // Static fallback Fuse — used instantly while the API call is in flight
 const STATIC_FUSE = new Fuse(TRADE_IN_MODELS, FUSE_OPTIONS);
@@ -63,24 +75,47 @@ export default function DeviceSearchBox({
   const [fuseInstance, setFuseInstance] = useState<Fuse<TradeInModel>>(STATIC_FUSE);
 
   useEffect(() => {
-    catalogApi.listTradeInModels()
-      .then(items => {
-        const dbModels: TradeInModel[] = items.map(item => ({
-          name:     item.name,
-          brand:    item.brand,
-          category: CAT_NAME_TO_ID[item.category] ?? item.category,
-        }));
+    // Three-tier merge, most authoritative first:
+    //  1. DeviceCatalog (forTradeIn=true) — real, priced devices. Carries catalogId +
+    //     attributeOptions so picking one routes into that exact device's real trade-in
+    //     flow instead of the generic "unlisted device" path.
+    //  2. The broader admin-curated trade_in_devices search list (may use shorter/different
+    //     naming, e.g. "PS3" vs the catalog's "PlayStation 3") — fills brand/model breadth
+    //     for devices not yet in the catalog.
+    //  3. Static fallback list (e.g. Nothing Phone, Fairphone) for gaps in both of the above.
+    Promise.all([
+      fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true`)
+        .then(r => r.json())
+        .catch(() => [] as any[]),
+      catalogApi.listTradeInModels().catch(() => []),
+    ]).then(([catalogEntries, items]: [any[], { name: string; brand: string; category: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced' }[]]) => {
+      const catalogModels: TradeInModel[] = catalogEntries.map(e => ({
+        name:     e.model,
+        brand:    e.brandCategory?.brand?.name ?? "",
+        category: CAT_NAME_TO_ID[e.brandCategory?.category?.name] ?? e.brandCategory?.category?.name ?? "",
+        tradeInMode: e.tradeInMode,
+        catalogId: e.id,
+        attributeOptions: e.attributeOptions ?? [],
+        storageOptions: e.storageOptions ?? [],
+        aliases: generateAliases(e.model),
+      }));
 
-        // Merge: DB models first, then any static models not already in the DB
-        // This ensures models in the admin catalog take priority, but the static
-        // list (e.g. Nothing Phone, Fairphone) fills gaps until they're added to the catalog
-        const dbKeys = new Set(dbModels.map(m => `${m.brand}:${m.name}`));
-        const staticOnly = TRADE_IN_MODELS.filter(m => !dbKeys.has(`${m.brand}:${m.name}`));
-        const merged = [...dbModels, ...staticOnly];
+      const dbModels: TradeInModel[] = items.map(item => ({
+        name:     item.name,
+        brand:    item.brand,
+        category: CAT_NAME_TO_ID[item.category] ?? item.category,
+        tradeInMode: item.tradeInMode,
+      }));
 
-        setFuseInstance(new Fuse(merged, FUSE_OPTIONS));
-      })
-      .catch(() => {}); // silently keep static fallback on error
+      const key = (m: { brand: string; name: string }) => `${m.brand}:${m.name}`.toLowerCase();
+      const catalogKeys = new Set(catalogModels.map(key));
+      const dbOnly = dbModels.filter(m => !catalogKeys.has(key(m)));
+
+      const mergedKeys = new Set([...catalogModels, ...dbOnly].map(key));
+      const staticOnly = TRADE_IN_MODELS.filter(m => !mergedKeys.has(key(m)));
+
+      setFuseInstance(new Fuse([...catalogModels, ...dbOnly, ...staticOnly], FUSE_OPTIONS));
+    }).catch(() => {}); // silently keep static fallback on error
   }, []);
 
   const suggestions: TradeInModel[] = useMemo(
@@ -168,8 +203,26 @@ export default function DeviceSearchBox({
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 shrink-0">
-                      Get Cash <ChevronRight className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-2 shrink-0">
+                      {sug.tradeInMode === "auto" && (
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          Auto-price
+                        </span>
+                      )}
+                      {sug.tradeInMode === "manual_price" && (
+                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          Manual Price
+                        </span>
+                      )}
+                      {!sug.catalogId && (
+                        <span title="Not yet in the device catalog — priced manually after a photo review"
+                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-help">
+                          Other
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
+                        Get Cash <ChevronRight className="h-3.5 w-3.5" />
+                      </div>
                     </div>
                   </button>
                 ))}
