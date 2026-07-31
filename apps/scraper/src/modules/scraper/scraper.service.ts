@@ -522,6 +522,16 @@ export class ScraperService implements OnApplicationBootstrap {
             const modelWordSet  = new Set(modelWords);
 
             const score = (h: any): number => {
+                // CeX's own product classification is a far more reliable signal than
+                // guessing "is this an accessory" from free text — it consistently buckets
+                // cases/cables/covers/chargers/screen protectors under a category literally
+                // named "... Accessories" for every product line, while real products (even
+                // ones that are themselves controllers/headphones in our catalog) get their
+                // own real category ("Xbox One Controllers", "Headphones & Earphones").
+                // Applied unconditionally — nothing in our catalog is itself an "Accessory".
+                const category = `${h.categoryFriendlyName ?? h.categoryName ?? ''}`.toLowerCase();
+                if (/\baccessor/.test(category)) return -999;
+
                 const raw   = (h.boxName ?? '').toLowerCase();
                 const nameN = raw.replace(/[()]/g, '').replace(/\s+/g, ' ').trim();
                 // Strip punctuation stuck to each token (CeX names read like "...Case, Black" —

@@ -110,6 +110,11 @@ const DEVICE_CATALOG = [
     { brand: 'Sony', model: 'PlayStation 4 Pro', category: 'gaming', storageOptions: ['1TB'] },
     { brand: 'Sony', model: 'PlayStation 5 Disc Edition', category: 'gaming', storageOptions: ['825GB', '1TB'] },
     { brand: 'Sony', model: 'PlayStation 5 Digital Edition', category: 'gaming', storageOptions: ['825GB', '1TB'] },
+    // The 1TB size never shipped in the original PS5 chassis — Sony only ever sold 1TB as
+    // the newer "Slim" revision, which CeX lists as its own distinct product line, priced
+    // differently. Same pattern as "PlayStation 4" vs "PlayStation 4 Slim" above.
+    { brand: 'Sony', model: 'PlayStation 5 Slim', category: 'gaming', storageOptions: ['1TB'] },
+    { brand: 'Sony', model: 'PlayStation 5 Slim Digital Edition', category: 'gaming', storageOptions: ['1TB'] },
     { brand: 'Microsoft', model: 'Xbox 360 Slim', category: 'gaming', storageOptions: ['4GB', '250GB', '320GB'] },
     { brand: 'Microsoft', model: 'Xbox One', category: 'gaming', storageOptions: ['500GB', '1TB'] },
     { brand: 'Microsoft', model: 'Xbox One S', category: 'gaming', storageOptions: ['500GB', '1TB', '2TB'] },
