@@ -273,9 +273,9 @@ export default function CatalogMgmtPage() {
             </div>
             <div>
               <div className="text-4xl font-black text-zinc-900">{searchDevices.length}</div>
-              <div className="font-bold text-zinc-700 text-sm mt-1">Search Devices</div>
+              <div className="font-bold text-zinc-700 text-sm mt-1">Other Search Devices</div>
               <p className="text-xs text-zinc-400 mt-1 font-medium">
-                {searchDevices.filter(d => d.isActive).length} active · shown in trade-in search bar
+                {searchDevices.filter(d => d.isActive).length} active · devices not yet in the catalog, shown as manual-quote fallbacks in the search bar
               </p>
             </div>
           </div>
@@ -312,7 +312,7 @@ export default function CatalogMgmtPage() {
             <div className="h-8 w-8 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:text-black group-hover:bg-zinc-100 transition-colors shrink-0">
               <Search className="h-4 w-4" />
             </div>
-            Manage Search Devices
+            Manage Other Search Devices
           </Link>
           <Link
             href="/catalog-mgmt/brands?create=true"

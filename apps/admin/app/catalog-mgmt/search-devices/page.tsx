@@ -1,14 +1,27 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { tradeInDevicesApi, type TradeInDeviceItem } from "../../../lib/api";
-import { Plus, Pencil, Trash2, Check, X, Search, ArrowLeft } from "lucide-react";
+import { tradeInDevicesApi, deviceCatalogApi, type TradeInDeviceItem } from "../../../lib/api";
+import { Plus, Pencil, Trash2, Check, X, Search, ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 const CATEGORIES = ["Phone", "Tablet", "Console", "Laptop", "Audio", "Smartwatch", "Other"];
 
 type Form = { name: string; brand: string; category: string; isActive: boolean };
 const empty: Form = { name: "", brand: "", category: "Phone", isActive: true };
+
+// Loose match, mirroring how brand/model naming actually varies between this list
+// and the catalog (quotes, "-inch", extra whitespace) — good enough for a warning,
+// doesn't need to be perfect since the admin makes the final call either way.
+function normalize(s: string) {
+  return s.toLowerCase()
+    .replace(/["“”]/g, "")
+    .replace(/[()]/g, "")
+    .replace(/(\d)-inch\b/g, "$1")
+    .replace(/\binch\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
 export default function SearchDevicesPage() {
   const [devices, setDevices] = useState<TradeInDeviceItem[]>([]);
@@ -19,6 +32,16 @@ export default function SearchDevicesPage() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("All");
+  const [catalogKeys, setCatalogKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    deviceCatalogApi.list()
+      .then(items => setCatalogKeys(new Set(items.map(d => `${normalize(d.brandCategory.brand.name)}|${normalize(d.model)}`))))
+      .catch(() => {});
+  }, []);
+
+  const duplicateMatch = form.name.trim() && form.brand.trim()
+    && catalogKeys.has(`${normalize(form.brand)}|${normalize(form.name)}`);
 
   const load = () => {
     setLoading(true);
@@ -90,9 +113,11 @@ export default function SearchDevicesPage() {
           <Link href="/catalog-mgmt" className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-700 mb-1">
             <ArrowLeft className="h-3 w-3" /> Catalog Management
           </Link>
-          <h1 className="text-2xl font-bold text-zinc-900">Search Devices</h1>
+          <h1 className="text-2xl font-bold text-zinc-900">Other Search Devices</h1>
           <p className="text-xs text-zinc-400 mt-0.5">
-            Devices shown in the trade-in &amp; repair search bar — {totalActive} active of {devices.length} total
+            Devices not yet in the catalog — shown as manual-quote fallbacks in the trade-in &amp; repair search bar
+            alongside real catalog devices ({totalActive} active of {devices.length} total). Don&apos;t add a device
+            here if it already exists in the catalog — it&apos;ll just show up twice.
           </p>
         </div>
         <button
@@ -141,6 +166,15 @@ export default function SearchDevicesPage() {
             <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} />
             Active (visible in search)
           </label>
+          {duplicateMatch && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-700 font-medium">
+                This brand + model already exists in the device catalog — adding it here will show up as a
+                duplicate in the search bar. Only continue if this is genuinely a different device.
+              </p>
+            </div>
+          )}
           {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
           <div className="flex gap-2">
             <button onClick={save} disabled={saving}
@@ -204,9 +238,21 @@ export default function SearchDevicesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
-                    {items.map(d => (
+                    {items.map(d => {
+                      const isDup = catalogKeys.has(`${normalize(d.brand)}|${normalize(d.name)}`);
+                      return (
                       <tr key={d.id} className="hover:bg-zinc-50/50">
-                        <td className="px-5 py-3 font-semibold text-zinc-900">{d.name}</td>
+                        <td className="px-5 py-3 font-semibold text-zinc-900">
+                          <span className="flex items-center gap-1.5">
+                            {d.name}
+                            {isDup && (
+                              <span title="This device already exists in the catalog — remove it here to avoid a duplicate search result"
+                                className="inline-flex items-center gap-1 text-[9px] font-bold uppercase tracking-wide text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full cursor-help">
+                                <AlertTriangle className="h-2.5 w-2.5" /> In catalog
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td className="px-5 py-3 text-zinc-500 text-xs font-bold">{d.brand}</td>
                         <td className="px-5 py-3">
                           <button
@@ -227,7 +273,8 @@ export default function SearchDevicesPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
