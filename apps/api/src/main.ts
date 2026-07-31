@@ -7,6 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
+import type { NextFunction, Request, Response } from 'express';
 
 const appEnvPath = resolve(__dirname, '..', '.env');
 if (existsSync(appEnvPath)) {
@@ -39,6 +40,16 @@ async function bootstrap() {
   const { AppModule } = require('./app.module') as typeof import('./app.module');
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.getHttpAdapter().getInstance().disable('x-powered-by');
+
+  // This is a private, fully dynamic API (admin + storefront) — nothing here should ever
+  // be cached by an intermediary. Without this, a CDN/edge proxy in front of the API
+  // (e.g. Cloudflare) can cache a GET response (like an empty `/scraper/runs` right after
+  // a fresh deploy) and keep serving that stale body indefinitely, since we never sent
+  // any Cache-Control header for it to key off of.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
 
   app.useWebSocketAdapter(new IoAdapter(app));
   app.use(compression());
