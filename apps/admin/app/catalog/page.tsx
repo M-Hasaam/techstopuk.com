@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -35,12 +35,23 @@ function categoryLabel(d: DeviceCatalogItem) { return d.brandCategory?.category?
 
 export default function CatalogPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [devices, setDevices]     = useState<DeviceCatalogItem[]>([]);
   const [brandCategories, setBrandCategories] = useState<BrandCategoryOption[]>([]);
   const [loading, setLoading]     = useState(true);
   const [search, setSearch]       = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [filterCat, setFilterCat] = useState<string>("all");
+  const [filterCat, setFilterCat] = useState<string>(() => searchParams?.get("category") ?? "all");
+
+  // Keep the URL in sync so the browser back button restores the selected tab
+  // instead of remounting the page at the "all" default.
+  function selectCategory(slug: string) {
+    setFilterCat(slug);
+    const params = new URLSearchParams(searchParams?.toString());
+    if (slug === "all") params.delete("category"); else params.set("category", slug);
+    const qs = params.toString();
+    router.replace(qs ? `/catalog?${qs}` : "/catalog", { scroll: false });
+  }
   const [total, setTotal]         = useState(0);
   const [hasMore, setHasMore]     = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -375,12 +386,12 @@ export default function CatalogPage() {
             className="h-10 w-full rounded-xl bg-white border border-zinc-200 pl-9 pr-4 text-sm outline-none focus:border-black transition-colors" />
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1 -my-1 max-w-full">
-          <button onClick={() => setFilterCat("all")}
+          <button onClick={() => selectCategory("all")}
             className={`h-10 px-4 rounded-xl text-xs font-bold transition-colors shrink-0 ${filterCat === "all" ? "bg-zinc-950 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
             All{filterCat === "all" ? ` (${total})` : ""}
           </button>
           {allCategories.map(cat => (
-            <button key={cat.slug} onClick={() => setFilterCat(cat.slug)}
+            <button key={cat.slug} onClick={() => selectCategory(cat.slug)}
               className={`h-10 px-4 rounded-xl text-xs font-bold transition-colors capitalize shrink-0 ${filterCat === cat.slug ? "bg-zinc-950 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:border-zinc-400"}`}>
               {cat.slug}{filterCat === cat.slug ? ` (${total})` : ""}
             </button>

@@ -1625,7 +1625,7 @@ export default function TradeInPage() {
 
                                 const suggestions = wizardModelSearch.trim()
                                   ? fuse.search(wizardModelSearch).slice(0, 6).map(r => r.item)
-                                  : modelPool.slice(0, 8);
+                                  : modelPool;
 
                                 return (
                                   <>

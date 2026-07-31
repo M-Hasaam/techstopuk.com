@@ -50,7 +50,7 @@ export default function DeviceSearchBox({
   placeholder = "Search your device (e.g. Samsung Galaxy, iPhone 15 Pro...)",
   className = "",
   showSearchButton = false,
-  maxSuggestions = 7,
+  maxSuggestions = 20,
   filterCategories,
   onSelect,
   onManualEntry,
@@ -149,29 +149,31 @@ export default function DeviceSearchBox({
                 No results for &quot;{query}&quot; — use the option below to start a manual quote.
               </p>
             ) : (
-              suggestions.map((sug, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSelect(sug)}
-                  className="w-full flex items-center justify-between p-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 shrink-0">
-                      <Smartphone className="h-4 w-4" />
+              <div className="overflow-y-auto" style={{ maxHeight: 420 }}>
+                {suggestions.map((sug, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelect(sug)}
+                    className="w-full flex items-center justify-between p-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 shrink-0">
+                        <Smartphone className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-extrabold text-zinc-950 dark:text-white">{sug.name}</p>
+                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                          {sug.brand} · {sug.category}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-xs font-extrabold text-zinc-950 dark:text-white">{sug.name}</p>
-                      <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
-                        {sug.brand} · {sug.category}
-                      </p>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 shrink-0">
+                      Get Cash <ChevronRight className="h-3.5 w-3.5" />
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 shrink-0">
-                    Get Cash <ChevronRight className="h-3.5 w-3.5" />
-                  </div>
-                </button>
-              ))
+                  </button>
+                ))}
+              </div>
             )}
 
             <div className="border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-1">
