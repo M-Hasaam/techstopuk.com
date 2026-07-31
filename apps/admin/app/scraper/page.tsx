@@ -1,12 +1,42 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Fragment, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { scraperApi, healthApi, type ScrapedPriceRow, type ScraperStats, type ScraperRun } from "../../lib/api";
-import { Play, RefreshCw, Search, TrendingUp, CheckCircle2, AlertCircle, AlertTriangle, Clock, XCircle, Loader2, Zap, Trash2 } from "lucide-react";
+import { scraperApi, healthApi, productPricingApi, pricingConfigApi, type ScrapedPriceRow, type ScraperStats, type ScraperRun } from "../../lib/api";
+import { Play, RefreshCw, Search, TrendingUp, CheckCircle2, AlertCircle, AlertTriangle, Clock, XCircle, Loader2, Zap, Trash2, ChevronDown, ChevronRight } from "lucide-react";
 
 function fmt(v: number | null) {
   return v !== null ? `£${v.toFixed(0)}` : <span className="text-zinc-300">—</span>;
+}
+
+// Mirrors the live calculator on /pricing — same formula the backend actually prices with
+// (market × condition multiplier × (1+margin%) × (1-discount%), then × trade-in ratio × (1-margin%)).
+const GRADES = [
+  { key: "new", label: "New",     backendKey: "multiplier_new" },
+  { key: "a",   label: "A Grade", backendKey: "multiplier_a" },
+  { key: "b",   label: "B Grade", backendKey: "multiplier_b" },
+  { key: "c",   label: "C Grade", backendKey: "multiplier_c" },
+  { key: "f",   label: "F Grade", backendKey: "multiplier_f" },
+] as const;
+
+const GRADE_DEFAULTS: Record<string, number> = {
+  multiplier_new: 1.2, multiplier_a: 1.05, multiplier_b: 0.85, multiplier_c: 0.65, multiplier_f: 0.25,
+  sell_margin_pct: 0, sell_discount_pct: 0, tradein_ratio: 0.5, tradein_margin_pct: 0,
+};
+
+function round5(x: number) { return Math.max(Math.round(x / 5) * 5, 5); }
+
+function sellPriceFor(marketPrice: number, backendKey: string, configs: Record<string, number>) {
+  const mult     = configs[backendKey]          ?? GRADE_DEFAULTS[backendKey];
+  const margin   = configs["sell_margin_pct"]   ?? GRADE_DEFAULTS.sell_margin_pct;
+  const discount = configs["sell_discount_pct"] ?? GRADE_DEFAULTS.sell_discount_pct;
+  return round5(marketPrice * mult * (1 + margin / 100) * (1 - discount / 100));
+}
+
+function tradeOfferFor(sellPrice: number, configs: Record<string, number>) {
+  const ratio  = configs["tradein_ratio"]        ?? GRADE_DEFAULTS.tradein_ratio;
+  const margin = configs["tradein_margin_pct"]   ?? GRADE_DEFAULTS.tradein_margin_pct;
+  return round5(sellPrice * ratio * (1 - margin / 100));
 }
 
 function StatCard({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
@@ -110,6 +140,92 @@ export default function ScraperPage() {
   const [thresholdUnit, setThresholdUnit] = useState<"hours" | "days" | "weeks">("hours");
   const [savingThreshold, setSavingThreshold] = useState(false);
   const [thresholdMsg, setThresholdMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [flaggedKeys, setFlaggedKeys] = useState<Set<string>>(new Set());
+  const [flaggedGrades, setFlaggedGrades] = useState<Map<string, Set<string>>>(new Map());
+  const [aiRanges, setAiRanges] = useState<Map<string, { low: number; high: number }>>(new Map());
+  const [autoPriceEnabled, setAutoPriceEnabled] = useState(false);
+  const [autoPriceSaving, setAutoPriceSaving] = useState(false);
+  const [pricingLaunching, setPricingLaunching] = useState(false);
+  const [pricingConfigs, setPricingConfigs] = useState<Record<string, number>>({});
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
+
+  // Key must match how ScrapedPriceRow.{brand,model,storage,ram} are compared below —
+  // case-insensitive, trimmed, empty storage/ram normalized the same way on both sides.
+  // RAM is included so two RAM variants of the same brand/model/storage (e.g. a MacBook's
+  // 8GB vs 16GB configs) don't collide onto the same flagged/range/AI-estimate entry.
+  const flagKey = (brand: string, model: string, storage: string, ram = "") =>
+    `${brand.trim().toLowerCase()}|${model.trim().toLowerCase()}|${(storage || "").trim().toLowerCase()}|${(ram || "").trim().toLowerCase()}`;
+
+  const loadFlagged = useCallback(() => {
+    productPricingApi.flagged()
+      .then(rows => {
+        setFlaggedKeys(new Set(rows.map(r => flagKey(r.brand, r.model, r.storage, r.ram))));
+        const byGrade = new Map<string, Set<string>>();
+        for (const r of rows) {
+          const k = flagKey(r.brand, r.model, r.storage, r.ram);
+          const gradeKey = r.condition.toLowerCase();
+          if (!byGrade.has(k)) byGrade.set(k, new Set());
+          byGrade.get(k)!.add(gradeKey);
+        }
+        setFlaggedGrades(byGrade);
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadRanges = useCallback(() => {
+    productPricingApi.ranges()
+      .then(rows => setAiRanges(new Map(rows.map(r => [flagKey(r.brand, r.model, r.storage, r.ram), { low: r.low, high: r.high }]))))
+      .catch(() => {});
+  }, []);
+
+  const loadAutoPrice = useCallback(() => {
+    scraperApi.getAutoPrice().then(r => setAutoPriceEnabled(r.enabled)).catch(() => {});
+  }, []);
+
+  const loadPricingConfigs = useCallback(() => {
+    pricingConfigApi.list()
+      .then(rows => setPricingConfigs(Object.fromEntries(rows.map(c => [c.key, c.value]))))
+      .catch(() => {});
+  }, []);
+
+  async function handleToggleAutoPrice() {
+    const next = !autoPriceEnabled;
+    setAutoPriceSaving(true);
+    setAutoPriceEnabled(next); // optimistic
+    try {
+      await scraperApi.setAutoPrice(next);
+    } catch {
+      setAutoPriceEnabled(!next); // revert on failure
+    } finally {
+      setAutoPriceSaving(false);
+    }
+  }
+
+  async function handleLaunchPricing() {
+    setPricingLaunching(true);
+    try {
+      await productPricingApi.run();
+      await watchPricingJob();
+    } catch { /* already running or error */ } finally {
+      setPricingLaunching(false);
+    }
+  }
+
+  // The pricing job runs in the background with no ScraperRun row and no stats.total
+  // change to key off of, so nothing else on this page notices when it finishes —
+  // poll its own status endpoint until done, then refresh the ranges/flagged data it wrote.
+  async function watchPricingJob() {
+    const maxWaitMs = 30 * 60 * 1000;
+    const pollMs = 3000;
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, pollMs));
+      const status = await productPricingApi.status().catch(() => null);
+      if (!status || !status.running) break;
+    }
+    loadRanges();
+    loadFlagged();
+  }
 
   const loadStats = useCallback(() => {
     scraperApi.stats().then(setStats).catch(() => {});
@@ -167,7 +283,11 @@ export default function ScraperPage() {
     loadRuns();
     loadSchedule();
     loadStuckThreshold();
-  }, [loadStats, loadRuns, loadSchedule, loadStuckThreshold, router]);
+    loadFlagged();
+    loadRanges();
+    loadAutoPrice();
+    loadPricingConfigs();
+  }, [loadStats, loadRuns, loadSchedule, loadStuckThreshold, loadFlagged, loadRanges, loadAutoPrice, loadPricingConfigs, router]);
 
   // One-shot health check on mount so serviceOnline resolves immediately
   // rather than waiting up to 15s for the first poll tick.
@@ -201,9 +321,11 @@ export default function ScraperPage() {
     const isRunning  = runs.some(r => r.status === "RUNNING");
     if (wasRunning && !isRunning) {
       loadPrices(); // run just finished — refresh table once
+      loadFlagged();
+      loadRanges();
     }
     prevRunsRef.current = runs;
-  }, [runs, loadPrices]);
+  }, [runs, loadPrices, loadFlagged, loadRanges]);
 
   // Stats poll every 8-15s regardless of whether a tracked run is active — e.g. rows
   // scraped one at a time via the per-row "Scrape" button, or scraped from another
@@ -214,9 +336,11 @@ export default function ScraperPage() {
     if (!SCRAPER_ENABLED || !stats) return;
     if (prevStatsTotalRef.current !== null && stats.total !== prevStatsTotalRef.current) {
       loadPrices();
+      loadFlagged();
+      loadRanges();
     }
     prevStatsTotalRef.current = stats.total;
-  }, [stats, loadPrices]);
+  }, [stats, loadPrices, loadFlagged, loadRanges]);
 
   // Auto-poll: 8s while a run is active, 15s when idle (fast enough to feel
   // real-time without hammering the server).
@@ -458,22 +582,67 @@ export default function ScraperPage() {
     const key = `${row.brand}|${row.model}`;
     const isLoading = scrapingKey === key;
     const result = scrapeRowResult?.key === key ? scrapeRowResult : null;
+    const isFlagged = flaggedKeys.has(flagKey(row.brand, row.model, row.storage, row.ram));
+    const aiRange = aiRanges.get(flagKey(row.brand, row.model, row.storage, row.ram));
+    // No real market price? Fall back to the midpoint of the AI-estimated range as the
+    // basis for Sell/Trade-in preview — same "purely informational" spirit as AI Min-Max.
+    const basisPrice = row.marketPrice ?? (aiRange ? Math.round((aiRange.low + aiRange.high) / 2) : null);
+    const aGradeSell = basisPrice !== null ? sellPriceFor(basisPrice, "multiplier_a", pricingConfigs) : null;
+    const aGradeTradeIn = aGradeSell !== null ? tradeOfferFor(aGradeSell, pricingConfigs) : null;
+    const isExpanded = expandedRowId === row.id;
     return (
-      <tr key={row.id} className="hover:bg-zinc-50 transition-colors">
-        <td className="px-6 py-3.5 font-bold text-black whitespace-nowrap">{row.brand} {row.model}</td>
+      <Fragment key={row.id}>
+      <tr
+        onClick={() => setExpandedRowId(isExpanded ? null : row.id)}
+        className="hover:bg-zinc-50 transition-colors cursor-pointer"
+      >
+        <td className="px-6 py-3.5 text-zinc-500 font-medium whitespace-nowrap">{row.brand}</td>
+        <td className="px-6 py-3.5 font-bold text-black whitespace-nowrap">
+          <span className="flex items-center gap-1.5">
+            {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-zinc-300 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-zinc-300 shrink-0" />}
+            {row.model}
+          </span>
+        </td>
         <td className="px-6 py-3.5 text-zinc-500 whitespace-nowrap">{row.storage || "—"}</td>
+        <td className="px-6 py-3.5 text-zinc-500 whitespace-nowrap">{row.ram || "—"}</td>
         <td className="px-6 py-3.5 font-mono text-zinc-700">{fmt(row.cexSellPrice)}</td>
         <td className="px-6 py-3.5 font-mono text-zinc-500">{fmt(row.cexCashPrice)}</td>
         <td className="px-6 py-3.5 font-mono text-zinc-500">{fmt(row.cexExchangePrice)}</td>
         <td className="px-6 py-3.5 font-mono text-zinc-700">{fmt(row.envirofonePrice)}</td>
         <td className="px-6 py-3.5">
-          {row.marketPrice !== null ? (
-            <span className="inline-flex items-center gap-1.5 font-bold font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-xs">
-              £{row.marketPrice.toFixed(0)}
+          <div className="flex flex-col gap-1 items-start">
+            {row.marketPrice !== null ? (
+              <span className="inline-flex items-center gap-1.5 font-bold font-mono text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg text-xs">
+                £{row.marketPrice.toFixed(0)}
+              </span>
+            ) : (
+              <span className="text-zinc-300 text-xs font-medium">No data</span>
+            )}
+            {isFlagged && (
+              <span title="A linked product's computed price fell outside the AI sanity-check range and was held back for review"
+                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg cursor-help">
+                <AlertTriangle className="h-3 w-3" /> Flagged
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="px-6 py-3.5 font-mono text-xs whitespace-nowrap">
+          {aiRange ? (
+            <span className={row.marketPrice === null ? "text-blue-600" : "text-zinc-500"}>
+              £{aiRange.low.toFixed(0)} – £{aiRange.high.toFixed(0)}
+              {row.marketPrice === null && (
+                <span title="No scraped market price — this is a one-off AI estimate for manual pricing" className="ml-1 text-[9px] font-bold uppercase tracking-wide text-blue-400 cursor-help">
+                  AI est.
+                </span>
+              )}
             </span>
-          ) : (
-            <span className="text-zinc-300 text-xs font-medium">No data</span>
-          )}
+          ) : <span className="text-zinc-300">—</span>}
+        </td>
+        <td className="px-6 py-3.5 font-mono text-xs text-zinc-700 whitespace-nowrap">
+          {aGradeSell !== null ? `£${aGradeSell.toFixed(0)}` : <span className="text-zinc-300">—</span>}
+        </td>
+        <td className="px-6 py-3.5 font-mono text-xs text-zinc-700 whitespace-nowrap">
+          {aGradeTradeIn !== null ? `£${aGradeTradeIn.toFixed(0)}` : <span className="text-zinc-300">—</span>}
         </td>
         <td className="px-6 py-3.5">
           <span className="flex items-center gap-1.5 text-xs text-zinc-400 whitespace-nowrap">
@@ -493,22 +662,60 @@ export default function ScraperPage() {
             </span>
           ) : (
             <button
-              onClick={() => handleScrapeRow(row.brand, row.model)}
+              onClick={e => { e.stopPropagation(); handleScrapeRow(row.brand, row.model); }}
               disabled={scrapingKey !== null}
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-zinc-600 bg-zinc-100 hover:bg-zinc-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Zap className="h-3 w-3" /> Scrape
             </button>
           )}
         </td>
       </tr>
+      {isExpanded && (
+        <tr className="bg-zinc-50/60">
+          <td colSpan={14} className="px-6 py-4">
+            {basisPrice === null ? (
+              <p className="text-xs text-zinc-400">No market price or AI estimate available yet — nothing to calculate from.</p>
+            ) : (
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">
+                  Per-grade breakdown · based on {row.marketPrice !== null ? "market price" : "AI estimate"} £{basisPrice}
+                </p>
+                <div className="grid grid-cols-5 gap-3">
+                  {GRADES.map(g => {
+                    const sell = sellPriceFor(basisPrice, g.backendKey, pricingConfigs);
+                    const trade = tradeOfferFor(sell, pricingConfigs);
+                    const gradeFlagged = flaggedGrades.get(flagKey(row.brand, row.model, row.storage, row.ram))?.has(g.key) ?? false;
+                    return (
+                      <div key={g.key} className={`rounded-xl border px-3 py-2.5 ${gradeFlagged ? "bg-amber-50 border-amber-200" : "bg-white border-zinc-100"}`}>
+                        <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                          {g.label}
+                          {gradeFlagged && <AlertTriangle className="h-3 w-3 text-amber-500" />}
+                        </p>
+                        <p className="text-sm font-bold font-mono text-zinc-900">£{sell.toFixed(0)}</p>
+                        <p className="text-[11px] text-zinc-400 font-mono">trade-in £{trade.toFixed(0)}</p>
+                        {gradeFlagged && (
+                          <p title="This grade's computed price fell outside the AI sanity-check range and was held back for review" className="text-[10px] font-bold text-amber-700 mt-1 cursor-help">
+                            Flagged
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </td>
+        </tr>
+      )}
+      </Fragment>
     );
   };
 
   const priceTableHead = (
     <thead>
       <tr className="border-b border-zinc-100">
-        {["Device", "Storage", "CeX Sell", "CeX Cash", "CeX Exchange", "Envirofone", "Market Price", "Last Updated", ""].map(h => (
+        {["Brand", "Device", "Storage", "RAM", "CeX Sell", "CeX Cash", "CeX Exchange", "Envirofone", "Market Price", "AI Min-Max", "Sell (A Grade)", "Trade-in (A Grade)", "Last Updated", ""].map(h => (
           <th key={h} className="text-left text-[10px] font-bold uppercase tracking-widest text-zinc-400 px-6 py-3 whitespace-nowrap">{h}</th>
         ))}
       </tr>
@@ -590,12 +797,44 @@ export default function ScraperPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Auto-price-after-scrape toggle — persisted server-side, applies to manual "Run Now" runs */}
+          <label
+            title="When on, a manual scraper run will automatically re-price the catalog once it finishes"
+            className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-zinc-200 text-sm font-bold text-zinc-600 cursor-pointer select-none"
+          >
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoPriceEnabled}
+              onClick={handleToggleAutoPrice}
+              disabled={autoPriceSaving}
+              className={`relative h-5 w-9 rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${autoPriceEnabled ? "bg-emerald-500" : "bg-zinc-200"}`}
+            >
+              <span
+                className="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-[left] duration-200"
+                style={{ left: autoPriceEnabled ? 18 : 2 }}
+              />
+            </button>
+            Auto-price after scrape
+          </label>
+
+          {/* Manual pricing run — same job the auto-price toggle triggers, available on demand */}
+          <button
+            onClick={handleLaunchPricing}
+            disabled={pricingLaunching}
+            title="Run the pricing job now against currently scraped prices"
+            className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-zinc-200 text-zinc-600 text-sm font-bold hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {pricingLaunching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+            Auto-price All
+          </button>
+
           {/* Clear all scraped data — blocked while a run is active to avoid confusing an in-flight scrape */}
           <button
             onClick={() => setShowPurgeConfirm(true)}
             disabled={isRunActive}
             title={isRunActive ? "Stop the active run before clearing data" : "Delete all scraped prices and run history"}
-            className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-zinc-200 text-zinc-500 text-sm font-bold hover:border-red-200 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-zinc-200 text-zinc-500 text-sm font-bold hover:border-red-200 hover:text-red-700 hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <Trash2 className="h-4 w-4" /> Clear Data
           </button>
@@ -605,7 +844,7 @@ export default function ScraperPage() {
             <button
               onClick={handleStop}
               disabled={stopping}
-              className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 transition-colors disabled:opacity-60"
+              className="flex items-center gap-2 h-11 px-4 rounded-2xl border-2 border-red-200 text-red-700 text-sm font-bold hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {stopping
                 ? <><Loader2 className="h-4 w-4 animate-spin" /> Stopping…</>
@@ -623,7 +862,7 @@ export default function ScraperPage() {
               serviceOnline === false ? "Scraper service is offline" :
               undefined
             }
-            className="flex items-center gap-2 h-11 px-6 rounded-2xl bg-black text-white text-sm font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 h-11 px-6 rounded-2xl bg-black text-white text-sm font-bold hover:bg-zinc-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {running ? (
               <><RefreshCw className="h-4 w-4 animate-spin" /> Starting…</>
