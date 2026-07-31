@@ -247,6 +247,46 @@ const DEVICE_CATALOG = [
             { label: 'RAM',   options: ['36GB', '48GB', '64GB', '128GB'] },
         ],
     },
+    {
+        brand: 'Apple', model: 'MacBook Air 13-inch M3', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver', 'Starlight', 'Midnight'] },
+            { label: 'RAM',   options: ['8GB', '16GB', '24GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Air 15-inch M3', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver', 'Starlight', 'Midnight'] },
+            { label: 'RAM',   options: ['8GB', '16GB', '24GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 14-inch M3 Pro', category: 'laptops',
+        storageOptions: ['512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Black', 'Silver'] },
+            { label: 'RAM',   options: ['18GB', '36GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 14-inch M3 Max', category: 'laptops',
+        storageOptions: ['1TB', '2TB', '4TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Black', 'Silver'] },
+            { label: 'RAM',   options: ['36GB', '48GB', '64GB', '128GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 16-inch M3 Pro', category: 'laptops',
+        storageOptions: ['512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Black', 'Silver'] },
+            { label: 'RAM',   options: ['18GB', '36GB'] },
+        ],
+    },
 ];
 
 export interface SeedResult {
