@@ -11,12 +11,15 @@ import {
 import {
   deviceCatalogApi, catalogBrandCategoryApi, catalogBrandsApi, catalogCategoriesApi, scraperApi,
   type DeviceCatalogItem, type BrandCategoryOption, type ScrapedPriceRow,
-  type CatalogBrandItem, type CatalogCategoryItem,
+  type CatalogBrandItem, type CatalogCategoryItem, type AttributeOption,
 } from "../../lib/api";
 
 const SCRAPER_ENABLED = process.env.NEXT_PUBLIC_SCRAPER_ENABLED === "true";
 
-const EMPTY_FORM = { categoryId: "", brandId: "", model: "", storageOptions: [""], isActive: true };
+const EMPTY_FORM = {
+  categoryId: "", brandId: "", model: "", storageOptions: [""],
+  attributeOptions: [] as AttributeOption[], isActive: true,
+};
 
 function priceRange(prices: (number | null)[]): string | null {
   const valid = prices.filter((p): p is number => p !== null && p > 0);
@@ -198,6 +201,7 @@ export default function CatalogPage() {
       brandId:    d.brandCategory?.brand?.id ?? "",
       model:      d.model,
       storageOptions: [...d.storageOptions],
+      attributeOptions: (d.attributeOptions ?? []).map(g => ({ label: g.label, options: [...g.options] })),
       isActive:   d.isActive,
     });
     setModalOpen(true);
@@ -207,6 +211,10 @@ export default function CatalogPage() {
   async function saveModal() {
     const storageClean = form.storageOptions.map(s => s.trim()).filter(Boolean);
     if (!form.brandId || !form.categoryId || !form.model.trim() || !storageClean.length) return;
+    // Drop empty option values, then drop any group left with no label or no options
+    const attributeOptionsClean = form.attributeOptions
+      .map(g => ({ label: g.label.trim(), options: g.options.map(o => o.trim()).filter(Boolean) }))
+      .filter(g => g.label && g.options.length > 0);
     setSaving(true);
     try {
       // Find existing brand-category link or create it automatically
@@ -216,7 +224,10 @@ export default function CatalogPage() {
         setBrandCategories(prev => [...prev, bc!]);
       }
 
-      const payload = { brandCategoryId: bc.id, model: form.model, storageOptions: storageClean, isActive: form.isActive };
+      const payload = {
+        brandCategoryId: bc.id, model: form.model, storageOptions: storageClean,
+        attributeOptions: attributeOptionsClean, isActive: form.isActive,
+      };
       if (editItem) {
         const updated = await deviceCatalogApi.update(editItem.id, payload);
         setDevices(ds => ds.map(d => d.id === editItem.id ? updated : d));
@@ -252,6 +263,44 @@ export default function CatalogPage() {
 
   function updateStorage(idx: number, val: string) {
     setForm(f => { const s = [...f.storageOptions]; s[idx] = val; return { ...f, storageOptions: s }; });
+  }
+
+  // ── Attribute groups (Color, Edition, Memory, etc.) ─────────────────────────
+  function addAttributeGroup() {
+    setForm(f => ({ ...f, attributeOptions: [...f.attributeOptions, { label: "", options: [""] }] }));
+  }
+  function removeAttributeGroup(idx: number) {
+    setForm(f => ({ ...f, attributeOptions: f.attributeOptions.filter((_, i) => i !== idx) }));
+  }
+  function updateAttributeLabel(idx: number, val: string) {
+    setForm(f => {
+      const groups = [...f.attributeOptions];
+      groups[idx] = { ...groups[idx], label: val };
+      return { ...f, attributeOptions: groups };
+    });
+  }
+  function addAttributeOption(groupIdx: number) {
+    setForm(f => {
+      const groups = [...f.attributeOptions];
+      groups[groupIdx] = { ...groups[groupIdx], options: [...groups[groupIdx].options, ""] };
+      return { ...f, attributeOptions: groups };
+    });
+  }
+  function updateAttributeOption(groupIdx: number, optIdx: number, val: string) {
+    setForm(f => {
+      const groups = [...f.attributeOptions];
+      const options = [...groups[groupIdx].options];
+      options[optIdx] = val;
+      groups[groupIdx] = { ...groups[groupIdx], options };
+      return { ...f, attributeOptions: groups };
+    });
+  }
+  function removeAttributeOption(groupIdx: number, optIdx: number) {
+    setForm(f => {
+      const groups = [...f.attributeOptions];
+      groups[groupIdx] = { ...groups[groupIdx], options: groups[groupIdx].options.filter((_, i) => i !== optIdx) };
+      return { ...f, attributeOptions: groups };
+    });
   }
 
   function devicePriceRange(device: DeviceCatalogItem): string | null {
@@ -366,6 +415,12 @@ export default function CatalogPage() {
                     <div className="flex flex-wrap gap-1">
                       {device.storageOptions.map(s => (
                         <span key={s} className="px-2 py-0.5 bg-zinc-100 text-zinc-500 rounded-md text-[11px] font-medium">{s}</span>
+                      ))}
+                      {(device.attributeOptions ?? []).map(g => (
+                        <span key={g.label}
+                          className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md text-[11px] font-medium">
+                          <span className="text-blue-400">{g.label}:</span> {g.options.join(", ")}
+                        </span>
                       ))}
                     </div>
                     {SCRAPER_ENABLED && (
@@ -496,6 +551,55 @@ export default function CatalogPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-zinc-400">Use "—" for devices without storage variants.</p>
+                </div>
+
+                {/* Attributes: Color, Edition, Memory — any other variant dimension */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">Attributes</label>
+                    <button type="button" onClick={addAttributeGroup}
+                      className="text-[11px] font-bold text-zinc-500 hover:text-black flex items-center gap-1 transition-colors">
+                      <Plus className="h-3 w-3" /> Add attribute
+                    </button>
+                  </div>
+                  {form.attributeOptions.length === 0 ? (
+                    <p className="text-[11px] text-zinc-400">No extra attributes — e.g. add "Color" with options White, Black.</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {form.attributeOptions.map((group, gIdx) => (
+                        <div key={gIdx} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 space-y-2">
+                          <div className="flex gap-2">
+                            <input type="text" value={group.label} onChange={e => updateAttributeLabel(gIdx, e.target.value)}
+                              placeholder="e.g. Color"
+                              className="flex-1 h-9 rounded-xl border border-zinc-200 bg-white px-3 text-sm font-bold outline-none focus:border-black transition-colors" />
+                            <button type="button" onClick={() => removeAttributeGroup(gIdx)}
+                              className="h-9 w-9 rounded-xl border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:border-red-200 transition-colors bg-white">
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="space-y-1.5 pl-1">
+                            {group.options.map((opt, oIdx) => (
+                              <div key={oIdx} className="flex gap-2">
+                                <input type="text" value={opt} onChange={e => updateAttributeOption(gIdx, oIdx, e.target.value)}
+                                  placeholder="e.g. White"
+                                  className="flex-1 h-8 rounded-lg border border-zinc-200 bg-white px-3 text-xs outline-none focus:border-black transition-colors" />
+                                {group.options.length > 1 && (
+                                  <button type="button" onClick={() => removeAttributeOption(gIdx, oIdx)}
+                                    className="h-8 w-8 rounded-lg border border-zinc-200 flex items-center justify-center text-zinc-400 hover:text-red-500 hover:border-red-200 transition-colors bg-white">
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                            <button type="button" onClick={() => addAttributeOption(gIdx)}
+                              className="text-[11px] font-bold text-zinc-500 hover:text-black flex items-center gap-1 transition-colors">
+                              <Plus className="h-3 w-3" /> Add option
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between p-4 rounded-2xl bg-zinc-50 border border-zinc-100">

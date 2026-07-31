@@ -188,7 +188,8 @@ export default function ProductDetailPage() {
 
   const savings = product.comparePrice ? product.comparePrice - (product.price ?? 0) : 0;
   const images = product.images.length > 0 ? product.images : ["https://picsum.photos/seed/placeholder/600/600"];
-  const specs = product.specs as Record<string, unknown>;
+  // Attributes (Color, Edition, etc.) take priority over the generic specs bag they overlap with.
+  const specs = { ...(product.attributes ?? {}), ...(product.specs as Record<string, unknown>) };
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground font-sans selection:bg-accent selection:text-white">

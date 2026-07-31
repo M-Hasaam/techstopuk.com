@@ -65,6 +65,7 @@ describe('ProductsService', () => {
         };
         productPricingMock = {
             priceProduct: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
+            getTradeInFormulaConfig: jest.fn<() => Promise<any>>().mockResolvedValue({ tradeInRatio: 0.5, tradeInMargin: 0 }),
         };
 
         const module: TestingModule = await Test.createTestingModule({

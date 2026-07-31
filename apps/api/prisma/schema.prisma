@@ -100,6 +100,9 @@ model Product {
   slug         String    @unique
   condition    Condition
   storage      String    @default("")
+  attributes   Json      @default("{}")
+  // Selected values for this product's variant, e.g. {"Color":"White","Edition":"Slim"} —
+  // keys are free-form labels defined per-device on DeviceCatalog.attributeOptions.
   price        Float?
   comparePrice Float?
   stock        Int       @default(0)
@@ -319,6 +322,9 @@ model DeviceCatalog {
   brandCategory   BrandCategory @relation(fields: [brandCategoryId], references: [id])
   model           String
   storageOptions  String[]
+  attributeOptions Json         @default("[]")
+  // Admin-defined variant dimensions beyond storage, e.g.
+  // [{"label":"Color","options":["White","Black"]},{"label":"Edition","options":["Slim","Standard"]}]
   isActive           Boolean       @default(true)
   tradeInEnabled     Boolean       @default(true)
   manualMarketPrice  Float?

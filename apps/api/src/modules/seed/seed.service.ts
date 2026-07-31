@@ -64,49 +64,120 @@ const PRICING_DEFAULTS = [
     { key: 'show_unpriced_products', value: 0, label: 'Show unpriced products on storefront (0=hide, 1=show)' },
 ];
 
+// Colors below are each model's real official retail color lineup (verified against
+// Apple/Samsung/Sony/Microsoft product pages and launch coverage), not placeholders.
 const DEVICE_CATALOG = [
-    { brand: 'Apple', model: 'iPhone 11', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'] },
-    { brand: 'Apple', model: 'iPhone 11 Pro', category: 'phones', storageOptions: ['64GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 11 Pro Max', category: 'phones', storageOptions: ['64GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 12', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'] },
-    { brand: 'Apple', model: 'iPhone 12 Mini', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'] },
-    { brand: 'Apple', model: 'iPhone 12 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 12 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 13', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 13 Mini', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 13 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPhone 13 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPhone 14', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 14 Plus', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 14 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPhone 14 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPhone 15', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 15 Plus', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Apple', model: 'iPhone 15 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPhone 15 Pro Max', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'] },
-    { brand: 'Samsung', model: 'Galaxy S21 5G', category: 'phones', storageOptions: ['128GB', '256GB'] },
-    { brand: 'Samsung', model: 'Galaxy S21 Plus 5G', category: 'phones', storageOptions: ['128GB', '256GB'] },
-    { brand: 'Samsung', model: 'Galaxy S21 Ultra 5G', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Samsung', model: 'Galaxy S22', category: 'phones', storageOptions: ['128GB', '256GB'] },
-    { brand: 'Samsung', model: 'Galaxy S22 Plus', category: 'phones', storageOptions: ['128GB', '256GB'] },
-    { brand: 'Samsung', model: 'Galaxy S22 Ultra', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'] },
-    { brand: 'Samsung', model: 'Galaxy S23', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Samsung', model: 'Galaxy S23 Plus', category: 'phones', storageOptions: ['256GB', '512GB'] },
-    { brand: 'Samsung', model: 'Galaxy S23 Ultra', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'] },
-    { brand: 'Samsung', model: 'Galaxy S24', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'] },
-    { brand: 'Samsung', model: 'Galaxy S24 Plus', category: 'phones', storageOptions: ['256GB', '512GB'] },
-    { brand: 'Samsung', model: 'Galaxy S24 Ultra', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'iPad 9th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'] },
-    { brand: 'Apple', model: 'iPad 10th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'] },
-    { brand: 'Apple', model: 'iPad Air 5th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'] },
-    { brand: 'Apple', model: 'iPad Mini 6th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'] },
-    { brand: 'Apple', model: 'iPad Pro 11-inch M1', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'iPad Pro 11-inch M2', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'iPad Pro 12.9-inch M1', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'iPad Pro 12.9-inch M2', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'] },
+    { brand: 'Apple', model: 'iPhone 11', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Black', 'Green', 'Yellow', 'Purple', 'Red', 'White'] }] },
+    { brand: 'Apple', model: 'iPhone 11 Pro', category: 'phones', storageOptions: ['64GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Midnight Green', 'Space Gray', 'Silver', 'Gold'] }] },
+    { brand: 'Apple', model: 'iPhone 11 Pro Max', category: 'phones', storageOptions: ['64GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Midnight Green', 'Space Gray', 'Silver', 'Gold'] }] },
+    { brand: 'Apple', model: 'iPhone 12', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'] }] },
+    { brand: 'Apple', model: 'iPhone 12 Mini', category: 'phones', storageOptions: ['64GB', '128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Black', 'White', 'Red', 'Green', 'Blue', 'Purple'] }] },
+    { brand: 'Apple', model: 'iPhone 12 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Graphite', 'Silver', 'Gold', 'Pacific Blue'] }] },
+    { brand: 'Apple', model: 'iPhone 12 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Graphite', 'Silver', 'Gold', 'Pacific Blue'] }] },
+    { brand: 'Apple', model: 'iPhone 13', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red', 'Green'] }] },
+    { brand: 'Apple', model: 'iPhone 13 Mini', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Pink', 'Blue', 'Midnight', 'Starlight', 'Red', 'Green'] }] },
+    { brand: 'Apple', model: 'iPhone 13 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'] }] },
+    { brand: 'Apple', model: 'iPhone 13 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Graphite', 'Gold', 'Silver', 'Sierra Blue', 'Alpine Green'] }] },
+    { brand: 'Apple', model: 'iPhone 14', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Midnight', 'Purple', 'Starlight', 'Red', 'Blue', 'Yellow'] }] },
+    { brand: 'Apple', model: 'iPhone 14 Plus', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Midnight', 'Purple', 'Starlight', 'Red', 'Blue', 'Yellow'] }] },
+    { brand: 'Apple', model: 'iPhone 14 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Space Black', 'Silver', 'Gold', 'Deep Purple'] }] },
+    { brand: 'Apple', model: 'iPhone 14 Pro Max', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Space Black', 'Silver', 'Gold', 'Deep Purple'] }] },
+    { brand: 'Apple', model: 'iPhone 15', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Black', 'Blue', 'Green', 'Yellow', 'Pink'] }] },
+    { brand: 'Apple', model: 'iPhone 15 Plus', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Black', 'Blue', 'Green', 'Yellow', 'Pink'] }] },
+    { brand: 'Apple', model: 'iPhone 15 Pro', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Black Titanium', 'White Titanium', 'Blue Titanium', 'Natural Titanium'] }] },
+    { brand: 'Apple', model: 'iPhone 15 Pro Max', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Black Titanium', 'White Titanium', 'Blue Titanium', 'Natural Titanium'] }] },
+    { brand: 'Samsung', model: 'Galaxy S21 5G', category: 'phones', storageOptions: ['128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Gray', 'Phantom White', 'Phantom Violet', 'Phantom Pink'] }] },
+    { brand: 'Samsung', model: 'Galaxy S21 Plus 5G', category: 'phones', storageOptions: ['128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Black', 'Phantom Silver', 'Phantom Violet'] }] },
+    { brand: 'Samsung', model: 'Galaxy S21 Ultra 5G', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Black', 'Phantom Silver'] }] },
+    { brand: 'Samsung', model: 'Galaxy S22', category: 'phones', storageOptions: ['128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom White', 'Phantom Black', 'Green', 'Pink Gold'] }] },
+    { brand: 'Samsung', model: 'Galaxy S22 Plus', category: 'phones', storageOptions: ['128GB', '256GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom White', 'Phantom Black', 'Green', 'Pink Gold'] }] },
+    { brand: 'Samsung', model: 'Galaxy S22 Ultra', category: 'phones', storageOptions: ['128GB', '256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom White', 'Phantom Black', 'Green', 'Burgundy'] }] },
+    { brand: 'Samsung', model: 'Galaxy S23', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Black', 'Cream', 'Green', 'Lavender'] }] },
+    { brand: 'Samsung', model: 'Galaxy S23 Plus', category: 'phones', storageOptions: ['256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Black', 'Cream', 'Green', 'Lavender'] }] },
+    { brand: 'Samsung', model: 'Galaxy S23 Ultra', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Phantom Black', 'Cream', 'Green', 'Lavender'] }] },
+    { brand: 'Samsung', model: 'Galaxy S24', category: 'phones', storageOptions: ['128GB', '256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Onyx Black', 'Marble Gray', 'Cobalt Violet', 'Amber Yellow'] }] },
+    { brand: 'Samsung', model: 'Galaxy S24 Plus', category: 'phones', storageOptions: ['256GB', '512GB'],
+      attributeOptions: [{ label: 'Color', options: ['Onyx Black', 'Marble Gray', 'Cobalt Violet', 'Amber Yellow'] }] },
+    { brand: 'Samsung', model: 'Galaxy S24 Ultra', category: 'phones', storageOptions: ['256GB', '512GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Titanium Black', 'Titanium Gray', 'Titanium Violet', 'Titanium Yellow'] }] },
+    { brand: 'Apple', model: 'iPad 9th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Silver', 'Space Gray'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad 10th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Silver', 'Blue', 'Pink', 'Yellow'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Air 5th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Starlight', 'Pink', 'Purple', 'Blue'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Mini 6th Gen', category: 'tablets', storageOptions: ['64GB', '256GB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Pink', 'Purple', 'Starlight'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Pro 11-inch M1', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Silver'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Pro 11-inch M2', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Silver'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Pro 12.9-inch M1', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Silver'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
+    { brand: 'Apple', model: 'iPad Pro 12.9-inch M2', category: 'tablets', storageOptions: ['128GB', '256GB', '512GB', '1TB', '2TB'],
+      attributeOptions: [
+          { label: 'Color', options: ['Space Gray', 'Silver'] },
+          { label: 'Connectivity', options: ['WiFi', 'WiFi + Cellular'] },
+      ] },
     { brand: 'Sony', model: 'PlayStation 3 Slim', category: 'gaming', storageOptions: ['120GB', '250GB', '320GB', '500GB'] },
-    { brand: 'Sony', model: 'PlayStation 4', category: 'gaming', storageOptions: ['500GB', '1TB'] },
-    { brand: 'Sony', model: 'PlayStation 4 Slim', category: 'gaming', storageOptions: ['500GB', '1TB'] },
+    // Jet Black / Glacier White were real retail colors for the PS4 body — most other
+    // consoles below only ever shipped as a single standard color at retail (custom
+    // console "colors" seen online are usually detachable faceplates, a separate
+    // aftermarket accessory, not a factory option), so they're left without a Color attribute.
+    { brand: 'Sony', model: 'PlayStation 4', category: 'gaming', storageOptions: ['500GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Jet Black', 'Glacier White'] }] },
+    { brand: 'Sony', model: 'PlayStation 4 Slim', category: 'gaming', storageOptions: ['500GB', '1TB'],
+      attributeOptions: [{ label: 'Color', options: ['Jet Black', 'Glacier White'] }] },
     { brand: 'Sony', model: 'PlayStation 4 Pro', category: 'gaming', storageOptions: ['1TB'] },
     { brand: 'Sony', model: 'PlayStation 5 Disc Edition', category: 'gaming', storageOptions: ['825GB', '1TB'] },
     { brand: 'Sony', model: 'PlayStation 5 Digital Edition', category: 'gaming', storageOptions: ['825GB', '1TB'] },
@@ -121,11 +192,61 @@ const DEVICE_CATALOG = [
     { brand: 'Microsoft', model: 'Xbox One X', category: 'gaming', storageOptions: ['1TB'] },
     { brand: 'Microsoft', model: 'Xbox Series S', category: 'gaming', storageOptions: ['512GB', '1TB'] },
     { brand: 'Microsoft', model: 'Xbox Series X', category: 'gaming', storageOptions: ['1TB'] },
-    { brand: 'Apple', model: 'MacBook Air M1 (2020)', category: 'laptops', storageOptions: ['256GB', '512GB', '1TB'] },
-    { brand: 'Apple', model: 'MacBook Air M2 (2022)', category: 'laptops', storageOptions: ['256GB', '512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'MacBook Pro 13-inch M1 (2020)', category: 'laptops', storageOptions: ['256GB', '512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'MacBook Pro 14-inch M2 Pro (2023)', category: 'laptops', storageOptions: ['512GB', '1TB', '2TB'] },
-    { brand: 'Apple', model: 'MacBook Pro 16-inch M3 Max (2023)', category: 'laptops', storageOptions: ['1TB', '2TB', '4TB'] },
+    // Colors and RAM below match Apple's actual retail configurations for each model.
+    // No release year in the name — the chip already disambiguates each line, and CeX
+    // identifies these by internal model number rather than year anyway (the scraper
+    // already strips a "(YYYY)" suffix before matching, so it was never load-bearing).
+    {
+        brand: 'Apple', model: 'MacBook Air 13-inch M1', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver', 'Gold'] },
+            { label: 'RAM',   options: ['8GB', '16GB'] },
+        ],
+    },
+    // Apple sold two genuinely different M2 Air models — a 13" (2022) and a later,
+    // larger 15" (2023) with a bigger battery and six-speaker sound system. Same
+    // storage/RAM/color options for both, but CeX prices them differently.
+    {
+        brand: 'Apple', model: 'MacBook Air 13-inch M2', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver', 'Starlight', 'Midnight'] },
+            { label: 'RAM',   options: ['8GB', '16GB', '24GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Air 15-inch M2', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver', 'Starlight', 'Midnight'] },
+            { label: 'RAM',   options: ['8GB', '16GB', '24GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 13-inch M1', category: 'laptops',
+        storageOptions: ['256GB', '512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver'] },
+            { label: 'RAM',   options: ['8GB', '16GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 14-inch M2 Pro', category: 'laptops',
+        storageOptions: ['512GB', '1TB', '2TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Gray', 'Silver'] },
+            { label: 'RAM',   options: ['16GB', '32GB'] },
+        ],
+    },
+    {
+        brand: 'Apple', model: 'MacBook Pro 16-inch M3 Max', category: 'laptops',
+        storageOptions: ['1TB', '2TB', '4TB'],
+        attributeOptions: [
+            { label: 'Color', options: ['Space Black', 'Silver'] },
+            { label: 'RAM',   options: ['36GB', '48GB', '64GB', '128GB'] },
+        ],
+    },
 ];
 
 export interface SeedResult {
@@ -423,7 +544,13 @@ export class SeedService {
             }
 
             await this.prisma.deviceCatalog.create({
-                data: { brandCategoryId: bcCache.get(bcKey)!, model: dev.model, storageOptions: dev.storageOptions, isActive: true },
+                data: {
+                    brandCategoryId: bcCache.get(bcKey)!,
+                    model: dev.model,
+                    storageOptions: dev.storageOptions,
+                    attributeOptions: (dev as { attributeOptions?: unknown }).attributeOptions ?? [],
+                    isActive: true,
+                },
             });
         }
         this.logger.log(`Seeded ${DEVICE_CATALOG.length} device catalog entries`);

@@ -85,7 +85,7 @@ export class DeviceCatalogService {
 
     create(dto: UpsertDeviceDto) {
         return this.prisma.deviceCatalog.create({
-            data: dto,
+            data: dto as never,
             include: { brandCategory: { include: { brand: true, category: true } } },
         });
     }
@@ -95,7 +95,7 @@ export class DeviceCatalogService {
         if (!existing) throw new NotFoundException('Device not found');
         return this.prisma.deviceCatalog.update({
             where: { id },
-            data: dto,
+            data: dto as never,
             include: { brandCategory: { include: { brand: true, category: true } } },
         });
     }

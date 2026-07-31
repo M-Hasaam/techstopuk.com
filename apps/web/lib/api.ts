@@ -387,6 +387,7 @@ export interface Product {
   stock: number;
   images: string[];
   specs: Record<string, unknown>;
+  attributes?: Record<string, string>;
   description?: string;
   rating: number;
   reviewCount: number;

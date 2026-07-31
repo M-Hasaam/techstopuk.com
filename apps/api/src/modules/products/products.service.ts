@@ -125,7 +125,8 @@ export class ProductsService {
                 storage: dto.storage ?? '',
                 slug,
                 images: dto.images ?? [],
-                specs:  (dto.specs ?? {}) as never,
+                specs:      (dto.specs ?? {}) as never,
+                attributes: (dto.attributes ?? {}) as never,
             } as never,
             include: CATALOG_INCLUDE,
         });

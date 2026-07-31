@@ -38,6 +38,10 @@ export class CreateProductDto {
     @IsOptional()
     storage?: string;
 
+    @IsObject()
+    @IsOptional()
+    attributes?: Record<string, string>;
+
     @IsNumber()
     @Min(0)
     @IsOptional()

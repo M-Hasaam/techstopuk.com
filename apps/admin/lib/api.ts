@@ -72,6 +72,11 @@ export const adminApi = {
 };
 
 // ── Device Catalog ────────────────────────────────────────────────────────────
+export interface AttributeOption {
+  label: string;
+  options: string[];
+}
+
 export const deviceCatalogApi = {
   list: (params?: { categorySlug?: string; brandSlug?: string; search?: string }) => {
     const q = new URLSearchParams();
@@ -92,9 +97,9 @@ export const deviceCatalogApi = {
   },
   getById: (id: string) =>
     apiFetch<DeviceCatalogItem>(`/device-catalog/${id}`, { auth: false }),
-  create: (data: { brandCategoryId: string; model: string; storageOptions: string[]; isActive?: boolean }) =>
+  create: (data: { brandCategoryId: string; model: string; storageOptions: string[]; attributeOptions?: AttributeOption[]; isActive?: boolean }) =>
     apiFetch<DeviceCatalogItem>('/device-catalog', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ brandCategoryId: string; model: string; storageOptions: string[]; isActive: boolean; tradeInEnabled: boolean; manualMarketPrice: number | null }>) =>
+  update: (id: string, data: Partial<{ brandCategoryId: string; model: string; storageOptions: string[]; attributeOptions: AttributeOption[]; isActive: boolean; tradeInEnabled: boolean; manualMarketPrice: number | null }>) =>
     apiFetch<DeviceCatalogItem>(`/device-catalog/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) =>
     apiFetch<void>(`/device-catalog/${id}`, { method: 'DELETE' }),
@@ -639,6 +644,7 @@ export interface Product {
   category: string;             // flattened from either track
   condition: string;
   storage: string;
+  attributes?: Record<string, string>;
   price: number | null;
   comparePrice?: number;
   tradeInPrice?: number | null;
@@ -662,6 +668,7 @@ export interface CreateProductPayload {
   name: string;
   condition: string;
   storage?: string;
+  attributes?: Record<string, string>;
   price?: number | null;
   comparePrice?: number;
   stock?: number;
@@ -759,6 +766,7 @@ export interface DeviceCatalogItem {
   };
   model: string;
   storageOptions: string[];
+  attributeOptions: AttributeOption[];
   isActive: boolean;
   tradeInEnabled: boolean;
   manualMarketPrice: number | null;

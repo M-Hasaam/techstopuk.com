@@ -433,6 +433,20 @@ export default function ProductDetailPage() {
                   />
                 </div>
               </div>
+
+              {/* Attributes (Color, Edition, etc.) — set from the Products list edit modal, shown here read-only */}
+              {product && Object.entries(product.attributes ?? {}).filter(([, v]) => v).length > 0 && (
+                <div className="mt-5 pt-5 border-t border-zinc-100">
+                  <label className="text-[11px] font-bold uppercase tracking-widest text-zinc-400 mb-2 block">Attributes</label>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(product.attributes ?? {}).filter(([, v]) => v).map(([label, value]) => (
+                      <span key={label} className="px-3 py-1.5 bg-zinc-50 border border-zinc-200 rounded-xl text-xs font-semibold text-zinc-600">
+                        <span className="text-zinc-400">{label}:</span> {value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Purchase History */}

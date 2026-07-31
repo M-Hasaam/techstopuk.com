@@ -29,7 +29,7 @@ const STATUS_TO_API: Record<string, string | undefined> = {
 
 const EMPTY_FORM: CreateProductPayload = {
   catalogId: "", name: "", condition: "A",
-  storage: "", price: 0, comparePrice: undefined,
+  storage: "", attributes: {}, price: 0, comparePrice: undefined,
   stock: 0, description: "", isActive: true,
 };
 
@@ -238,7 +238,7 @@ export default function ProductsPage() {
     setEditProduct(p);
     setFormData({
       catalogId: p.catalogId, name: p.name, condition: p.condition,
-      storage: p.storage, price: p.price, comparePrice: p.comparePrice,
+      storage: p.storage, attributes: p.attributes ?? {}, price: p.price, comparePrice: p.comparePrice,
       stock: p.stock, description: p.description ?? "",
       isActive: p.isActive, specs: p.specs,
     });
@@ -251,6 +251,10 @@ export default function ProductsPage() {
 
   function selectCatalogDevice(dev: DeviceCatalogItem) {
     const firstStorage = dev.storageOptions[0] ?? "";
+    const defaultAttributes: Record<string, string> = {};
+    for (const group of dev.attributeOptions ?? []) {
+      if (group.options[0]) defaultAttributes[group.label] = group.options[0];
+    }
     setSelectedDevice(dev);
     setDeviceQuery(`${dev.brandCategory.brand.name} ${dev.model}`);
     setPickerOpen(false);
@@ -260,6 +264,7 @@ export default function ProductsPage() {
       catalogId: dev.id,
       name: suggestedName,
       storage: firstStorage,
+      attributes: defaultAttributes,
     }));
     const brand = dev.brandCategory.brand.name;
     loadEstimate(brand, dev.model, firstStorage, formData.condition);
@@ -371,6 +376,7 @@ export default function ProductsPage() {
   }
 
   const storage = (p: Product) => p.storage || "—";
+  const attributesLabel = (p: Product) => Object.values(p.attributes ?? {}).filter(Boolean).join(" · ");
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 md:p-8">
@@ -519,7 +525,9 @@ export default function ProductsPage() {
                       )}
                       <div>
                         <p className="font-bold">{p.name}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5">{p.brand} · {storage(p)}</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          {p.brand} · {storage(p)}{attributesLabel(p) ? ` · ${attributesLabel(p)}` : ""}
+                        </p>
                       </div>
                     </div>
                   </td>
@@ -980,6 +988,24 @@ export default function ProductsPage() {
                     />
                   )}
                 </div>
+
+                {/* Attributes: one select per device-defined group (Color, Edition, etc.) */}
+                {selectedDevice && (selectedDevice.attributeOptions ?? []).map(group => (
+                  <div key={group.label} className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">{group.label}</label>
+                    <div className="relative">
+                      <select value={formData.attributes?.[group.label] ?? ""}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setFormData(f => ({ ...f, attributes: { ...f.attributes, [group.label]: val } }));
+                        }}
+                        className="h-12 w-full rounded-[0.875rem] border-2 border-zinc-200 pl-4 pr-10 text-sm font-medium outline-none focus:border-black transition-colors bg-white appearance-none">
+                        {group.options.map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                ))}
 
                 {/* Pricing Intelligence (add mode) */}
                 {selectedDevice && (

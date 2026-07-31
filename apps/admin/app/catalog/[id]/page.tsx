@@ -220,6 +220,23 @@ export default function CatalogDetailPage() {
                 )}
               </div>
             </div>
+            {(device.attributeOptions ?? []).length > 0 && (
+              <div className="mt-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-zinc-400 mb-2">Configured Attributes</h3>
+                <div className="space-y-2.5">
+                  {device.attributeOptions.map(group => (
+                    <div key={group.label} className="flex items-start gap-3">
+                      <span className="shrink-0 pt-1 text-xs font-bold text-zinc-500 w-20">{group.label}</span>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map(option => (
+                          <span key={option} className="px-3 py-1 bg-blue-50 text-blue-700 rounded-xl text-xs font-semibold border border-blue-100">{option}</span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <div className="mt-8 pt-4 border-t border-zinc-100 flex items-center justify-between text-xs text-zinc-400 font-medium">
             <span>Created: {new Date(device.createdAt).toLocaleDateString()}</span>
@@ -441,7 +458,11 @@ export default function CatalogDetailPage() {
                       )}
                       <div>
                         <p className="font-bold text-zinc-950 group-hover:text-black">{p.name}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5">Storage: {p.storage || "—"}</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">
+                          Storage: {p.storage || "—"}
+                          {Object.values(p.attributes ?? {}).filter(Boolean).length > 0 &&
+                            ` · ${Object.values(p.attributes ?? {}).filter(Boolean).join(" · ")}`}
+                        </p>
                       </div>
                     </div>
                   </td>
