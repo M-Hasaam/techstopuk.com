@@ -61,6 +61,14 @@ export class ScraperService implements OnApplicationBootstrap {
     private readonly logger = new Logger(ScraperService.name);
     private stopRequested = false;
     private isRunning = false;
+    private runStartedAt: number | null = null;
+    // Absolute safety net: if a run's in-memory lock is somehow still held this long
+    // (e.g. a single Puppeteer page interaction hangs forever with no timeout of its
+    // own), treat it as stale and self-clear rather than blocking every future run
+    // indefinitely — confirmed in practice: isRunning stuck true with zero rows in
+    // scraper_runs, surviving even a DB-side stuck-run cleanup, because that only
+    // touches the DB and has no way to reach into this process's memory.
+    private static readonly STALE_LOCK_HOURS = 3;
 
     constructor(
         private readonly prisma: PrismaService,
@@ -98,6 +106,17 @@ export class ScraperService implements OnApplicationBootstrap {
 
     /** Whether a scraper run (fresh or auto-resumed) is currently in progress. */
     isBusy(): boolean {
+        if (this.isRunning && this.runStartedAt) {
+            const hoursSinceStart = (Date.now() - this.runStartedAt) / (60 * 60 * 1000);
+            if (hoursSinceStart > ScraperService.STALE_LOCK_HOURS) {
+                this.logger.warn(
+                    `isRunning has been held for ${hoursSinceStart.toFixed(1)}h — treating as a stale lock ` +
+                    `from a hung run and clearing it so new runs aren't blocked forever.`,
+                );
+                this.isRunning = false;
+                this.runStartedAt = null;
+            }
+        }
         return this.isRunning;
     }
 
@@ -186,10 +205,12 @@ export class ScraperService implements OnApplicationBootstrap {
             throw new Error('A scraper run is already in progress.');
         }
         this.isRunning = true;
+        this.runStartedAt = Date.now();
         try {
             return await this.runScraperImpl(limit, skipKeys);
         } finally {
             this.isRunning = false;
+            this.runStartedAt = null;
         }
     }
 
