@@ -36,17 +36,24 @@ export class ProductPricingController {
         @Query('model')     model:     string,
         @Query('storage')   storage:   string,
         @Query('condition') condition: string,
+        @Query('ram')       ram?:      string,
     ) {
         return this.service.getEstimate(
             brand     ?? '',
             model     ?? '',
             storage   ?? '',
             condition ?? 'Good',
+            ram       ?? '',
         );
     }
 
     @Get('flagged')
     flagged() {
         return this.service.getFlaggedProducts();
+    }
+
+    @Get('ranges')
+    ranges() {
+        return this.service.getPricingRanges();
     }
 }

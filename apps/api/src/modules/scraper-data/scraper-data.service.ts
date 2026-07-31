@@ -217,12 +217,13 @@ export class ScraperDataService {
         }
     }
 
-    async lookupPrice(brand: string, model: string, storage?: string): Promise<number | null> {
+    async lookupPrice(brand: string, model: string, storage?: string, ram?: string): Promise<number | null> {
         const rows = await this.prisma.scrapedPrice.findMany({
             where: {
                 brand: { equals: brand, mode: 'insensitive' },
                 model: { equals: model, mode: 'insensitive' },
                 ...(storage ? { storage: { equals: storage, mode: 'insensitive' } } : {}),
+                ...(ram ? { ram: { equals: ram, mode: 'insensitive' } } : {}),
             },
             orderBy: { scrapedAt: 'desc' },
             take: 1,

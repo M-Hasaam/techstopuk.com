@@ -114,6 +114,9 @@ model Product {
   isActive     Boolean   @default(true)
   pricingStatus String   @default("no_data")
   // "auto_priced" | "manual" | "flagged" | "no_data"
+  aiRangeLow   Float?
+  aiRangeHigh  Float?
+  // Last AI-computed resale price bounds (GBP) used for the sanity-check on this product's condition.
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -343,6 +346,9 @@ model ScrapedPrice {
   brand              String
   model              String
   storage            String
+  ram                String   @default("")
+  // RAM variant, when the device has one (mainly laptops) — "" for devices with no
+  // RAM attribute, keeping deviceKey/lookup behavior unchanged for everything else.
   cexSellPrice       Float?
   cexCashPrice       Float?
   cexExchangePrice   Float?
@@ -350,6 +356,11 @@ model ScrapedPrice {
   musicMagpiePrice   Float?
   envirofonePrice    Float?
   marketPrice        Float?   // best available price computed from all sources
+  aiRangeLow         Float?
+  aiRangeHigh        Float?
+  // One-off AI resale-price estimate, computed only when marketPrice is null and never
+  // recomputed afterward — lets admins manually price devices CeX/Envirofone don't carry
+  // without repeatedly spending OpenAI tokens on the same unchanged device.
   scrapedAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

@@ -245,7 +245,7 @@ export default function ProductsPage() {
     setError("");
     setShowModal(true);
     if (p.catalogId && p.brand && p.model) {
-      loadEstimate(p.brand, p.model, p.storage ?? '', p.condition);
+      loadEstimate(p.brand, p.model, p.storage ?? '', p.condition, p.attributes?.RAM);
     }
   }
 
@@ -267,7 +267,7 @@ export default function ProductsPage() {
       attributes: defaultAttributes,
     }));
     const brand = dev.brandCategory.brand.name;
-    loadEstimate(brand, dev.model, firstStorage, formData.condition);
+    loadEstimate(brand, dev.model, firstStorage, formData.condition, defaultAttributes.RAM);
   }
 
   async function handleDeleteAll() {
@@ -361,12 +361,12 @@ export default function ProductsPage() {
     }
   }
 
-  async function loadEstimate(brand: string, model: string, storage: string, condition: string) {
+  async function loadEstimate(brand: string, model: string, storage: string, condition: string, ram?: string) {
     if (!brand || !model) return;
     setLoadingEstimate(true);
     setEstimate(null);
     try {
-      const result = await productPricingApi.estimate(brand, model, storage, condition);
+      const result = await productPricingApi.estimate(brand, model, storage, condition, ram);
       setEstimate(result);
     } catch {
       setEstimate(null);
@@ -738,7 +738,7 @@ export default function ProductsPage() {
                         try {
                           const result = await productPricingApi.priceOne(editProduct.id);
                           if (result.candidatePrice !== undefined) setFormData(f => ({ ...f, price: result.candidatePrice! }));
-                          await loadEstimate(editProduct.brand, editProduct.model, editProduct.storage ?? '', editProduct.condition);
+                          await loadEstimate(editProduct.brand, editProduct.model, editProduct.storage ?? '', editProduct.condition, editProduct.attributes?.RAM);
                         } catch (e: any) { alert(e.message ?? 'Pricing failed'); }
                         finally { setPricingProductId(null); }
                       }}
@@ -798,7 +798,7 @@ export default function ProductsPage() {
                         const c = e.target.value;
                         setFormData(f => ({ ...f, condition: c }));
                         if (editProduct?.catalogId && editProduct.brand && editProduct.model)
-                          loadEstimate(editProduct.brand, editProduct.model, formData.storage ?? '', c);
+                          loadEstimate(editProduct.brand, editProduct.model, formData.storage ?? '', c, formData.attributes?.RAM);
                       }}
                       className="h-12 w-full rounded-[0.875rem] border-2 border-zinc-200 pl-4 pr-10 text-sm font-medium outline-none focus:border-black transition-colors bg-white appearance-none"
                     >
@@ -974,7 +974,7 @@ export default function ProductsPage() {
                         onChange={e => {
                           const s = e.target.value;
                           setFormData(f => ({ ...f, storage: s, name: `${selectedDevice.brandCategory.brand.name} ${selectedDevice.model}${s ? ` ${s}` : ""}` }));
-                          loadEstimate(selectedDevice.brandCategory.brand.name, selectedDevice.model, s, formData.condition);
+                          loadEstimate(selectedDevice.brandCategory.brand.name, selectedDevice.model, s, formData.condition, formData.attributes?.RAM);
                         }}
                         className="h-12 w-full rounded-[0.875rem] border-2 border-zinc-200 pl-4 pr-10 text-sm font-medium outline-none focus:border-black transition-colors bg-white appearance-none">
                         {selectedDevice.storageOptions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -998,6 +998,11 @@ export default function ProductsPage() {
                         onChange={e => {
                           const val = e.target.value;
                           setFormData(f => ({ ...f, attributes: { ...f.attributes, [group.label]: val } }));
+                          // RAM materially affects resale price — refresh the live estimate.
+                          // Other attributes (color, etc.) don't, so skip the extra request for those.
+                          if (group.label === "RAM" && selectedDevice) {
+                            loadEstimate(selectedDevice.brandCategory.brand.name, selectedDevice.model, formData.storage ?? "", formData.condition, val);
+                          }
                         }}
                         className="h-12 w-full rounded-[0.875rem] border-2 border-zinc-200 pl-4 pr-10 text-sm font-medium outline-none focus:border-black transition-colors bg-white appearance-none">
                         {group.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -1112,7 +1117,7 @@ export default function ProductsPage() {
                       onChange={e => {
                         const c = e.target.value;
                         setFormData(f => ({ ...f, condition: c }));
-                        if (selectedDevice) loadEstimate(selectedDevice.brandCategory.brand.name, selectedDevice.model, formData.storage ?? '', c);
+                        if (selectedDevice) loadEstimate(selectedDevice.brandCategory.brand.name, selectedDevice.model, formData.storage ?? '', c, formData.attributes?.RAM);
                       }}
                       className="h-12 w-full rounded-[0.875rem] border-2 border-zinc-200 pl-4 pr-10 text-sm font-medium outline-none focus:border-black transition-colors bg-white appearance-none">
                       {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}

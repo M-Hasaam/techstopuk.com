@@ -220,17 +220,26 @@ export class ScraperService implements OnApplicationBootstrap {
         });
         this.logger.log(`Found ${devices.length} active devices in catalog.`);
 
-        const searchItems: { brand: string; model: string; storage: string; fullName: string; cexOnly?: boolean }[] = [];
+        const searchItems: { brand: string; model: string; storage: string; ram: string; fullName: string; cexOnly?: boolean }[] = [];
         for (const dev of devices) {
             const brandName = dev.brandCategory.brand.name;
-            const options = dev.storageOptions?.length ? dev.storageOptions : [''];
-            for (const storage of options) {
-                searchItems.push({
-                    brand:    brandName,
-                    model:    dev.model,
-                    storage:  storage as string,
-                    fullName: storage ? `${brandName} ${dev.model} ${storage}` : `${brandName} ${dev.model}`,
-                });
+            const storageOpts = dev.storageOptions?.length ? dev.storageOptions : [''];
+            // RAM materially changes resale value (mainly laptops) — scrape it as its own
+            // dimension alongside storage, same way. Devices with no RAM attribute group
+            // (phones, consoles, etc.) get ramOpts = [''], so nothing changes for them.
+            const ramGroup = (dev.attributeOptions as { label: string; options: string[] }[] | null)?.find(g => g.label === 'RAM');
+            const ramOpts = ramGroup?.options?.length ? ramGroup.options : [''];
+            for (const storage of storageOpts) {
+                for (const ram of ramOpts) {
+                    const fullName = [brandName, dev.model, ram, storage].filter(Boolean).join(' ');
+                    searchItems.push({
+                        brand:   brandName,
+                        model:   dev.model,
+                        storage: storage as string,
+                        ram:     ram as string,
+                        fullName,
+                    });
+                }
             }
         }
 
@@ -250,6 +259,7 @@ export class ScraperService implements OnApplicationBootstrap {
                 brand:    brandName,
                 model:    p.name,
                 storage:  '',
+                ram:      '',
                 fullName: `${brandName} ${p.name}`,
                 cexOnly:  true,
             });
@@ -309,10 +319,10 @@ export class ScraperService implements OnApplicationBootstrap {
 
                 const num = `[${String(i + 1).padStart(2, '0')}/${String(total).padStart(2, '0')}]`;
 
-                let cex = await this.scrapeCeX(context, item.brand, item.model, item.storage, !item.cexOnly);
+                let cex = await this.scrapeCeX(context, item.brand, item.model, item.storage, item.ram, !item.cexOnly);
                 if (!cex && item.storage) {
                     await this.delay(500);
-                    cex = await this.scrapeCeX(context, item.brand, item.model, '', !item.cexOnly);
+                    cex = await this.scrapeCeX(context, item.brand, item.model, '', item.ram, !item.cexOnly);
                 }
                 await this.delay(500);
                 const ref = cex?.sellPrice ?? undefined;
@@ -333,6 +343,7 @@ export class ScraperService implements OnApplicationBootstrap {
                         brand:            item.brand,
                         model:            item.model,
                         storage:          item.storage,
+                        ram:              item.ram,
                         cexSellPrice:     cex?.sellPrice        ?? null,
                         cexCashPrice:     cex?.buyCashPrice     ?? null,
                         cexExchangePrice: cex?.buyExchangePrice ?? null,
@@ -409,7 +420,7 @@ export class ScraperService implements OnApplicationBootstrap {
     // CeX loads search results from Algolia (search.webuy.io). By intercepting
     // that network response we get clean JSON with all prices — no HTML parsing.
     private async scrapeCeX(
-        context: BrowserContext, brand: string, model: string, storage: string,
+        context: BrowserContext, brand: string, model: string, storage: string, ram = '',
         isMainDevice = true,
     ): Promise<CompetitorPrices | null> {
         // CeX uses "Plus" not "+": "Galaxy S24+" → "Galaxy S24 Plus"
@@ -422,7 +433,7 @@ export class ScraperService implements OnApplicationBootstrap {
             .replace(/\bdisc edition\b/gi, '')
             .replace(/\s+/g, ' ')
             .trim();
-        const query = [brand, normModel, storage].filter(Boolean).join(' ');
+        const query = [brand, normModel, ram, storage].filter(Boolean).join(' ');
         const page = await context.newPage();
         try {
             // Helper: navigate and capture the Algolia JSON response
@@ -465,7 +476,7 @@ export class ScraperService implements OnApplicationBootstrap {
                     .replace(/\bwireless\b/gi, '')
                     .replace(/\s+/g, ' ').trim();
                 if (simplified !== normModel) {
-                    hits = await fetchHits([brand, simplified, storage].filter(Boolean).join(' '));
+                    hits = await fetchHits([brand, simplified, ram, storage].filter(Boolean).join(' '));
                 }
             }
 
@@ -477,6 +488,7 @@ export class ScraperService implements OnApplicationBootstrap {
             // reject the real console listing just like it rejected the search above.
             const modelL  = normModel.toLowerCase();
             const storageN = (storage ?? '').toLowerCase().replace(/\s+/g, '');
+            const ramN     = (ram ?? '').toLowerCase().replace(/\s+/g, '');
 
             // Normalize model: drop a bare release year in parens e.g. "(2020)" — CeX
             // identifies MacBooks by Apple's internal model number, not release year, so
@@ -554,7 +566,10 @@ export class ScraperService implements OnApplicationBootstrap {
                 }
 
                 const nameFlat = raw.replace(/\s+/g, '');
+                // RAM is checked as a whole token, not a substring of nameFlat — "8gb" RAM
+                // would otherwise falsely match inside "128gb" storage text (both use "GB").
                 return (storageN && nameFlat.includes(storageN) ? 2 : 0)
+                     + (ramN && nameWords.has(ramN) ? 2 : 0)
                      + (raw.includes('unlocked') ? 1 : 0);
             };
 
@@ -653,6 +668,8 @@ export class ScraperService implements OnApplicationBootstrap {
         });
 
         const storageOptions = device?.storageOptions?.length ? device.storageOptions as string[] : [''];
+        const ramGroup = (device?.attributeOptions as { label: string; options: string[] }[] | null)?.find(g => g.label === 'RAM');
+        const ramOptions = ramGroup?.options?.length ? ramGroup.options : [''];
         const browser = await chromium.launch({
             headless: true,
             args: CHROMIUM_ARGS,
@@ -661,50 +678,52 @@ export class ScraperService implements OnApplicationBootstrap {
 
         try {
             for (const storage of storageOptions) {
-                const fullName = storage ? `${brand} ${model} ${storage}` : `${brand} ${model}`;
-                this.logger.log(`  → ${fullName}`);
+                for (const ram of ramOptions) {
+                    const fullName = [brand, model, ram, storage].filter(Boolean).join(' ');
+                    this.logger.log(`  → ${fullName}`);
 
-                let cex = await this.scrapeCeX(context, brand, model, storage, !!device);
-                if (!cex && storage) {
+                    let cex = await this.scrapeCeX(context, brand, model, storage, ram, !!device);
+                    if (!cex && storage) {
+                        await this.delay(500);
+                        cex = await this.scrapeCeX(context, brand, model, '', ram, !!device);
+                    }
                     await this.delay(500);
-                    cex = await this.scrapeCeX(context, brand, model, '', !!device);
+                    const ref2 = cex?.sellPrice ?? undefined;
+                    const backMarket  = await this.scrapeBackMarket(context, fullName, storage, ref2);
+                    await this.delay(500);
+                    const musicMagpie = await this.scrapeMusicMagpie(context, fullName, storage, ref2);
+                    await this.delay(500);
+                    const envirofone  = await this.scrapeEnvirofone(brand, model, storage, ref2);
+
+                    const marketPrice = cex?.sellPrice ?? backMarket.price ?? musicMagpie.price ?? envirofone.price ?? null;
+
+                    await this.prisma.scrapedPrice.upsert({
+                        where:  { deviceKey: fullName },
+                        create: {
+                            deviceKey: fullName, brand, model, storage, ram,
+                            cexSellPrice:     cex?.sellPrice        ?? null,
+                            cexCashPrice:     cex?.buyCashPrice     ?? null,
+                            cexExchangePrice: cex?.buyExchangePrice ?? null,
+                            backMarketPrice:  backMarket.price,
+                            musicMagpiePrice: musicMagpie.price,
+                            envirofonePrice:  envirofone.price,
+                            marketPrice, scrapedAt: new Date(),
+                        },
+                        update: {
+                            cexSellPrice:     cex?.sellPrice        ?? null,
+                            cexCashPrice:     cex?.buyCashPrice     ?? null,
+                            cexExchangePrice: cex?.buyExchangePrice ?? null,
+                            backMarketPrice:  backMarket.price,
+                            musicMagpiePrice: musicMagpie.price,
+                            envirofonePrice:  envirofone.price,
+                            marketPrice, scrapedAt: new Date(),
+                        },
+                    });
+
+                    const fmtJ = (r: JinaResult) => r.price ? `£${r.price}` : `(${r.reason})`;
+                    const fmtN = (v: number | null) => v ? `£${v}` : '--';
+                    this.logger.log(`     CeX:${fmtN(cex?.sellPrice ?? null)}  BM:${fmtJ(backMarket)}  MM:${fmtJ(musicMagpie)}  EF:${fmtJ(envirofone)}  Best:${marketPrice ? `£${marketPrice}` : 'none'}`);
                 }
-                await this.delay(500);
-                const ref2 = cex?.sellPrice ?? undefined;
-                const backMarket  = await this.scrapeBackMarket(context, fullName, storage, ref2);
-                await this.delay(500);
-                const musicMagpie = await this.scrapeMusicMagpie(context, fullName, storage, ref2);
-                await this.delay(500);
-                const envirofone  = await this.scrapeEnvirofone(brand, model, storage, ref2);
-
-                const marketPrice = cex?.sellPrice ?? backMarket.price ?? musicMagpie.price ?? envirofone.price ?? null;
-
-                await this.prisma.scrapedPrice.upsert({
-                    where:  { deviceKey: fullName },
-                    create: {
-                        deviceKey: fullName, brand, model, storage,
-                        cexSellPrice:     cex?.sellPrice        ?? null,
-                        cexCashPrice:     cex?.buyCashPrice     ?? null,
-                        cexExchangePrice: cex?.buyExchangePrice ?? null,
-                        backMarketPrice:  backMarket.price,
-                        musicMagpiePrice: musicMagpie.price,
-                        envirofonePrice:  envirofone.price,
-                        marketPrice, scrapedAt: new Date(),
-                    },
-                    update: {
-                        cexSellPrice:     cex?.sellPrice        ?? null,
-                        cexCashPrice:     cex?.buyCashPrice     ?? null,
-                        cexExchangePrice: cex?.buyExchangePrice ?? null,
-                        backMarketPrice:  backMarket.price,
-                        musicMagpiePrice: musicMagpie.price,
-                        envirofonePrice:  envirofone.price,
-                        marketPrice, scrapedAt: new Date(),
-                    },
-                });
-
-                const fmtJ = (r: JinaResult) => r.price ? `£${r.price}` : `(${r.reason})`;
-                const fmtN = (v: number | null) => v ? `£${v}` : '--';
-                this.logger.log(`     CeX:${fmtN(cex?.sellPrice ?? null)}  BM:${fmtJ(backMarket)}  MM:${fmtJ(musicMagpie)}  EF:${fmtJ(envirofone)}  Best:${marketPrice ? `£${marketPrice}` : 'none'}`);
             }
         } finally {
             await browser.close();

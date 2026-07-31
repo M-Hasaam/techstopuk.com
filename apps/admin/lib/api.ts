@@ -255,6 +255,7 @@ export interface ScrapedPriceRow {
   brand: string;
   model: string;
   storage: string;
+  ram: string;
   cexSellPrice: number | null;
   cexCashPrice: number | null;
   cexExchangePrice: number | null;
@@ -392,14 +393,20 @@ export const productPricingApi = {
   priceOne: (id: string) =>
     apiFetch<{ status: string; candidatePrice?: number }>(`/product-pricing/product/${id}`, { method: 'POST' }),
 
-  estimate: (brand: string, model: string, storage: string, condition: string) => {
+  estimate: (brand: string, model: string, storage: string, condition: string, ram?: string) => {
     const q = new URLSearchParams({ brand, model, storage, condition });
+    if (ram) q.set('ram', ram);
     return apiFetch<EstimateResult>(`/product-pricing/estimate?${q}`);
   },
 
   flagged: () =>
-    apiFetch<{ id: string; name: string; condition: string; storage: string; updatedAt: string }[]>(
+    apiFetch<{ id: string; name: string; condition: string; storage: string; ram: string; updatedAt: string; brand: string; model: string }[]>(
       '/product-pricing/flagged',
+    ),
+
+  ranges: () =>
+    apiFetch<{ brand: string; model: string; storage: string; ram: string; low: number; high: number }[]>(
+      '/product-pricing/ranges',
     ),
 };
 
