@@ -668,14 +668,14 @@ export default function RepairPage() {
                         </select>
                       </div>
                     )}
-                    <div className="bg-zinc-50 dark:bg-zinc-950/40 rounded-2xl p-4 border border-zinc-200/60 dark:border-zinc-800/80 space-y-2 mb-6">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400 font-bold">Address</span>
-                        <span className="text-zinc-900 dark:text-zinc-200 font-black">{storeAddress}</span>
+                    <div className="bg-zinc-50 dark:bg-zinc-950/40 rounded-2xl p-4 border border-zinc-200/60 dark:border-zinc-800/80 space-y-2.5 mb-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                        <span className="text-zinc-400 font-bold shrink-0">Address</span>
+                        <span className="text-zinc-900 dark:text-zinc-200 font-black text-left sm:text-right leading-snug">{storeAddress}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400 font-bold">Opening Hours</span>
-                        <span className="text-zinc-900 dark:text-zinc-200 font-black">{storeHours}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                        <span className="text-zinc-400 font-bold shrink-0">Opening Hours</span>
+                        <span className="text-zinc-900 dark:text-zinc-200 font-black text-left sm:text-right leading-snug">{storeHours}</span>
                       </div>
                     </div>
                     {/* Interactive Store Location Map */}

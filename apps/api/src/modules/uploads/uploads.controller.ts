@@ -42,7 +42,6 @@ export class UploadsController {
     }
 
     @Get('presign-trade-in-image')
-    @UseGuards(JwtAuthGuard)
     async presignTradeInImage(
         @Query('filename') filename: string,
         @Query('contentType') contentType: string,
@@ -59,7 +58,6 @@ export class UploadsController {
     }
 
     @Get('presign-repair-image')
-    @UseGuards(JwtAuthGuard)
     async presignRepairImage(
         @Query('filename') filename: string,
         @Query('contentType') contentType: string,

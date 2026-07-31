@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
 import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, type Store, type CatalogCategory, type Product } from "@/lib/api";
+import { TRADE_IN_MODELS } from "@/lib/trade-in-data";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import {
@@ -55,6 +56,18 @@ const CAT_NAME_MOOD: Record<string, string> = {
   Gaming: "bg-violet-500/10", Laptops: "bg-amber-500/10",
   Audio: "bg-indigo-500/10", Smartwatches: "bg-emerald-500/10",
 };
+
+// The "Other Search Devices" list uses different brand strings for the same real
+// brand than DeviceCatalog does ("Sony PlayStation" vs "Sony", "Microsoft Xbox" vs
+// "Microsoft") — without normalizing, merging the two sources shows the same brand
+// twice as separate buttons, and picking one wouldn't pull in the other's models.
+const BRAND_ALIAS: Record<string, string> = {
+  "sony playstation": "Sony",
+  "microsoft xbox": "Microsoft",
+};
+function normBrand(b: string): string {
+  return BRAND_ALIAS[b.toLowerCase().trim()] ?? b;
+}
 
 const BRANDS: Record<string, string[]> = {
   Phone: [
@@ -353,9 +366,9 @@ function AnimatedNumber({ value, format, suffix = "", duration = 1500, startOffs
 
 function StepHeader({ label, sub }: { label: string; sub?: string }) {
   return (
-    <div className="space-y-1">
-      <h2 className="font-sans text-2xl md:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white">{label}</h2>
-      {sub && <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-400">{sub}</p>}
+    <div className="space-y-0.5 sm:space-y-1">
+      <h2 className="font-sans text-lg sm:text-2xl md:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white">{label}</h2>
+      {sub && <p className="text-[11px] sm:text-xs font-semibold text-zinc-400 dark:text-zinc-400">{sub}</p>}
     </div>
   );
 }
@@ -414,6 +427,21 @@ export default function TradeInPage() {
     Laptop: "laptops", Audio: "audio", Smartwatch: "smartwatches",
   };
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
+  // Brands/models that exist only in the "Other Search Devices" list (e.g. Xiaomi,
+  // Huawei, Nintendo, Nokia) — dynamicBrands/dynamicModelData above only reflect
+  // DeviceCatalog, so without this merge these brands never show up as selectable
+  // at all in the step-by-step wizard, only via the free-text search box.
+  const [otherDevices, setOtherDevices] = useState<{ name: string; brand: string; category: string }[]>([]);
+  useEffect(() => {
+    catalogApi.listTradeInModels()
+      .then(items => {
+        const key = (d: { brand: string; name: string }) => `${d.brand}:${d.name}`.toLowerCase();
+        const dbKeys = new Set(items.map(key));
+        const staticOnly = TRADE_IN_MODELS.filter(m => !dbKeys.has(key(m)));
+        setOtherDevices([...items, ...staticOnly]);
+      })
+      .catch(() => setOtherDevices(TRADE_IN_MODELS));
+  }, []);
   const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]>([]);
   // Real per-device attributes (e.g. RAM for a specific MacBook) pulled from the catalog entry
   // the customer actually selected — takes priority over the generic per-category spec list
@@ -522,6 +550,14 @@ export default function TradeInPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const modalScrollRef = useRef<HTMLDivElement>(null);
+  const breadcrumbScrollRef = useRef<HTMLDivElement>(null);
+
+  // Keep the most recently picked breadcrumb (the current step) in view when the
+  // chain gets long enough to overflow its single-line scroll container on mobile.
+  useEffect(() => {
+    const el = breadcrumbScrollRef.current;
+    if (el) el.scrollLeft = el.scrollWidth;
+  }, [state.category, state.brand, state.model]);
 
   // Device pre-selection from home page search or login redirect
   const [pendingDevice, setPendingDevice] = useState<{ brand: string; model: string; category: string } | null>(null);
@@ -752,14 +788,21 @@ export default function TradeInPage() {
       const results = await Promise.all(
         files.slice(0, 6 - images.length).map(async (file) => {
           const { blob, previewUrl } = await compressToBlob(file);
-          const uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-          const { filePath } = await uploadsApi.tradeInImage(uploadFile, batchId);
+          let filePath = previewUrl;
+          try {
+            const uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+            const res = await uploadsApi.tradeInImage(uploadFile, batchId);
+            if (res?.presignedUrl) filePath = res.presignedUrl;
+            else if (res?.filePath) filePath = res.filePath;
+          } catch (uploadErr) {
+            console.warn("Background upload failed, falling back to local preview:", uploadErr);
+          }
           return { filePath, previewUrl };
         })
       );
       setImages(prev => [...prev, ...results].slice(0, 6));
-    } catch {
-      // silently ignore upload errors for individual images
+    } catch (err) {
+      console.error("Error processing captured photos:", err);
     } finally {
       setImageUploading(false);
     }
@@ -942,6 +985,7 @@ export default function TradeInPage() {
         }
         .custom-scrollbar::-webkit-scrollbar {
           width: 6px;
+          height: 6px;
         }
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
@@ -1215,14 +1259,14 @@ export default function TradeInPage() {
                         </AnimatePresence>
                       </div>
                     )}
-                    <div className="bg-zinc-50 dark:bg-zinc-950/40 rounded-2xl p-4 border border-zinc-200/60 dark:border-zinc-800/80 space-y-2 mb-6">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400 font-bold">Address</span>
-                        <span className="text-zinc-900 dark:text-zinc-200 font-black">{storeAddress}</span>
+                    <div className="bg-zinc-50 dark:bg-zinc-950/40 rounded-2xl p-4 border border-zinc-200/60 dark:border-zinc-800/80 space-y-2.5 mb-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                        <span className="text-zinc-400 font-bold shrink-0">Address</span>
+                        <span className="text-zinc-900 dark:text-zinc-200 font-black text-left sm:text-right leading-snug">{storeAddress}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-zinc-400 font-bold">Opening Hours</span>
-                        <span className="text-zinc-900 dark:text-zinc-200 font-black">{storeHours}</span>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                        <span className="text-zinc-400 font-bold shrink-0">Opening Hours</span>
+                        <span className="text-zinc-900 dark:text-zinc-200 font-black text-left sm:text-right leading-snug">{storeHours}</span>
                       </div>
                     </div>
                     {/* Interactive Store Location Map */}
@@ -1344,9 +1388,9 @@ export default function TradeInPage() {
               <button
                 type="button"
                 onClick={closeWizard}
-                className="absolute top-6 right-6 h-10 w-10 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 hover:border-zinc-950 dark:hover:border-white flex items-center justify-center text-zinc-500 hover:text-zinc-950 dark:hover:text-white transition-colors z-20 cursor-pointer shadow-sm shadow-zinc-900/5"
+                className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 h-8 w-8 sm:h-10 sm:w-10 rounded-full border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-800 hover:border-zinc-950 dark:hover:border-white flex items-center justify-center text-zinc-500 hover:text-zinc-950 dark:hover:text-white transition-colors z-20 cursor-pointer shadow-sm shadow-zinc-900/5"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
 
               <input
@@ -1369,26 +1413,27 @@ export default function TradeInPage() {
               />
 
               {/* Wizard Content Inner wrapper with scroll */}
-              <div ref={modalScrollRef} className="p-3 sm:p-6 md:p-10 flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar pt-14 md:pt-14">
-                <div className="w-full max-w-4xl mx-auto space-y-4 sm:space-y-6">
+              <div ref={modalScrollRef} className="p-3 sm:p-6 md:p-8 flex-1 flex flex-col justify-between overflow-y-auto custom-scrollbar pt-3 sm:pt-6 md:pt-8">
+                <div className="w-full max-w-4xl mx-auto space-y-2 sm:space-y-6">
 
                   {/* Wizard Navigation / Progress Header */}
-                  <div className="bg-white dark:bg-zinc-950 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-4 sm:p-6 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-                    <div className="flex items-center gap-3">
+                  <div className="bg-white dark:bg-zinc-950 rounded-2xl sm:rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm p-2.5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-2 md:gap-4">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       <button
                         onClick={handleBack}
-                        className="h-10 px-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors bg-white dark:bg-zinc-800"
+                        className="h-8 sm:h-10 px-2.5 sm:px-4 rounded-lg sm:rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white flex items-center gap-2 text-xs font-bold text-zinc-600 dark:text-zinc-400 hover:text-zinc-950 dark:hover:text-white transition-colors bg-white dark:bg-zinc-800"
                       >
                   <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Back</span>
                 </button>
                 <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden md:block" />
-                <div>
+                <div className="hidden sm:block">
                   <span className="text-[10px] font-black uppercase tracking-widest text-zinc-400 block">Step {phase} of 6</span>
                   <span className="text-sm font-extrabold text-zinc-800 dark:text-zinc-200">{PHASE_LABELS[phase - 1]}</span>
                 </div>
+                <span className="sm:hidden text-[11px] font-extrabold text-zinc-800 dark:text-zinc-200">{PHASE_LABELS[phase - 1]}</span>
               </div>
 
-              <div className="w-full md:flex-1 md:ml-auto flex items-center justify-center md:justify-end mt-2 md:mt-0">
+              <div className="w-full sm:flex-1 sm:min-w-0 flex items-center justify-center sm:justify-end">
                 <div className="flex items-center w-full max-w-sm justify-between px-1">
                   {[1, 2, 3, 4, 5, 6].map((s, idx) => {
                     const isCompleted = phase > s;
@@ -1396,17 +1441,17 @@ export default function TradeInPage() {
                     const active = isCompleted || isCurrent;
                     return (
                       <div key={s} className="flex items-center flex-1 last:flex-none">
-                        <div className={`flex items-center justify-center shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full transition-colors duration-300 ${active ? 'bg-indigo-50 dark:bg-indigo-500/10' : 'bg-transparent'}`}>
-                          <div className={`flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full transition-all duration-300 ${active ? 'bg-indigo-600 text-white shadow-sm' : 'border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400 bg-white dark:bg-zinc-900'}`}>
+                        <div className={`flex items-center justify-center shrink-0 w-5 h-5 sm:w-10 sm:h-10 rounded-full transition-colors duration-300 ${active ? 'bg-indigo-50 dark:bg-indigo-500/10' : 'bg-transparent'}`}>
+                          <div className={`flex items-center justify-center w-5 h-5 sm:w-8 sm:h-8 rounded-full transition-all duration-300 ${active ? 'bg-indigo-600 text-white shadow-sm' : 'border-2 border-zinc-200 dark:border-zinc-700 text-zinc-400 bg-white dark:bg-zinc-900'}`}>
                             {isCompleted ? (
-                              <Check className="h-3 w-3 sm:h-4 sm:w-4" strokeWidth={3} />
+                              <Check className="h-2.5 w-2.5 sm:h-4 sm:w-4" strokeWidth={3} />
                             ) : (
-                              <span className="text-[10px] sm:text-sm font-bold">{s}</span>
+                              <span className="text-[8px] sm:text-sm font-bold">{s}</span>
                             )}
                           </div>
                         </div>
                         {idx < 5 && (
-                          <div className={`flex-1 h-1 mx-0.5 sm:mx-2 rounded-full transition-colors duration-300 ${phase > s ? 'bg-indigo-600' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
+                          <div className={`flex-1 h-0.5 sm:h-1 mx-0.5 sm:mx-2 rounded-full transition-colors duration-300 ${phase > s ? 'bg-indigo-600' : 'bg-zinc-200 dark:bg-zinc-800'}`} />
                         )}
                       </div>
                     );
@@ -1417,37 +1462,40 @@ export default function TradeInPage() {
 
             {/* Breadcrumb Indicators */}
             {isWizardActive && (state.category || state.brand || state.model) && (
-              <div className="flex items-center gap-2 flex-wrap px-2">
+              <div ref={breadcrumbScrollRef} className="w-full max-w-full flex items-center gap-0.5 sm:gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide px-0.5 pr-2 py-1 my-0.5">
                 {state.category && (
                   <button
                     onClick={() => {
                       setState(s => ({ ...s, category: "", brand: "", model: "" }));
                       setPhase(1);
                     }}
-                    className="text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-3 py-1 text-zinc-500 dark:text-zinc-400 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors"
+                    className="shrink-0 whitespace-nowrap text-[10px] sm:text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-2 sm:px-3.5 py-0.5 sm:py-1 text-zinc-700 dark:text-zinc-300 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors shadow-2xs"
                   >
-                    Category: {state.category}
+                    <span className="hidden sm:inline text-zinc-400 font-normal mr-1">Category:</span>
+                    {state.category}
                   </button>
                 )}
                 {state.brand && (
                   <>
-                    <ChevronRight className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-700" />
+                    <ChevronRight className="shrink-0 h-2.5 w-2.5 sm:h-3 w-3 text-zinc-300 dark:text-zinc-700 -mx-0.5" />
                     <button
                       onClick={() => {
                         setState(s => ({ ...s, brand: "", model: "" }));
                         setPhase(1);
                       }}
-                      className="text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-3 py-1 text-zinc-500 dark:text-zinc-400 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors"
+                      className="shrink-0 whitespace-nowrap text-[10px] sm:text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-2 sm:px-3.5 py-0.5 sm:py-1 text-zinc-700 dark:text-zinc-300 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors shadow-2xs"
                     >
-                      Brand: {state.brand}
+                      <span className="hidden sm:inline text-zinc-400 font-normal mr-1">Brand:</span>
+                      {state.brand}
                     </button>
                   </>
                 )}
                 {state.model && (
                   <>
-                    <ChevronRight className="h-3.5 w-3.5 text-zinc-300 dark:text-zinc-700" />
-                    <span className="text-[11px] font-black bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-full px-3 py-1 shadow-sm">
-                      Model: {state.model}
+                    <ChevronRight className="shrink-0 h-2.5 w-2.5 sm:h-3 w-3 text-zinc-300 dark:text-zinc-700 -mx-0.5" />
+                    <span className="min-w-0 flex-1 max-w-[120px] sm:max-w-xs whitespace-nowrap text-[10px] sm:text-[11px] font-black bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-full px-2 sm:px-3.5 py-0.5 sm:py-1 shadow-sm truncate" title={state.model}>
+                      <span className="hidden sm:inline font-normal opacity-75 mr-1">Model:</span>
+                      {state.model}
                     </span>
                   </>
                 )}
@@ -1455,8 +1503,8 @@ export default function TradeInPage() {
             )}
 
             {/* Main Stepper Card */}
-            <div className="bg-white dark:bg-zinc-950 rounded-2xl sm:rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden min-h-[400px] flex flex-col">
-              <div className="p-4 sm:p-8 md:p-10 flex-1 flex flex-col justify-between">
+            <div className="bg-white dark:bg-zinc-950 rounded-2xl sm:rounded-[2rem] border border-zinc-200 dark:border-zinc-800 shadow-xl overflow-hidden flex flex-col">
+              <div className="p-3 sm:p-8 md:p-10 flex-1 flex flex-col justify-between">
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={phase}
@@ -1478,7 +1526,7 @@ export default function TradeInPage() {
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -15 }}
                               transition={{ duration: 0.2 }}
-                              className="space-y-6"
+                              className="space-y-3 sm:space-y-6"
                             >
                               <StepHeader label="What device are we trading in?" sub="Select a category from our supported devices list." />
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1533,16 +1581,29 @@ export default function TradeInPage() {
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -15 }}
                               transition={{ duration: 0.2 }}
-                              className="space-y-6"
+                              className="space-y-3 sm:space-y-6"
                             >
                               <StepHeader label="Which brand is it?" sub={`Choose the manufacturer for your ${state.category === "Other" ? "device" : state.category.toLowerCase()}.`} />
 
                               {/* Brand filter / search */}
                               {(() => {
-                                const allBrands = dynamicBrands.length > 0 ? dynamicBrands : (BRANDS[state.category] ?? []);
-                                const filtered = brandFilter.trim()
-                                  ? allBrands.filter(b => b.toLowerCase().includes(brandFilter.toLowerCase()))
-                                  : allBrands;
+                                const catalogOrFallbackBrands = dynamicBrands.length > 0 ? dynamicBrands : (BRANDS[state.category] ?? []);
+                                const catalogKeys = new Set(catalogOrFallbackBrands.map(b => b.toLowerCase()));
+                                // Brands that only exist in the "Other Search Devices" list — kept
+                                // visually separate below so it's clear they're not full catalog devices.
+                                const otherSeen = new Map<string, string>();
+                                for (const d of otherDevices) {
+                                  if (d.category !== state.category) continue;
+                                  const b = normBrand(d.brand);
+                                  const k = b.toLowerCase();
+                                  if (!catalogKeys.has(k) && !otherSeen.has(k)) otherSeen.set(k, b);
+                                }
+                                const otherBrands = [...otherSeen.values()];
+                                const allBrands = [...catalogOrFallbackBrands, ...otherBrands];
+                                const applyFilter = (list: string[]) =>
+                                  brandFilter.trim() ? list.filter(b => b.toLowerCase().includes(brandFilter.toLowerCase())) : list;
+                                const filteredCatalog = applyFilter(catalogOrFallbackBrands);
+                                const filteredOther = applyFilter(otherBrands);
                                 return (
                                   <>
                                     {allBrands.length > 6 && (
@@ -1552,9 +1613,9 @@ export default function TradeInPage() {
                                           value={brandFilter}
                                           onChange={(e) => setBrandFilter(e.target.value)}
                                           placeholder="Filter brands..."
-                                          className="h-11 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-10 pr-4 text-xs font-semibold outline-none focus:border-accent text-zinc-900 dark:text-white transition-all"
+                                          className="h-9 sm:h-11 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 sm:pl-10 pr-4 text-xs font-semibold outline-none focus:border-accent text-zinc-900 dark:text-white transition-all"
                                         />
-                                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+                                        <Search className="absolute left-3 sm:left-3.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-zinc-400" />
                                         {brandFilter && (
                                           <button onClick={() => setBrandFilter("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-950 dark:hover:text-white">
                                             <X className="h-4 w-4" />
@@ -1563,20 +1624,49 @@ export default function TradeInPage() {
                                       </div>
                                     )}
 
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                                      {filtered.map((brand) => (
-                                        <motion.button
-                                          key={brand}
-                                          whileHover={{ scale: 1.02 }}
-                                          whileTap={{ scale: 0.97 }}
-                                          onClick={() => handleBrandSelect(brand)}
-                                          className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-950 dark:hover:border-white text-center font-extrabold text-sm text-zinc-800 dark:text-zinc-200 transition-all hover:shadow-md"
-                                        >
-                                          {brand}
-                                        </motion.button>
-                                      ))}
-                                      {filtered.length === 0 && (
-                                        <p className="col-span-3 text-xs text-zinc-400 text-center py-4">No brands match &quot;{brandFilter}&quot;</p>
+                                    <div
+                                      className="overflow-y-auto pr-1 custom-scrollbar space-y-3"
+                                      style={{ maxHeight: 'clamp(220px, calc(100dvh - 400px), 480px)' }}
+                                    >
+                                      {filteredCatalog.length > 0 && (
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                          {filteredCatalog.map((brand) => (
+                                            <motion.button
+                                              key={brand}
+                                              whileHover={{ scale: 1.02 }}
+                                              whileTap={{ scale: 0.97 }}
+                                              onClick={() => handleBrandSelect(brand)}
+                                              className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-950 dark:hover:border-white text-center font-extrabold text-sm text-zinc-800 dark:text-zinc-200 transition-all hover:shadow-md"
+                                            >
+                                              {brand}
+                                            </motion.button>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {filteredOther.length > 0 && (
+                                        <>
+                                          <div className="flex items-center gap-3">
+                                            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                            <span className="text-[10px] font-black uppercase tracking-wide text-zinc-400 shrink-0">Other brands</span>
+                                            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                          </div>
+                                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                                            {filteredOther.map((brand) => (
+                                              <motion.button
+                                                key={brand}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.97 }}
+                                                onClick={() => handleBrandSelect(brand)}
+                                                className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-950 dark:hover:border-white text-center font-extrabold text-sm text-zinc-800 dark:text-zinc-200 transition-all hover:shadow-md"
+                                              >
+                                                {brand}
+                                              </motion.button>
+                                            ))}
+                                          </div>
+                                        </>
+                                      )}
+                                      {filteredCatalog.length === 0 && filteredOther.length === 0 && (
+                                        <p className="text-xs text-zinc-400 text-center py-4">No brands match &quot;{brandFilter}&quot;</p>
                                       )}
                                     </div>
                                   </>
@@ -1622,15 +1712,29 @@ export default function TradeInPage() {
                               animate={{ opacity: 1, x: 0 }}
                               exit={{ opacity: 0, x: -15 }}
                               transition={{ duration: 0.2 }}
-                              className="space-y-6"
+                              className="space-y-3 sm:space-y-6"
                             >
-                              <StepHeader label="Which model is it?" sub="Search by name — we'll find the closest match, or you can enter it manually." />
+                              <StepHeader label="Which model is it?" />
 
                               {/* Smart fuzzy search */}
                               {(() => {
-                                const modelPool = dynamicModelData.length > 0
-                                  ? dynamicModelData
-                                  : (MODELS[state.category]?.[state.brand] ?? []).map(m => ({ model: m, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }));
+                                // Merge real catalog models for this brand with "other" list models
+                                // for the same brand+category — a brand can be catalog-only (Apple),
+                                // other-only (Xiaomi), or occasionally both, so neither source alone
+                                // is reliable for every brand.
+                                const otherModelsForBrand = otherDevices
+                                  .filter(d => d.category === state.category && normBrand(d.brand).toLowerCase() === normBrand(state.brand).toLowerCase())
+                                  .map(d => ({ model: d.name, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }));
+                                const catalogModelNames = new Set(dynamicModelData.map(m => m.model.toLowerCase()));
+                                const dedupedOther = otherModelsForBrand.filter(m => !catalogModelNames.has(m.model.toLowerCase()));
+                                // Local hardcoded fallback only kicks in when neither real source has
+                                // anything for this brand — treated as "other" for display purposes too.
+                                const localFallback = (dynamicModelData.length === 0 && dedupedOther.length === 0)
+                                  ? (MODELS[state.category]?.[state.brand] ?? []).map(m => ({ model: m, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }))
+                                  : [];
+                                const otherModelsGroup = [...dedupedOther, ...localFallback];
+
+                                const modelPool = [...dynamicModelData, ...otherModelsGroup];
 
                                 const fuse = new Fuse(modelPool, {
                                   keys: ['model'],
@@ -1639,9 +1743,37 @@ export default function TradeInPage() {
                                   includeScore: true,
                                 });
 
-                                const suggestions = wizardModelSearch.trim()
+                                const isSearching = !!wizardModelSearch.trim();
+                                const suggestions = isSearching
                                   ? fuse.search(wizardModelSearch).slice(0, 6).map(r => r.item)
                                   : modelPool;
+
+                                const renderModelButton = ({ model, tradeInMode, attributeOptions }: { model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }) => (
+                                  <motion.button
+                                    key={model}
+                                    whileHover={{ x: 4 }}
+                                    onClick={() => {
+                                      setState(s => ({ ...s, model, tradeInMode }));
+                                      setCatalogAttributeOptions(attributeOptions ?? []);
+                                      goToPhase(2);
+                                    }}
+                                    className="flex items-center justify-between px-5 py-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white hover:bg-zinc-50 dark:hover:bg-zinc-950 bg-white dark:bg-zinc-900 text-xs font-bold text-left transition-all hover:shadow-sm group text-zinc-800 dark:text-zinc-200"
+                                  >
+                                    <span>{model}</span>
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      {tradeInMode === 'auto' && (
+                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Auto-price</span>
+                                      )}
+                                      {tradeInMode === 'manual_price' && (
+                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Manual Price</span>
+                                      )}
+                                      {tradeInMode === 'unpriced' && (
+                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">Manual Review</span>
+                                      )}
+                                      <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                                    </div>
+                                  </motion.button>
+                                );
 
                                 return (
                                   <>
@@ -1653,9 +1785,9 @@ export default function TradeInPage() {
                                         placeholder={modelPool.length === 0 ? "Type your model name..." : `Search ${state.brand} models...`}
                                         value={wizardModelSearch}
                                         onChange={(e) => setWizardModelSearch(e.target.value)}
-                                        className="h-12 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-11 pr-10 text-xs font-semibold outline-none focus:border-accent focus:bg-white dark:focus:bg-zinc-950 text-zinc-900 dark:text-white transition-all"
+                                        className="h-10 sm:h-12 w-full rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 pl-9 sm:pl-11 pr-9 sm:pr-10 text-xs font-semibold outline-none focus:border-accent focus:bg-white dark:focus:bg-zinc-950 text-zinc-900 dark:text-white transition-all"
                                       />
-                                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-zinc-400" />
+                                      <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4.5 sm:w-4.5 text-zinc-400" />
                                       {wizardModelSearch && (
                                         <button
                                           onClick={() => setWizardModelSearch("")}
@@ -1667,34 +1799,38 @@ export default function TradeInPage() {
                                     </div>
 
                                     {/* Suggestion list */}
-                                    {suggestions.length > 0 && (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                                        {suggestions.map(({ model, tradeInMode, attributeOptions }) => (
-                                          <motion.button
-                                            key={model}
-                                            whileHover={{ x: 4 }}
-                                            onClick={() => {
-                                              setState(s => ({ ...s, model, tradeInMode }));
-                                              setCatalogAttributeOptions(attributeOptions ?? []);
-                                              goToPhase(2);
-                                            }}
-                                            className="flex items-center justify-between px-5 py-4 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white hover:bg-zinc-50 dark:hover:bg-zinc-950 bg-white dark:bg-zinc-900 text-xs font-bold text-left transition-all hover:shadow-sm group text-zinc-800 dark:text-zinc-200"
-                                          >
-                                            <span>{model}</span>
-                                            <div className="flex items-center gap-2 shrink-0">
-                                              {tradeInMode === 'auto' && (
-                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Auto-price</span>
-                                              )}
-                                              {tradeInMode === 'manual_price' && (
-                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Manual Price</span>
-                                              )}
-                                              {tradeInMode === 'unpriced' && (
-                                                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">Manual Review</span>
-                                              )}
-                                              <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:text-zinc-950 dark:group-hover:text-white group-hover:translate-x-0.5 transition-all" />
+                                    {!isSearching && suggestions.length > 0 && (
+                                      <div
+                                      className="overflow-y-auto pr-1 custom-scrollbar space-y-3"
+                                      style={{ maxHeight: 'clamp(220px, calc(100dvh - 400px), 480px)' }}
+                                    >
+                                        {dynamicModelData.length > 0 && (
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {dynamicModelData.map(renderModelButton)}
+                                          </div>
+                                        )}
+                                        {otherModelsGroup.length > 0 && (
+                                          <>
+                                            {dynamicModelData.length > 0 && (
+                                              <div className="flex items-center gap-3">
+                                                <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                                <span className="text-[10px] font-black uppercase tracking-wide text-zinc-400 shrink-0">Other models</span>
+                                                <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+                                              </div>
+                                            )}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                              {otherModelsGroup.map(renderModelButton)}
                                             </div>
-                                          </motion.button>
-                                        ))}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                    {isSearching && suggestions.length > 0 && (
+                                      <div
+                                        className="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto pr-1 custom-scrollbar"
+                                        style={{ maxHeight: 'clamp(220px, calc(100dvh - 400px), 480px)' }}
+                                      >
+                                        {suggestions.map(renderModelButton)}
                                       </div>
                                     )}
 
@@ -1734,42 +1870,59 @@ export default function TradeInPage() {
                     {phase === 2 && (() => {
                       // Real per-device attributes (from the catalog entry actually selected) win over
                       // AI-guessed specs, which in turn win over the generic per-category fallback list.
-                      const specsToShow = catalogAttributeOptions.length > 0 ? catalogAttributeOptions
+                      // Condition/grade is always captured by the dedicated Physical Grade selector
+                      // below, so drop any spec (AI-guessed or otherwise) that would duplicate it.
+                      const dropConditionSpec = (specs: { label: string; options: string[] }[]) =>
+                        specs.filter(s => !/condition|grade|physical state/i.test(s.label));
+                      const isMultiSelectSpec = (spec: { label: string; options: string[]; isMulti?: boolean }) => {
+                        if (typeof spec.isMulti === "boolean") return spec.isMulti;
+                        const label = spec.label.trim();
+                        if (/^(controllers|cables|storage|ram|color|colorway|network|connectivity|type|case size|model|edition)$/i.test(label)) {
+                          return false;
+                        }
+                        const isAccessoryLabel = /(included accessories|accessories included|accessories|bundled items|extras included|optional extras|included extras)/i.test(label);
+                        if (!isAccessoryLabel) return false;
+                        const hasMutuallyExclusiveOptions = spec.options.some(opt =>
+                          /^(no |none$|only$|\d+\s*(controller|cable|item|accessory))/i.test(opt.trim())
+                        );
+                        return !hasMutuallyExclusiveOptions;
+                      };
+                      const rawSpecs = catalogAttributeOptions.length > 0 ? catalogAttributeOptions
                         : aiSpecs.length > 0 ? aiSpecs : currentSpecs;
-                      const specsComplete = specsToShow.length === 0 || specsToShow.every(s => !!state.specs[s.label]);
+                      const mergedSpecs = [...rawSpecs];
+                      currentSpecs.forEach(sysSpec => {
+                        const exists = mergedSpecs.some(s => s.label.trim().toLowerCase() === sysSpec.label.trim().toLowerCase());
+                        if (!exists) {
+                          mergedSpecs.push(sysSpec);
+                        }
+                      });
+                      const specsToShow = dropConditionSpec(mergedSpecs);
+                      const specsComplete = specsToShow.length === 0 || specsToShow.every(s => isMultiSelectSpec(s) || !!state.specs[s.label]);
                       const canProceedPhase2 = specsComplete && !!state.condition;
                       return (
                         <div className="space-y-8 flex-1 flex flex-col justify-between">
-                          <div className="space-y-6">
-                            <StepHeader label="Device Specifications & Condition" sub="Choose your configuration and select the overall physical state of the unit." />
-
-                            {/* Manual review banner for unlisted devices */}
-                            {state.tradeInMode === 'unpriced' && (
-                              <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40">
-                                <div className="h-8 w-8 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0 mt-0.5">
-                                  <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-black text-amber-900 dark:text-amber-300 uppercase tracking-wider">Manual Review</p>
-                                  <p className="text-xs text-amber-700 dark:text-amber-400 font-semibold mt-0.5 leading-relaxed">
-                                    This device will be personally reviewed by our team. Fill in the details below and upload clear photos — we&apos;ll come back with a fair offer within 24 hours.
-                                  </p>
-                                </div>
-                              </div>
-                            )}
+                          <div className="space-y-2.5 sm:space-y-3">
+                            <div>
+                              <StepHeader label="Device Specifications" />
+                              {aiSpecs.length > 0 && !aiSpecsLoading && (
+                                <p className="font-bold text-amber-500 text-[10px] sm:text-xs mt-0.5">
+                                  · AI generated
+                                </p>
+                              )}
+                            </div>
 
                             {/* Specification selectors — skeleton while AI loads, then pills */}
                             {aiSpecsLoading ? (
-                              <div className="space-y-4 border-b border-zinc-100 dark:border-zinc-800 pb-6">
+                              <div className="space-y-3 border-b border-zinc-100 dark:border-zinc-800 pb-3">
                                 <div className="flex items-center gap-2 text-xs text-zinc-400">
                                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                   <span className="font-semibold">Getting relevant specs for your device...</span>
                                 </div>
-                                <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
                                   {[1, 2].map(i => (
-                                    <div key={i} className="space-y-2">
+                                    <div key={i} className="space-y-1">
                                       <div className="h-3 w-20 bg-zinc-100 dark:bg-zinc-800 rounded animate-pulse" />
-                                      <div className="flex gap-2">
+                                      <div className="flex gap-1.5">
                                         {[1, 2, 3].map(j => (
                                           <div key={j} className="h-9 w-16 bg-zinc-100 dark:bg-zinc-800 rounded-xl animate-pulse" />
                                         ))}
@@ -1779,39 +1932,68 @@ export default function TradeInPage() {
                                 </div>
                               </div>
                             ) : specsToShow.length > 0 ? (
-                              <div className="space-y-4 border-b border-zinc-100 dark:border-zinc-800 pb-6">
-                                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">
-                                  Specifications
-                                  {aiSpecs.length > 0 && (
-                                    <span className="ml-2 normal-case font-bold text-amber-500 tracking-normal text-[9px]">
-                                      · AI suggested for your device
-                                    </span>
-                                  )}
-                                </h4>
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                  {specsToShow.map((spec) => (
-                                    <div key={spec.label} className="space-y-2">
-                                      <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200">{spec.label}</span>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {spec.options.map((opt) => {
-                                          const isSelected = state.specs[spec.label] === opt;
-                                          return (
-                                            <button
-                                              key={opt}
-                                              onClick={() => setState(s => ({ ...s, specs: { ...s.specs, [spec.label]: opt } }))}
-                                              className={`px-3 py-2 rounded-xl border text-xs font-bold transition-all ${
-                                                isSelected
-                                                  ? "border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950"
-                                                  : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white"
-                                              }`}
-                                            >
-                                              {opt}
-                                            </button>
-                                          );
-                                        })}
+                              <div className="space-y-2.5 border-b border-zinc-100 dark:border-zinc-800 pb-3">
+                                <div className="grid gap-2.5 sm:gap-3 sm:grid-cols-2">
+                                  {specsToShow.map((spec) => {
+                                    const isMulti = isMultiSelectSpec(spec);
+                                    const selectedValues = (state.specs[spec.label] || "")
+                                      .split(",")
+                                      .map(s => s.trim())
+                                      .filter(Boolean);
+
+                                    return (
+                                      <div key={spec.label} className="space-y-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-xs font-extrabold text-zinc-800 dark:text-zinc-200">{spec.label}</span>
+                                          {isMulti && (
+                                            <span className="text-[9px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">(Multi-select)</span>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {spec.options.map((opt) => {
+                                            const isSelected = isMulti
+                                              ? selectedValues.includes(opt)
+                                              : state.specs[spec.label] === opt;
+
+                                            const handleOptionClick = () => {
+                                              if (isMulti) {
+                                                let updated: string[];
+                                                if (selectedValues.includes(opt)) {
+                                                  updated = selectedValues.filter(v => v !== opt);
+                                                } else {
+                                                  updated = [...selectedValues, opt];
+                                                }
+                                                setState(s => ({
+                                                  ...s,
+                                                  specs: { ...s.specs, [spec.label]: updated.join(", ") },
+                                                }));
+                                              } else {
+                                                setState(s => ({
+                                                  ...s,
+                                                  specs: { ...s.specs, [spec.label]: isSelected ? "" : opt },
+                                                }));
+                                              }
+                                            };
+
+                                            return (
+                                              <button
+                                                key={opt}
+                                                type="button"
+                                                onClick={handleOptionClick}
+                                                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+                                                  isSelected
+                                                    ? "border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950"
+                                                    : "border-zinc-200 bg-white text-zinc-700 hover:border-zinc-950 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white"
+                                                }`}
+                                              >
+                                                {opt}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
                             ) : (
@@ -1821,8 +2003,8 @@ export default function TradeInPage() {
                             )}
 
                             {/* Condition grade selector */}
-                            <div className="space-y-4">
-                              <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Physical Grade</h4>
+                            <div className="space-y-3 pt-1">
+                              <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Condition</h4>
                               <div className="grid gap-3 sm:grid-cols-2">
                                 {CONDITIONS.map((c) => {
                                   const isSelected = state.condition === c.id;
@@ -2094,15 +2276,26 @@ export default function TradeInPage() {
                                 <p className="text-[10px] text-zinc-400 text-right">{(state.customerNotes ?? "").length}/1000</p>
                               </div>
 
-                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 text-left space-y-3">
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide">Device Model</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100">{state.model}</span>
+                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 text-left space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Device Model</span>
+                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.model}</span>
                                 </div>
+                                {Object.keys(state.specs).length > 0 && (
+                                  <>
+                                    <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
+                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                      <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Specs selected</span>
+                                      <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right leading-snug">
+                                        {Object.entries(state.specs).filter(([_, val]) => !!val).map(([_, val]) => val).join(" · ")}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
                                 <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide">Grade</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100">{state.condition}</span>
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Grade</span>
+                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.condition}</span>
                                 </div>
                                 <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
                                 <div className="flex items-start gap-2 text-[10px] font-semibold text-amber-600 dark:text-amber-400 pt-1">
@@ -2163,18 +2356,18 @@ export default function TradeInPage() {
                         {/* Setup Screen (Before Calculation) */}
                         {!aiLoading && !aiError && aiPrice === null && (
                           <div className="space-y-6 flex-1 flex flex-col justify-between">
-                            <div className="space-y-6">
-                              <StepHeader label="Device Photos" sub="Upload at least 1 clear photo of your device — our AI uses these to assess condition and give an accurate valuation." />
+                            <div className="space-y-4">
+                              <StepHeader label="Device Photos" />
 
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid grid-cols-2 gap-2.5">
                                 <motion.button
                                   whileHover={{ scale: 1.01 }}
                                   whileTap={{ scale: 0.99 }}
                                   onClick={() => fileInputRef.current?.click()}
                                   disabled={imageUploading}
-                                  className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-8 flex flex-col items-center gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
+                                  className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-6 py-5 flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
                                 >
-                                  <div className="h-12 w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
                                     {imageUploading ? (
                                       <div className="h-5 w-5 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin" />
                                     ) : (
@@ -2183,7 +2376,7 @@ export default function TradeInPage() {
                                   </div>
                                   <div className="text-center">
                                     <p className="text-xs font-black text-zinc-800 dark:text-zinc-200">{imageUploading ? "Uploading…" : "Upload photos"}</p>
-                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-1">JPEG or PNG · 1–6 required</p>
+                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-0.5">JPEG or PNG · 1–6 required</p>
                                   </div>
                                 </motion.button>
                                 <motion.button
@@ -2191,14 +2384,14 @@ export default function TradeInPage() {
                                   whileTap={{ scale: 0.99 }}
                                   onClick={() => setCameraOpen(true)}
                                   disabled={imageUploading}
-                                  className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-8 flex flex-col items-center gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
+                                  className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-6 py-5 flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
                                 >
-                                  <div className="h-12 w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
                                     <Camera className="h-5 w-5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
                                   </div>
                                   <div className="text-center">
                                     <p className="text-xs font-black text-zinc-800 dark:text-zinc-200">Take photo</p>
-                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-1">Use your camera</p>
+                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-0.5">Use your camera</p>
                                   </div>
                                 </motion.button>
                               </div>
@@ -2270,22 +2463,26 @@ export default function TradeInPage() {
                               </div>
 
                               {/* Price adjustment breakdown details */}
-                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-5 text-left space-y-3">
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide">Device Model</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100">{state.model}</span>
+                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 text-left space-y-3">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Device Model</span>
+                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.model}</span>
                                 </div>
+                                {Object.keys(state.specs).length > 0 && (
+                                  <>
+                                    <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
+                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                      <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Specs selected</span>
+                                      <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right leading-snug">
+                                        {Object.entries(state.specs).filter(([_, val]) => !!val).map(([_, val]) => val).join(" · ")}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
                                 <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide">Specs selected</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100">
-                                    {Object.entries(state.specs).map(([lbl, val]) => `${val}`).join(" · ")}
-                                  </span>
-                                </div>
-                                <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                <div className="flex justify-between items-center text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide">Grade</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100">{state.condition}</span>
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
+                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Grade</span>
+                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.condition}</span>
                                 </div>
                                 {Object.entries(state.answers).some(([k, v]) => v.toLowerCase().includes("crack") || v.toLowerCase().includes("faulty") || v.toLowerCase().includes("issue") || v.toLowerCase().includes("no")) && (
                                   <>
@@ -2348,20 +2545,6 @@ export default function TradeInPage() {
                           className="space-y-6 flex-1 flex flex-col justify-between"
                           onSubmit={async (e) => {
                             e.preventDefault();
-                            if (user) {
-                              const missing: string[] = [];
-                              if (!user.phone) missing.push("Phone number");
-                              if (state.fulfillment === "ship") {
-                                if (!user.address)  missing.push("Street address");
-                                if (!user.city)     missing.push("City");
-                                if (!user.postcode) missing.push("Postcode");
-                              }
-                              if (missing.length > 0) {
-                                setMissingFields(missing);
-                                setMissingDetailsOpen(true);
-                                return;
-                              }
-                            }
                             setSubmitting(true);
                             setSubmitError("");
                             try {
@@ -2486,64 +2669,53 @@ export default function TradeInPage() {
                                 <div className="space-y-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 animate-fade-in">
                                   <span className="text-xs font-black uppercase tracking-widest text-zinc-400 block">Personal Details</span>
 
-                                  {user ? (
-                                    <div className="flex items-center gap-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 rounded-2xl px-4 py-3">
-                                      <div className="h-8 w-8 rounded-full bg-emerald-100 dark:bg-emerald-900/40 border border-emerald-200 dark:border-emerald-900/30 flex items-center justify-center font-black text-xs text-emerald-700 dark:text-emerald-400 shrink-0">
-                                        {user.name[0]}
-                                      </div>
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-xs font-black text-emerald-900 dark:text-emerald-400 truncate">{user.name}</p>
-                                        <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-555">Details filled from your account</p>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div className="space-y-3">
-                                      <a
-                                        href={`${API_URL}/auth/google`}
-                                        onClick={() => { /* auto-save handles sessionStorage */ }}
-                                        className="w-full h-12 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl font-bold transition-all hover:scale-[1.02] hover:border-zinc-400 active:scale-[0.98] flex items-center justify-center gap-3 text-sm text-zinc-700 dark:text-zinc-300 shadow-sm"
-                                      >
-                                        <GoogleIcon />
-                                        Continue with Google
-                                      </a>
-                                      <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">or fill manually</span>
-                                        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
-                                      </div>
-                                    </div>
-                                  )}
                                   {(() => {
-                                    const allFields = [
-                                      { key: "name",     label: "Full Name",                   type: "text",  placeholder: "e.g. Jordan Mitchell",  span: false, profileValue: user?.name },
-                                      { key: "email",    label: "Email Address",                type: "email", placeholder: "e.g. you@domain.com",   span: false, profileValue: user?.email },
-                                      { key: "phone",    label: "Phone Number",                 type: "tel",   placeholder: "e.g. +44 7700 900077",  span: false, profileValue: user?.phone },
+                                    const visibleFields = [
+                                      { key: "name",     label: "Full Name",                   type: "text",  placeholder: "e.g. Jordan Mitchell",  span: false },
+                                      { key: "email",    label: "Email Address",                type: "email", placeholder: "e.g. you@domain.com",   span: false },
+                                      { key: "phone",    label: "Phone Number",                 type: "tel",   placeholder: "e.g. +44 7700 900077",  span: false },
                                       ...(state.fulfillment === "ship" ? [
-                                        { key: "address",  label: "Collection / Return Address", type: "text",  placeholder: "e.g. 10 High Street",   span: true,  profileValue: user?.address },
-                                        { key: "postcode", label: "Postcode",                    type: "text",  placeholder: "e.g. LE1 1AA",          span: false, profileValue: undefined },
+                                        { key: "address",  label: "Collection / Return Address", type: "text",  placeholder: "e.g. 10 High Street",   span: true },
+                                        { key: "postcode", label: "Postcode",                    type: "text",  placeholder: "e.g. LE1 1AA",          span: false },
                                       ] : []),
                                     ];
-                                    // Logged-in users: modal guard handles missing postcode, no inline fields needed
-                                    const visibleFields = user ? [] : allFields;
-                                    if (visibleFields.length === 0) return null;
                                     return (
-                                      <div className="grid gap-4 sm:grid-cols-2">
-                                        {visibleFields.map((inp) => (
-                                          <div key={inp.key} className={inp.span ? "sm:col-span-2" : ""}>
-                                            <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">{inp.label}</label>
-                                            <input
-                                              type={inp.type}
-                                              required
-                                              placeholder={inp.placeholder}
-                                              value={state.contact[inp.key as keyof typeof state.contact] || ""}
-                                              onChange={(e) => setState(s => ({
-                                                ...s,
-                                                contact: { ...s.contact, [inp.key]: e.target.value }
-                                              }))}
-                                              className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-800 px-4 text-xs font-semibold outline-none focus:border-accent transition-colors bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white"
-                                            />
+                                      <div className="space-y-4">
+                                        {!user && (
+                                          <div className="space-y-3">
+                                            <a
+                                              href={`${API_URL}/auth/google`}
+                                              onClick={() => { /* auto-save handles sessionStorage */ }}
+                                              className="w-full h-12 bg-white dark:bg-zinc-900 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl font-bold transition-all hover:scale-[1.02] hover:border-zinc-400 active:scale-[0.98] flex items-center justify-center gap-3 text-sm text-zinc-700 dark:text-zinc-300 shadow-sm"
+                                            >
+                                              <GoogleIcon />
+                                              Continue with Google
+                                            </a>
+                                            <div className="flex items-center gap-3">
+                                              <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+                                              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">or fill manually</span>
+                                              <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-800" />
+                                            </div>
                                           </div>
-                                        ))}
+                                        )}
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                          {visibleFields.map((inp) => (
+                                            <div key={inp.key} className={inp.span ? "sm:col-span-2" : ""}>
+                                              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">{inp.label}</label>
+                                              <input
+                                                type={inp.type}
+                                                required
+                                                placeholder={inp.placeholder}
+                                                value={state.contact[inp.key as keyof typeof state.contact] || (user ? (user[inp.key as keyof typeof user] as string || "") : "")}
+                                                onChange={(e) => setState(s => ({
+                                                  ...s,
+                                                  contact: { ...s.contact, [inp.key]: e.target.value }
+                                                }))}
+                                                className="h-12 w-full rounded-xl border border-zinc-300 dark:border-zinc-800 px-4 text-xs font-semibold outline-none focus:border-zinc-950 dark:focus:border-white transition-colors bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white"
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     );
                                   })()}
@@ -2566,19 +2738,6 @@ export default function TradeInPage() {
                                   <span className="inline-block bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[9px] px-2 py-0.5 rounded-md mt-0.5">
                                     {state.category}
                                   </span>
-                                </div>
-
-                                <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-
-                                <div className="space-y-1">
-                                  <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block">Specifications</span>
-                                  <div className="flex flex-wrap gap-1 mt-1">
-                                    {Object.entries(state.specs).map(([lbl, val]) => (
-                                      <span key={lbl} className="bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-805 text-zinc-800 dark:text-zinc-300 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                        {val}
-                                      </span>
-                                    ))}
-                                  </div>
                                 </div>
 
                                 <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />

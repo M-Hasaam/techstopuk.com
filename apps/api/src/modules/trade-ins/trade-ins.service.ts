@@ -410,7 +410,8 @@ Respond with ONLY: {"price": <number rounded to nearest 5, minimum 10>}`;
         const prompt = `Device trade-in assistant. Customer wants to sell: brand="${brand}", model="${model}", category="${category}".
 Return JSON with 2-4 relevant specification fields and their options so we can log key details about this device.
 Example: { "specs": [{ "label": "Storage", "options": ["64GB","128GB","256GB","512GB"] }, { "label": "Connectivity", "options": ["Wi-Fi Only","Wi-Fi + Cellular"] }] }
-For unknown/other categories use generic fields like Storage, Condition Notes, Accessories Included.
+For unknown/other categories use generic fields like Storage, Accessories Included, Color.
+Do NOT include a condition/grade/physical-state field — that is captured separately by our own condition grading step.
 Respond only with valid JSON.`;
 
         try {
@@ -423,7 +424,10 @@ Respond only with valid JSON.`;
             });
 
             const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}') as { specs?: { label: string; options: string[] }[] };
-            return parsed.specs ?? [];
+            const specs = parsed.specs ?? [];
+            // Defensive filter in case the model ignores the instruction above —
+            // condition/grade is always handled by the dedicated grading step, never here.
+            return specs.filter(s => !/condition|grade|physical state/i.test(s.label));
         } catch {
             return [];
         }
