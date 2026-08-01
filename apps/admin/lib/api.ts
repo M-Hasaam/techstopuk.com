@@ -937,6 +937,10 @@ export const tradeInDevicesApi = {
     apiFetch<TradeInDeviceItem>(`/trade-in-devices/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) =>
     apiFetch<void>(`/trade-in-devices/${id}`, { method: 'DELETE' }),
+  removeAll: () =>
+    apiFetch<{ deleted: number }>('/trade-in-devices/all', { method: 'DELETE' }),
+  seedDefaults: () =>
+    apiFetch<{ seeded: number }>('/trade-in-devices/seed', { method: 'POST' }),
 };
 
 export const promoSlidesApi = {

@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ChevronRight, Plus, Smartphone } from "lucide-react";
 import Fuse from "fuse.js";
-import { TRADE_IN_MODELS, type TradeInModel } from "@/lib/trade-in-data";
+import { type TradeInModel } from "@/lib/trade-in-data";
 import { catalogApi } from "@/lib/api";
 
 // Category name from DB → wizard category ID used by trade-in/repair pages
@@ -55,9 +55,6 @@ function generateAliases(name: string): string[] {
   return aliases;
 }
 
-// Static fallback Fuse — used instantly while the API call is in flight
-const STATIC_FUSE = new Fuse(TRADE_IN_MODELS, FUSE_OPTIONS);
-
 export default function DeviceSearchBox({
   placeholder = "Search your device (e.g. Samsung Galaxy, iPhone 15 Pro...)",
   className = "",
@@ -71,23 +68,22 @@ export default function DeviceSearchBox({
 }: DeviceSearchBoxProps) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
-  // Starts with static fallback; upgraded to live catalog data once the API responds
-  const [fuseInstance, setFuseInstance] = useState<Fuse<TradeInModel>>(STATIC_FUSE);
+  // No static data — empty until the live sources below resolve.
+  const [fuseInstance, setFuseInstance] = useState<Fuse<TradeInModel>>(() => new Fuse<TradeInModel>([], FUSE_OPTIONS));
 
   useEffect(() => {
-    // Three-tier merge, most authoritative first:
+    // The only two sources of search results, ever:
     //  1. DeviceCatalog (forTradeIn=true) — real, priced devices. Carries catalogId +
     //     attributeOptions so picking one routes into that exact device's real trade-in
     //     flow instead of the generic "unlisted device" path.
-    //  2. The broader admin-curated trade_in_devices search list (may use shorter/different
-    //     naming, e.g. "PS3" vs the catalog's "PlayStation 3") — fills brand/model breadth
-    //     for devices not yet in the catalog.
-    //  3. Static fallback list (e.g. Nothing Phone, Fairphone) for gaps in both of the above.
+    //  2. The admin-curated "Other Search Devices" list (trade_in_devices) — fills
+    //     brand/model breadth for devices not yet in the catalog (e.g. "PS3").
+    // No static fallback list — if this call fails, results just stay empty rather
+    // than showing stale/unmanaged data the admin has no way to edit or remove.
     Promise.all([
       fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true`)
-        .then(r => r.json())
-        .catch(() => [] as any[]),
-      catalogApi.listTradeInModels().catch(() => []),
+        .then(r => r.json()),
+      catalogApi.listTradeInModels(),
     ]).then(([catalogEntries, items]: [any[], { name: string; brand: string; category: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced' }[]]) => {
       const catalogModels: TradeInModel[] = catalogEntries.map(e => ({
         name:     e.model,
@@ -111,11 +107,8 @@ export default function DeviceSearchBox({
       const catalogKeys = new Set(catalogModels.map(key));
       const dbOnly = dbModels.filter(m => !catalogKeys.has(key(m)));
 
-      const mergedKeys = new Set([...catalogModels, ...dbOnly].map(key));
-      const staticOnly = TRADE_IN_MODELS.filter(m => !mergedKeys.has(key(m)));
-
-      setFuseInstance(new Fuse([...catalogModels, ...dbOnly, ...staticOnly], FUSE_OPTIONS));
-    }).catch(() => {}); // silently keep static fallback on error
+      setFuseInstance(new Fuse([...catalogModels, ...dbOnly], FUSE_OPTIONS));
+    }).catch(() => {}); // API unreachable — keep the static STATIC_FUSE fallback already in state
   }, []);
 
   const suggestions: TradeInModel[] = useMemo(

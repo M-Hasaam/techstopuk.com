@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
+import { DEFAULT_TRADE_IN_DEVICES } from './trade-in-devices.seed-data';
 
 export interface CreateTradeInDeviceDto {
     name:     string;
@@ -66,5 +67,16 @@ export class TradeInDevicesService {
 
     bulkCreate(devices: CreateTradeInDeviceDto[]) {
         return Promise.all(devices.map(d => this.create(d)));
+    }
+
+    async removeAll() {
+        const result = await this.prisma.tradeInDevice.deleteMany({});
+        return { deleted: result.count };
+    }
+
+    /** Upserts the canonical "genuine gaps" list — safe to call repeatedly, never deletes. */
+    async seedDefaults() {
+        await this.bulkCreate(DEFAULT_TRADE_IN_DEVICES);
+        return { seeded: DEFAULT_TRADE_IN_DEVICES.length };
     }
 }

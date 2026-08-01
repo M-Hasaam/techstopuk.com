@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { tradeInDevicesApi, deviceCatalogApi, type TradeInDeviceItem } from "../../../lib/api";
-import { Plus, Pencil, Trash2, Check, X, Search, ArrowLeft, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, Check, X, Search, ArrowLeft, AlertTriangle, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
 const CATEGORIES = ["Phone", "Tablet", "Console", "Laptop", "Audio", "Smartwatch", "Other"];
@@ -23,6 +23,31 @@ function normalize(s: string) {
     .trim();
 }
 
+// This list uses "Sony PlayStation"/"Microsoft Xbox" as brand names while the real
+// catalog uses plain "Sony"/"Microsoft" — without this, every PlayStation/Xbox
+// catalog entry is invisible to the duplicate check below.
+const BRAND_ALIAS: Record<string, string> = {
+  "sony playstation": "sony",
+  "microsoft xbox": "microsoft",
+};
+function normBrand(b: string): string {
+  const n = normalize(b);
+  return BRAND_ALIAS[n] ?? n;
+}
+
+// Generates both the full and "PS4"-style abbreviated form of a model name so
+// "PS5 Disc Edition" here is recognized as the same device as the catalog's
+// "PlayStation 5 Disc Edition" (and vice versa).
+function modelVariants(model: string): string[] {
+  const n = normalize(model);
+  const variants = new Set([n]);
+  const full = n.match(/^playstation (\d+)\b(.*)$/);
+  if (full) variants.add(`ps${full[1]}${full[2]}`);
+  const abbrev = n.match(/^ps(\d+)\b(.*)$/);
+  if (abbrev) variants.add(`playstation ${abbrev[1]}${abbrev[2]}`);
+  return [...variants];
+}
+
 export default function SearchDevicesPage() {
   const [devices, setDevices] = useState<TradeInDeviceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,15 +58,30 @@ export default function SearchDevicesPage() {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("All");
   const [catalogKeys, setCatalogKeys] = useState<Set<string>>(new Set());
+  const [deletingAll, setDeletingAll] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState("");
 
   useEffect(() => {
     deviceCatalogApi.list()
-      .then(items => setCatalogKeys(new Set(items.map(d => `${normalize(d.brandCategory.brand.name)}|${normalize(d.model)}`))))
+      .then(items => {
+        const keys = new Set<string>();
+        for (const d of items) {
+          const brand = normBrand(d.brandCategory.brand.name);
+          for (const v of modelVariants(d.model)) keys.add(`${brand}|${v}`);
+        }
+        setCatalogKeys(keys);
+      })
       .catch(() => {});
   }, []);
 
-  const duplicateMatch = form.name.trim() && form.brand.trim()
-    && catalogKeys.has(`${normalize(form.brand)}|${normalize(form.name)}`);
+  const isCatalogDuplicate = (brand: string, name: string) => {
+    if (!brand.trim() || !name.trim()) return false;
+    const b = normBrand(brand);
+    return modelVariants(name).some(v => catalogKeys.has(`${b}|${v}`));
+  };
+
+  const duplicateMatch = isCatalogDuplicate(form.brand, form.name);
 
   const load = () => {
     setLoading(true);
@@ -75,6 +115,27 @@ export default function SearchDevicesPage() {
     if (!confirm(`Delete "${name}"?`)) return;
     await tradeInDevicesApi.remove(id).catch(() => {});
     load();
+  }
+
+  async function handleDeleteAll() {
+    if (!confirm(`Delete all ${devices.length} devices in this list? This cannot be undone — use "Seed this only" afterwards to restore the default list.`)) return;
+    setDeletingAll(true); setBulkMsg("");
+    try {
+      const { deleted } = await tradeInDevicesApi.removeAll();
+      setBulkMsg(`Deleted ${deleted} device${deleted !== 1 ? "s" : ""}.`);
+      load();
+    } catch (e: any) { setBulkMsg(e.message ?? "Delete failed"); }
+    finally { setDeletingAll(false); }
+  }
+
+  async function handleSeedDefaults() {
+    setSeeding(true); setBulkMsg("");
+    try {
+      const { seeded } = await tradeInDevicesApi.seedDefaults();
+      setBulkMsg(`Seeded ${seeded} default device${seeded !== 1 ? "s" : ""} (existing entries left untouched).`);
+      load();
+    } catch (e: any) { setBulkMsg(e.message ?? "Seed failed"); }
+    finally { setSeeding(false); }
   }
 
   async function toggleActive(d: TradeInDeviceItem) {
@@ -120,13 +181,37 @@ export default function SearchDevicesPage() {
             here if it already exists in the catalog — it&apos;ll just show up twice.
           </p>
         </div>
-        <button
-          onClick={startCreate}
-          className="flex items-center gap-2 h-9 px-4 rounded-xl bg-zinc-950 text-white text-xs font-bold hover:bg-zinc-800 shrink-0"
-        >
-          <Plus className="h-3.5 w-3.5" /> Add device
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={handleSeedDefaults}
+            disabled={seeding}
+            title="Upsert the canonical default list — safe to run any time, never deletes anything"
+            className="flex items-center gap-2 h-9 px-4 rounded-xl border border-zinc-200 text-zinc-600 text-xs font-bold hover:border-zinc-400 hover:text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${seeding ? "animate-spin" : ""}`} /> {seeding ? "Seeding…" : "Seed this only"}
+          </button>
+          <button
+            onClick={handleDeleteAll}
+            disabled={deletingAll || devices.length === 0}
+            title="Delete every device in this list"
+            className="flex items-center gap-2 h-9 px-4 rounded-xl border border-zinc-200 text-zinc-500 text-xs font-bold hover:border-red-200 hover:text-red-700 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Trash2 className="h-3.5 w-3.5" /> {deletingAll ? "Deleting…" : "Delete All"}
+          </button>
+          <button
+            onClick={startCreate}
+            className="flex items-center gap-2 h-9 px-4 rounded-xl bg-zinc-950 text-white text-xs font-bold hover:bg-zinc-800"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add device
+          </button>
+        </div>
       </div>
+
+      {bulkMsg && (
+        <div className="text-xs font-semibold text-zinc-600 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2 mb-4">
+          {bulkMsg}
+        </div>
+      )}
 
       {/* Add / Edit form */}
       {editing && (
@@ -239,7 +324,7 @@ export default function SearchDevicesPage() {
                   </thead>
                   <tbody className="divide-y divide-zinc-50">
                     {items.map(d => {
-                      const isDup = catalogKeys.has(`${normalize(d.brand)}|${normalize(d.name)}`);
+                      const isDup = isCatalogDuplicate(d.brand, d.name);
                       return (
                       <tr key={d.id} className="hover:bg-zinc-50/50">
                         <td className="px-5 py-3 font-semibold text-zinc-900">

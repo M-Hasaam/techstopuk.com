@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
 import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, type Store, type CatalogCategory, type Product } from "@/lib/api";
-import { TRADE_IN_MODELS } from "@/lib/trade-in-data";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import {
@@ -68,74 +67,6 @@ const BRAND_ALIAS: Record<string, string> = {
 function normBrand(b: string): string {
   return BRAND_ALIAS[b.toLowerCase().trim()] ?? b;
 }
-
-const BRANDS: Record<string, string[]> = {
-  Phone: [
-    "Apple", "Samsung", "Google", "OnePlus", "Nothing", "Motorola",
-    "Xiaomi", "Redmi", "Huawei", "Nokia", "Sony", "LG", "HTC", "ASUS",
-    "Realme", "Oppo", "Vivo", "Honor", "Fairphone", "Alcatel",
-    "BlackBerry", "CAT", "Crosscall", "Doogee", "Doro", "ZTE", "TCL",
-  ],
-  Tablet: [
-    "Apple", "Samsung", "Microsoft", "Amazon", "Lenovo",
-    "Huawei", "ASUS", "Google",
-  ],
-  Console: [
-    "Sony PlayStation", "Microsoft Xbox", "Nintendo", "Sega", "Atari",
-  ],
-  Laptop: [
-    "Apple", "Dell", "Lenovo", "HP", "ASUS", "Microsoft",
-    "Acer", "Samsung", "Toshiba", "MSI", "Razer", "LG",
-    "Huawei", "Google", "Xiaomi",
-  ],
-  Smartwatch: [
-    "Apple", "Samsung", "Fitbit", "Garmin", "Fossil",
-    "Huawei", "Xiaomi", "Amazfit", "Suunto", "Polar",
-  ],
-  Audio: [
-    "Apple", "Sony", "Bose", "Samsung", "Jabra",
-    "Sennheiser", "Bang & Olufsen", "Beats", "JBL", "Anker",
-    "Skullcandy", "Marshall", "Razer",
-  ],
-};
-
-const MODELS: Record<string, Record<string, string[]>> = {
-  Phone: {
-    Apple: ["iPhone 15 Pro Max", "iPhone 15 Pro", "iPhone 15 Plus", "iPhone 15", "iPhone 14 Pro Max", "iPhone 14 Pro", "iPhone 14 Plus", "iPhone 14", "iPhone 13 Pro Max", "iPhone 13 Pro", "iPhone 13", "iPhone 12 Pro Max", "iPhone 12 Pro", "iPhone 12", "iPhone 11 Pro Max", "iPhone 11 Pro", "iPhone 11"],
-    Samsung: ["Galaxy S24 Ultra", "Galaxy S24+", "Galaxy S24", "Galaxy S23 Ultra", "Galaxy S23+", "Galaxy S23", "Galaxy S22 Ultra", "Galaxy S22+", "Galaxy S22", "Galaxy S21 Ultra", "Galaxy S21+", "Galaxy S21"],
-    Google: ["Pixel 8 Pro", "Pixel 8", "Pixel 7 Pro", "Pixel 7", "Pixel 6 Pro", "Pixel 6"],
-    OnePlus: ["OnePlus 12", "OnePlus 11", "OnePlus 10 Pro", "OnePlus 9 Pro"],
-    Nothing: ["Nothing Phone (2)", "Nothing Phone (1)"],
-    Motorola: ["Edge 50 Pro", "Edge 40 Pro", "Moto G84", "Moto G54"],
-  },
-  Tablet: {
-    Apple: ["iPad Pro 13\" M4", "iPad Pro 11\" M4", "iPad Air 13\" M2", "iPad Air 11\" M2", "iPad mini 7th Gen", "iPad Pro 13\" M2", "iPad Pro 11\" M2", "iPad Air 5th Gen", "iPad 10th Gen", "iPad 9th Gen", "iPad mini 6th Gen"],
-    Samsung: ["Galaxy Tab S10 Ultra", "Galaxy Tab S10+", "Galaxy Tab S10", "Galaxy Tab S9 Ultra", "Galaxy Tab S9+", "Galaxy Tab S9", "Galaxy Tab S8 Ultra"],
-    Microsoft: ["Surface Pro 11", "Surface Pro 10", "Surface Pro 9", "Surface Pro 8"],
-  },
-  Console: {
-    "Sony PlayStation": ["PS5 Disc Edition", "PS5 Digital Edition", "PS4 Pro", "PS4 Slim", "PS4", "PS3 Slim", "PS3"],
-    "Microsoft Xbox": ["Xbox Series X", "Xbox Series S", "Xbox One X", "Xbox One S", "Xbox One", "Xbox 360 S", "Xbox 360"],
-    Nintendo: ["Nintendo Switch OLED", "Nintendo Switch (V2)", "Nintendo Switch Lite"],
-  },
-  Laptop: {
-    Apple: ["MacBook Pro 16\" M3 Max", "MacBook Pro 16\" M3 Pro", "MacBook Pro 14\" M3 Max", "MacBook Pro 14\" M3 Pro", "MacBook Air 15\" M3", "MacBook Air 13\" M3", "MacBook Pro 16\" M2 Max", "MacBook Pro 16\" M2 Pro", "MacBook Pro 14\" M2 Pro", "MacBook Air 15\" M2", "MacBook Air 13\" M2", "MacBook Air 13\" M1"],
-    Dell: ["XPS 15 (2024)", "XPS 13 (2024)", "Inspiron 15 5530", "Latitude 14 5440"],
-    Lenovo: ["ThinkPad X1 Carbon Gen 12", "ThinkPad T14s Gen 5", "IdeaPad Slim 5", "Legion 5i Gen 9"],
-    HP: ["Spectre x360 14", "EliteBook 840 G11", "Pavilion 15", "Envy x360 15"],
-    ASUS: ["ZenBook 14 OLED", "ROG Zephyrus G14 2024", "VivoBook 15 OLED", "ExpertBook B9 OLED"],
-  },
-  Smartwatch: {
-    Apple: ["Apple Watch Ultra 2", "Apple Watch Series 9", "Apple Watch Series 8", "Apple Watch SE (2nd Gen)"],
-    Samsung: ["Galaxy Watch 6 Classic", "Galaxy Watch 6", "Galaxy Watch 5 Pro", "Galaxy Watch 5"],
-    Fitbit: ["Fitbit Sense 2", "Fitbit Versa 4", "Fitbit Charge 6"],
-  },
-  Audio: {
-    Apple: ["AirPods Max", "AirPods Pro 2", "AirPods Pro", "AirPods 3rd Gen"],
-    Sony: ["WH-1000XM5", "WF-1000XM5", "WH-1000XM4"],
-    Bose: ["QuietComfort Ultra", "QuietComfort II Headphones", "QuietComfort Earbuds II"],
-  },
-};
 
 const SPECS: Record<string, { label: string; options: string[] }[]> = {
   Phone: [
@@ -221,12 +152,6 @@ const CONDITION_QUESTIONS: Record<string, { id: string; question: string; option
     { id: "reset",    question: "Will you factory reset before sending?", options: ["Yes, already done", "I'll do it before sending"] },
   ],
 };
-
-const ALL_MODELS = Object.entries(MODELS).flatMap(([catId, brandsMap]) =>
-  Object.entries(brandsMap).flatMap(([brandName, modelsList]) =>
-    modelsList.map(modelName => ({ name: modelName, category: catId, brand: brandName }))
-  )
-);
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -433,14 +358,12 @@ export default function TradeInPage() {
   // at all in the step-by-step wizard, only via the free-text search box.
   const [otherDevices, setOtherDevices] = useState<{ name: string; brand: string; category: string }[]>([]);
   useEffect(() => {
+    // The admin-curated "Other Search Devices" list is the only source for this — no
+    // static fallback. If the call fails, this just stays empty rather than showing
+    // stale/unmanaged data the admin has no way to edit or remove.
     catalogApi.listTradeInModels()
-      .then(items => {
-        const key = (d: { brand: string; name: string }) => `${d.brand}:${d.name}`.toLowerCase();
-        const dbKeys = new Set(items.map(key));
-        const staticOnly = TRADE_IN_MODELS.filter(m => !dbKeys.has(key(m)));
-        setOtherDevices([...items, ...staticOnly]);
-      })
-      .catch(() => setOtherDevices(TRADE_IN_MODELS));
+      .then(items => setOtherDevices(items))
+      .catch(() => {});
   }, []);
   const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]>([]);
   // Real per-device attributes (e.g. RAM for a specific MacBook) pulled from the catalog entry
@@ -1587,8 +1510,8 @@ export default function TradeInPage() {
 
                               {/* Brand filter / search */}
                               {(() => {
-                                const catalogOrFallbackBrands = dynamicBrands.length > 0 ? dynamicBrands : (BRANDS[state.category] ?? []);
-                                const catalogKeys = new Set(catalogOrFallbackBrands.map(b => b.toLowerCase()));
+                                const catalogBrands = dynamicBrands;
+                                const catalogKeys = new Set(catalogBrands.map(b => b.toLowerCase()));
                                 // Brands that only exist in the "Other Search Devices" list — kept
                                 // visually separate below so it's clear they're not full catalog devices.
                                 const otherSeen = new Map<string, string>();
@@ -1599,10 +1522,10 @@ export default function TradeInPage() {
                                   if (!catalogKeys.has(k) && !otherSeen.has(k)) otherSeen.set(k, b);
                                 }
                                 const otherBrands = [...otherSeen.values()];
-                                const allBrands = [...catalogOrFallbackBrands, ...otherBrands];
+                                const allBrands = [...catalogBrands, ...otherBrands];
                                 const applyFilter = (list: string[]) =>
                                   brandFilter.trim() ? list.filter(b => b.toLowerCase().includes(brandFilter.toLowerCase())) : list;
-                                const filteredCatalog = applyFilter(catalogOrFallbackBrands);
+                                const filteredCatalog = applyFilter(catalogBrands);
                                 const filteredOther = applyFilter(otherBrands);
                                 return (
                                   <>
@@ -1727,12 +1650,7 @@ export default function TradeInPage() {
                                   .map(d => ({ model: d.name, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }));
                                 const catalogModelNames = new Set(dynamicModelData.map(m => m.model.toLowerCase()));
                                 const dedupedOther = otherModelsForBrand.filter(m => !catalogModelNames.has(m.model.toLowerCase()));
-                                // Local hardcoded fallback only kicks in when neither real source has
-                                // anything for this brand — treated as "other" for display purposes too.
-                                const localFallback = (dynamicModelData.length === 0 && dedupedOther.length === 0)
-                                  ? (MODELS[state.category]?.[state.brand] ?? []).map(m => ({ model: m, tradeInMode: 'unpriced' as const, attributeOptions: [] as { label: string; options: string[] }[] }))
-                                  : [];
-                                const otherModelsGroup = [...dedupedOther, ...localFallback];
+                                const otherModelsGroup = dedupedOther;
 
                                 const modelPool = [...dynamicModelData, ...otherModelsGroup];
 

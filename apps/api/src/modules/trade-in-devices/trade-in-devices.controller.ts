@@ -28,6 +28,20 @@ export class TradeInDevicesController {
         return this.service.update(id, dto);
     }
 
+    @Delete('all')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    removeAll() {
+        return this.service.removeAll();
+    }
+
+    @Post('seed')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN')
+    seedDefaults() {
+        return this.service.seedDefaults();
+    }
+
     @Delete(':id')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN')
