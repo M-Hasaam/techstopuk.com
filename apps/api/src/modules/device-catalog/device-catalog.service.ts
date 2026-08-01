@@ -61,6 +61,13 @@ export class DeviceCatalogService {
         if (!params?.forTradeIn) return entries;
 
         const augmented = await Promise.all(entries.map(async (entry) => {
+            // An admin-set manual price is an explicit override — it always wins over
+            // automated scraped data, both here (display label) and in the actual offer
+            // calculation (ProductPricingService.getTradeInAnchor).
+            if ((entry as any).manualMarketPrice) {
+                return { ...entry, tradeInMode: 'manual_price' as const };
+            }
+
             // Only real scraped market data counts as 'auto' — AI-estimated product prices do not
             const hasScrapedPrice = await this.prisma.scrapedPrice.findFirst({
                 where: {
@@ -71,11 +78,7 @@ export class DeviceCatalogService {
                 select: { id: true },
             });
 
-            const tradeInMode = hasScrapedPrice
-                ? 'auto'
-                : (entry as any).manualMarketPrice
-                ? 'manual_price'
-                : 'unpriced';
+            const tradeInMode = hasScrapedPrice ? 'auto' : 'unpriced';
 
             return { ...entry, tradeInMode: tradeInMode as 'auto' | 'manual_price' | 'unpriced' };
         }));

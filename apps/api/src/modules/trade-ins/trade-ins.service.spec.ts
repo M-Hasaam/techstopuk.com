@@ -415,11 +415,51 @@ describe('TradeInsService', () => {
     describe('aiPrice', () => {
         const dto = { brand: 'Apple', model: 'iPhone 13', category: 'Phones', condition: 'A', specs: { storage: '128GB' }, answers: {} } as any;
 
-        it('returns the deterministic anchor price without calling OpenAI when available', async () => {
+        it('returns the deterministic anchor price unadjusted when no OpenAI key is configured', async () => {
+            delete process.env.OPENAI_API_KEY;
             productPricingMock.getTradeInAnchor.mockResolvedValueOnce(120);
             const result = await service.aiPrice(dto);
             expect(result).toEqual({ price: 120, aiUsed: false, source: 'anchor' });
             expect(mockOpenAiCreate).not.toHaveBeenCalled();
+        });
+
+        it('skips the AI spec adjustment entirely when there are no specs or answers to weigh', async () => {
+            process.env.OPENAI_API_KEY = 'sk-test';
+            productPricingMock.getTradeInAnchor.mockResolvedValueOnce(120);
+            const result = await service.aiPrice({ ...dto, specs: {}, answers: {} });
+            expect(result).toEqual({ price: 120, aiUsed: false, source: 'anchor' });
+            expect(mockOpenAiCreate).not.toHaveBeenCalled();
+        });
+
+        it('adjusts the anchor price with a bounded AI multiplier when specs/answers are provided', async () => {
+            process.env.OPENAI_API_KEY = 'sk-test';
+            productPricingMock.getTradeInAnchor.mockResolvedValueOnce(200);
+            mockOpenAiCreate.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({ multiplier: 0.9 }) } }],
+            });
+            const result = await service.aiPrice(dto);
+            // round5(200 * 0.9) = 180
+            expect(result).toEqual({ price: 180, aiUsed: false, source: 'anchor' });
+            expect(mockOpenAiCreate).toHaveBeenCalledTimes(1);
+        });
+
+        it('clamps an out-of-range AI multiplier to the ±20%/+10% bound', async () => {
+            process.env.OPENAI_API_KEY = 'sk-test';
+            productPricingMock.getTradeInAnchor.mockResolvedValueOnce(200);
+            mockOpenAiCreate.mockResolvedValueOnce({
+                choices: [{ message: { content: JSON.stringify({ multiplier: 2.5 }) } }],
+            });
+            const result = await service.aiPrice(dto);
+            // multiplier clamped to 1.1 → round5(200 * 1.1) = 220
+            expect(result.price).toBe(220);
+        });
+
+        it('falls back to the unadjusted anchor when the AI spec-adjustment call fails', async () => {
+            process.env.OPENAI_API_KEY = 'sk-test';
+            productPricingMock.getTradeInAnchor.mockResolvedValueOnce(120);
+            mockOpenAiCreate.mockRejectedValueOnce(new Error('network error'));
+            const result = await service.aiPrice(dto);
+            expect(result).toEqual({ price: 120, aiUsed: false, source: 'anchor' });
         });
 
         it('throws InternalServerErrorException when no anchor and no OpenAI key configured', async () => {

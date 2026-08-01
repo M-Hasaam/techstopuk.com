@@ -107,6 +107,15 @@ describe('DeviceCatalogService', () => {
             expect(result[0].tradeInMode).toBe('unpriced');
         });
 
+        it('manualMarketPrice overrides an existing scraped price — "manual_price" wins, not "auto"', async () => {
+            prismaMock.deviceCatalog.findMany.mockResolvedValueOnce([makeDevice({ manualMarketPrice: 100 })]);
+            prismaMock.scrapedPrice.findFirst.mockResolvedValueOnce({ id: 'sp-1' });
+            const result = await service.findAll({ forTradeIn: true }) as any[];
+            expect(result[0].tradeInMode).toBe('manual_price');
+            // The override short-circuits before even checking for a scraped price
+            expect(prismaMock.scrapedPrice.findFirst).not.toHaveBeenCalled();
+        });
+
         it('sets tradeInEnabled filter only when forTradeIn is true', async () => {
             prismaMock.deviceCatalog.findMany.mockResolvedValueOnce([]);
             await service.findAll({ forTradeIn: true });

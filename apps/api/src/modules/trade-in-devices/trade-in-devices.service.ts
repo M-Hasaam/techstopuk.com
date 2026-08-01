@@ -22,7 +22,18 @@ export class TradeInDevicesService {
         // Cross-reference against the pricing catalog so the search box can show
         // an "auto-priced" badge for devices with a real, confirmed price — same
         // tradeInMode computation DeviceCatalogService uses for the wizard's list.
+        // An admin-set manual price is an explicit override and always wins over
+        // automated scraped data.
         return Promise.all(devices.map(async (d) => {
+            const catalogEntry = await this.prisma.deviceCatalog.findFirst({
+                where: {
+                    model: { equals: d.name, mode: 'insensitive' },
+                    brandCategory: { brand: { name: { equals: d.brand, mode: 'insensitive' } } },
+                },
+                select: { manualMarketPrice: true },
+            });
+            if (catalogEntry?.manualMarketPrice) return { ...d, tradeInMode: 'manual_price' as const };
+
             const hasScrapedPrice = await this.prisma.scrapedPrice.findFirst({
                 where: {
                     brand: { equals: d.brand, mode: 'insensitive' },
@@ -31,17 +42,7 @@ export class TradeInDevicesService {
                 },
                 select: { id: true },
             });
-            if (hasScrapedPrice) return { ...d, tradeInMode: 'auto' as const };
-
-            const catalogEntry = await this.prisma.deviceCatalog.findFirst({
-                where: {
-                    model: { equals: d.name, mode: 'insensitive' },
-                    brandCategory: { brand: { name: { equals: d.brand, mode: 'insensitive' } } },
-                },
-                select: { manualMarketPrice: true },
-            });
-            const tradeInMode = catalogEntry?.manualMarketPrice ? 'manual_price' as const : 'unpriced' as const;
-            return { ...d, tradeInMode };
+            return { ...d, tradeInMode: hasScrapedPrice ? 'auto' as const : 'unpriced' as const };
         }));
     }
 

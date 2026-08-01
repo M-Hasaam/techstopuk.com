@@ -318,20 +318,69 @@ export class TradeInsService {
         return row?.value ?? 30;
     }
 
+    // A grade (A/B/C/F) alone drives the deterministic anchor's multiplier — but customers
+    // also answer accessory/diagnostic questions (controllers included? screen cracked? etc.)
+    // that carry no pricing weight of their own. This nudges the anchor with a small, bounded
+    // AI-judged multiplier so those answers actually matter, without letting a hallucinated
+    // adjustment swing the real-market-data-backed anchor by more than ±20%/+10%.
+    private async adjustAnchorForSpecs(
+        anchor: number,
+        dto: { brand: string; model: string; category: string; condition: string; specs: Record<string, string>; answers: Record<string, string> },
+    ): Promise<number> {
+        const specsText   = Object.entries(dto.specs ?? {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+        const answersText = Object.entries(dto.answers ?? {}).map(([k, v]) => `${k}: ${v}`).join(', ');
+        if (!specsText && !answersText) return anchor;
+
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) return anchor;
+
+        try {
+            const openai = new OpenAI({ apiKey });
+            const prompt = `A customer is trading in a ${dto.brand} ${dto.model} (${dto.category}), self-graded condition "${dto.condition}", currently anchored at a base trade-in offer of £${anchor} from real market data for that grade.
+
+Additional details the customer provided that are NOT already reflected in the base grade:
+${specsText   ? `Specs: ${specsText}` : ''}
+${answersText ? `Diagnostic answers: ${answersText}` : ''}
+
+Decide a small adjustment multiplier reflecting ONLY what these extra details reveal beyond the stated grade — e.g. missing accessories (controllers, cables, chargers, box) push it below 1.0; everything included and no extra issues means 1.0; diagnostic answers revealing problems worse than the grade implies also push it below 1.0. Do not re-judge overall condition already captured by the grade itself — most cases should land close to 1.0.
+
+Respond with ONLY a JSON object in this exact form: {"multiplier": <number between 0.8 and 1.1>}`;
+
+            const response = await openai.chat.completions.create({
+                model: 'gpt-4o-mini',
+                temperature: 0,
+                max_tokens: 50,
+                response_format: { type: 'json_object' },
+                messages: [{ role: 'user', content: prompt }],
+            });
+            const raw = response.choices[0]?.message?.content ?? '{}';
+            const parsed = JSON.parse(raw) as { multiplier?: number };
+            const multiplier = Math.min(1.1, Math.max(0.8, parsed.multiplier ?? 1));
+            const adjusted = Math.max(Math.round(anchor * multiplier / 5) * 5, 10);
+            this.logger.log(`AI spec adjustment for ${dto.brand} ${dto.model}: ×${multiplier} (£${anchor} → £${adjusted})`);
+            return adjusted;
+        } catch (err: any) {
+            this.logger.warn(`AI spec adjustment failed, using unadjusted anchor: ${err?.message}`);
+            return anchor;
+        }
+    }
+
     async aiPrice(dto: AiPriceDto): Promise<{ price: number; aiUsed: boolean; source?: string }> {
         const storage = (dto.specs as Record<string, string>)?.storage
                      ?? (dto.specs as Record<string, string>)?.Storage
                      ?? '';
 
-        // Priority 1 & 2: deterministic anchor (catalog product price → scraped price)
+        // Deterministic anchor (manual override → catalog product price → scraped price)
         const anchor = await this.productPricing.getTradeInAnchor(
             dto.brand, dto.model, storage, dto.condition,
         );
         if (anchor !== null) {
+            const adjustedPrice = await this.adjustAnchorForSpecs(anchor, dto);
             this.logger.log(
-                `Trade-in anchor for ${dto.brand} ${dto.model} ${storage} (${dto.condition}): £${anchor}`,
+                `Trade-in anchor for ${dto.brand} ${dto.model} ${storage} (${dto.condition}): £${anchor}` +
+                (adjustedPrice !== anchor ? ` → £${adjustedPrice} after spec adjustment` : ''),
             );
-            return { price: anchor, aiUsed: false, source: 'anchor' };
+            return { price: adjustedPrice, aiUsed: false, source: 'anchor' };
         }
 
         // Priority 3: AI fallback — only when no scraped/catalog data exists

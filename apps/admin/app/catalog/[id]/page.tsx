@@ -7,7 +7,7 @@ import {
   RefreshCw, AlertCircle, RefreshCcw, PoundSterling, Check, X as XIcon,
 } from "lucide-react";
 import {
-  deviceCatalogApi, productsApi, scraperApi,
+  deviceCatalogApi, productsApi, scraperApi, pricingConfigApi,
   type DeviceCatalogItem, type Product, type ScrapedPriceRow,
 } from "../../../lib/api";
 
@@ -22,6 +22,37 @@ function ageDays(date: string) {
   return Math.round((Date.now() - new Date(date).getTime()) / 86_400_000);
 }
 
+// Mirrors the exact formula the backend prices with (ProductPricingService /
+// getTradeInAnchor): market × condition multiplier × (1+sell margin%) × (1-discount%),
+// then × trade-in ratio × (1-trade-in margin%). Same helpers as /scraper.
+const GRADES = [
+  { key: "new", label: "New",     backendKey: "multiplier_new" },
+  { key: "a",   label: "A Grade", backendKey: "multiplier_a" },
+  { key: "b",   label: "B Grade", backendKey: "multiplier_b" },
+  { key: "c",   label: "C Grade", backendKey: "multiplier_c" },
+  { key: "f",   label: "F Grade", backendKey: "multiplier_f" },
+] as const;
+
+const GRADE_DEFAULTS: Record<string, number> = {
+  multiplier_new: 1.2, multiplier_a: 1.05, multiplier_b: 0.85, multiplier_c: 0.65, multiplier_f: 0.25,
+  sell_margin_pct: 0, sell_discount_pct: 0, tradein_ratio: 0.5, tradein_margin_pct: 0,
+};
+
+function round5(x: number) { return Math.max(Math.round(x / 5) * 5, 5); }
+
+function sellPriceFor(marketPrice: number, backendKey: string, configs: Record<string, number>) {
+  const mult     = configs[backendKey]          ?? GRADE_DEFAULTS[backendKey];
+  const margin   = configs["sell_margin_pct"]   ?? GRADE_DEFAULTS.sell_margin_pct;
+  const discount = configs["sell_discount_pct"] ?? GRADE_DEFAULTS.sell_discount_pct;
+  return round5(marketPrice * mult * (1 + margin / 100) * (1 - discount / 100));
+}
+
+function tradeOfferFor(sellPrice: number, configs: Record<string, number>) {
+  const ratio  = configs["tradein_ratio"]      ?? GRADE_DEFAULTS.tradein_ratio;
+  const margin = configs["tradein_margin_pct"] ?? GRADE_DEFAULTS.tradein_margin_pct;
+  return round5(sellPrice * ratio * (1 - margin / 100));
+}
+
 export default function CatalogDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -32,6 +63,7 @@ export default function CatalogDetailPage() {
   const [prices, setPrices]     = useState<ScrapedPriceRow[]>([]);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
+  const [pricingConfigs, setPricingConfigs] = useState<Record<string, number>>({});
 
   // Per-device re-scrape
   const [scraping, setScraping]   = useState(false);
@@ -84,6 +116,10 @@ export default function CatalogDetailPage() {
 
         scraperApi.devicePrices(devItem.brandCategory.brand.name, devItem.model)
           .then(setPrices)
+          .catch(() => {});
+
+        pricingConfigApi.list()
+          .then(rows => setPricingConfigs(Object.fromEntries(rows.map(c => [c.key, c.value]))))
           .catch(() => {});
       } catch (err: any) {
         setError(err.message || "Failed to load catalog details");
@@ -164,11 +200,8 @@ export default function CatalogDetailPage() {
   const totalStock = products.reduce((acc, p) => acc + p.stock, 0);
   const scrapeIsError = scrapeMsg.toLowerCase().includes("fail") || scrapeMsg.toLowerCase().includes("error");
 
-  // Compute trade-in offer: 30% margin applied to CeX sell price
-  function tradeInOffer(sellPrice: number | null): string {
-    if (!sellPrice || sellPrice <= 0) return "—";
-    return `£${Math.max(Math.round(sellPrice * 0.7 / 5) * 5, 10)}`;
-  }
+  const previewPrice = parseFloat(manualPriceInput);
+  const hasValidPreview = !isNaN(previewPrice) && previewPrice > 0;
 
   return (
     <div className="p-6 md:p-8 max-w-5xl mx-auto min-h-screen bg-[#f8f9fa] text-zinc-900 font-sans">
@@ -285,10 +318,10 @@ export default function CatalogDetailPage() {
               Manual Market Price
             </h2>
             <p className="text-xs text-zinc-400 mt-0.5">
-              Set a market reference price when no scraper data exists. The trade-in offer is calculated from this value using the configured pricing rules.
+              An explicit override — when set, this always takes priority over scraped/auto data for this device's trade-in offer, using the configured pricing rules.
               {device.manualMarketPrice
-                ? <span className="ml-1 font-semibold text-blue-600">Currently set to £{device.manualMarketPrice}</span>
-                : <span className="ml-1 text-amber-500 font-semibold">Not set — this device shows as "Unpriced" in trade-in.</span>}
+                ? <span className="ml-1 font-semibold text-blue-600">Currently set to £{device.manualMarketPrice} — overriding any auto/scraped price.</span>
+                : <span className="ml-1 text-amber-500 font-semibold">Not set — this device uses auto/scraped pricing, or shows as &quot;Unpriced&quot; if none exists.</span>}
             </p>
           </div>
           {device.manualMarketPrice != null && (
@@ -328,6 +361,31 @@ export default function CatalogDetailPage() {
           <p className="text-xs text-red-500 font-medium mt-2 flex items-center gap-1">
             <AlertCircle className="h-3.5 w-3.5" /> {manualPriceError}
           </p>
+        )}
+
+        {/* Live per-grade Sell/Trade-in preview — updates as you type, before saving */}
+        {hasValidPreview && (
+          <div className="mt-5 pt-5 border-t border-zinc-100">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mb-2">
+              Calculated Sell &amp; Trade-in price · based on £{previewPrice.toFixed(0)}
+              {manualPriceInput !== String(device.manualMarketPrice ?? "") && (
+                <span className="ml-1 text-blue-500 normal-case font-semibold">(preview — not yet saved)</span>
+              )}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {GRADES.map(g => {
+                const sell = sellPriceFor(previewPrice, g.backendKey, pricingConfigs);
+                const trade = tradeOfferFor(sell, pricingConfigs);
+                return (
+                  <div key={g.key} className="rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">{g.label}</p>
+                    <p className="text-sm font-bold font-mono text-zinc-900">£{sell.toFixed(0)}</p>
+                    <p className="text-[11px] text-zinc-400 font-mono">trade-in £{trade.toFixed(0)}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
 
@@ -375,7 +433,7 @@ export default function CatalogDetailPage() {
             <table className="w-full text-sm min-w-[750px]">
             <thead>
               <tr className="border-b border-zinc-100 bg-zinc-50/50">
-                {["Storage", "CeX Sell", "CeX Cash", "CeX Exchange", "Est. Trade-in Offer", "Scraped"].map(h => (
+                {["Storage", "CeX Sell", "CeX Cash", "CeX Exchange", "Sell (A Grade)", "Trade-in (A Grade)", "Scraped"].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{h}</th>
                 ))}
               </tr>
@@ -394,15 +452,31 @@ export default function CatalogDetailPage() {
                     <td className="px-6 py-4 font-mono font-bold text-zinc-800">{fmt(row.cexSellPrice)}</td>
                     <td className="px-6 py-4 font-mono text-zinc-500">{fmt(row.cexCashPrice)}</td>
                     <td className="px-6 py-4 font-mono text-zinc-500">{fmt(row.cexExchangePrice)}</td>
-                    <td className="px-6 py-4">
-                      {row.cexSellPrice && row.cexSellPrice > 0 ? (
-                        <span className="inline-flex items-center font-bold font-mono text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                          {tradeInOffer(row.cexSellPrice)}
-                        </span>
-                      ) : (
-                        <span className="text-zinc-300 text-xs">—</span>
-                      )}
-                    </td>
+                    {(() => {
+                      // Manual override (if set) always wins over this row's own scraped price —
+                      // matches ProductPricingService.getTradeInAnchor exactly.
+                      const basis = device.manualMarketPrice ?? row.marketPrice;
+                      if (!basis || basis <= 0) {
+                        return (
+                          <>
+                            <td className="px-6 py-4"><span className="text-zinc-300 text-xs">—</span></td>
+                            <td className="px-6 py-4"><span className="text-zinc-300 text-xs">—</span></td>
+                          </>
+                        );
+                      }
+                      const sell = sellPriceFor(basis, "multiplier_a", pricingConfigs);
+                      const trade = tradeOfferFor(sell, pricingConfigs);
+                      return (
+                        <>
+                          <td className="px-6 py-4 font-mono font-bold text-zinc-800">£{sell.toFixed(0)}</td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center font-bold font-mono text-xs text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg">
+                              £{trade.toFixed(0)}
+                            </span>
+                          </td>
+                        </>
+                      );
+                    })()}
                     <td className="px-6 py-4">
                       <span className={`flex items-center gap-1.5 text-xs font-medium whitespace-nowrap ${stale ? "text-amber-500" : "text-zinc-400"}`}>
                         <Clock className="h-3 w-3" />

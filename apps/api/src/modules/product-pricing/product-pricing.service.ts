@@ -243,7 +243,25 @@ export class ProductPricingService {
         const conditionMult    = configs[multiplierKey]        ?? 0.82;
         const sellMargin       = configs['sell_margin_pct']    ?? 0;
 
-        // Priority 1: catalog product resale price
+        // Priority 1: admin-set manual market price — an explicit override always wins
+        // over automated data (catalog product price / scraper), run through the same
+        // "market price" pipeline as the scraped path (condition multiplier + margin).
+        const catalogEntry = await this.prisma.deviceCatalog.findFirst({
+            where: {
+                brandCategory: { brand: { name: { equals: brand, mode: 'insensitive' } } },
+                model: { equals: model, mode: 'insensitive' },
+            },
+            select: { manualMarketPrice: true },
+        });
+        if (catalogEntry?.manualMarketPrice) {
+            const resalePrice = computeCandidatePrice(catalogEntry.manualMarketPrice, conditionMult, sellMargin);
+            const rawOffer    = computeTradeInOffer(resalePrice, tradeInRatio);
+            const offer       = round5(rawOffer * (1 - tradeInMargin / 100));
+            this.logger.log(`Trade-in anchor (manual override): market £${catalogEntry.manualMarketPrice} → resale £${resalePrice} × ${tradeInRatio} − ${tradeInMargin}% margin = £${offer}`);
+            return offer;
+        }
+
+        // Priority 2: catalog product resale price
         const product = await this.prisma.product.findFirst({
             where: {
                 catalog: {
@@ -266,7 +284,7 @@ export class ProductPricingService {
             return offer;
         }
 
-        // Priority 2: scraped market price
+        // Priority 3: scraped market price
         const marketPrice = await this.scraperData.lookupPrice(brand, model, storage);
         if (marketPrice) {
             const resalePrice  = computeCandidatePrice(marketPrice, conditionMult, sellMargin);
