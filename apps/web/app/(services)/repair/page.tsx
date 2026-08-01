@@ -198,16 +198,10 @@ export default function RepairPage() {
     storesApi.list().then(setStores).catch(() => {});
   }, []);
 
-  // Auto-open wizard once auth resolves and there is a pending repair device
+  // Auto-open wizard once auth resolves and there is a pending repair device.
+  // Works for guests too — no account required to book a repair.
   useEffect(() => {
     if (authLoading || !pendingRepair || isWizardActive) return;
-    if (!user) {
-      sessionStorage.setItem("ts_pending_repair", JSON.stringify(pendingRepair));
-      sessionStorage.setItem("ts_login_redirect", "/repair");
-      router.push("/login?redirect=%2Frepair");
-      setPendingRepair(null);
-      return;
-    }
     setState(prev => ({
       ...prev,
       deviceType: pendingRepair.deviceType,
@@ -319,8 +313,9 @@ export default function RepairPage() {
   const guardedOpen = (action: () => void) => {
     if (authLoading) return;
     if (!user) {
-      sessionStorage.setItem("ts_login_redirect", "/repair");
-      router.push("/login?redirect=%2Frepair");
+      // Guests can proceed straight into the wizard — they'll give their name and
+      // contact details on the contact step instead of needing an account.
+      action();
       return;
     }
     // Always fetch fresh profile — context can be stale after settings updates
@@ -1176,22 +1171,24 @@ export default function RepairPage() {
 
                                 {(() => {
                                   const allFields = [
-                                    { key: "name",     label: "Full Name",          type: "text",  placeholder: "E.g. Alex Turner" },
-                                    { key: "email",    label: "Email Address",       type: "email", placeholder: "you@example.com" },
-                                    { key: "phone",    label: "Phone Number",        type: "tel",   placeholder: "+44 7700 000000" },
+                                    { key: "name",     label: "Full Name",          type: "text",  placeholder: "E.g. Alex Turner", mandatory: true },
+                                    { key: "email",    label: "Email Address",       type: "email", placeholder: "you@example.com", mandatory: true },
+                                    { key: "phone",    label: "Phone Number",        type: "tel",   placeholder: "+44 7700 000000", mandatory: true },
                                     ...(state.fulfillment === "mail" ? [
-                                      { key: "address",  label: "Collection Address", type: "text",  placeholder: "Street address" },
-                                      { key: "postcode", label: "Postcode",           type: "text",  placeholder: "LE1 1AA" },
+                                      { key: "address",  label: "Collection Address", type: "text",  placeholder: "Street address", mandatory: false },
+                                      { key: "postcode", label: "Postcode",           type: "text",  placeholder: "LE1 1AA", mandatory: false },
                                     ] : []),
                                   ];
                                   const visibleFields = user ? [] : allFields;
                                   if (visibleFields.length === 0) return null;
-                                  return visibleFields.map(({ key, label, type, placeholder }) => (
+                                  return visibleFields.map(({ key, label, type, placeholder, mandatory }) => (
                                     <div key={key} className="flex flex-col gap-2">
-                                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">{label}</label>
+                                      <label className="text-xs font-bold uppercase tracking-widest text-zinc-400">
+                                        {label} {mandatory && <span className="text-red-500">*</span>}
+                                      </label>
                                       <input
                                         type={type}
-                                        required
+                                        required={mandatory}
                                         placeholder={placeholder}
                                         value={state.contact[key as keyof typeof state.contact]}
                                         onChange={e => setState(s => ({ ...s, contact: { ...s.contact, [key]: e.target.value } }))}

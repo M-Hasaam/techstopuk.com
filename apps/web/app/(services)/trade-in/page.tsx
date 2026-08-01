@@ -533,18 +533,10 @@ export default function TradeInPage() {
     storesApi.list().then(setStores).catch(() => {});
   }, []);
 
-  // Auto-open wizard once auth resolves and there is a pending device selection
+  // Auto-open wizard once auth resolves and there is a pending device selection.
+  // Works for guests too — no account required to start a trade-in.
   useEffect(() => {
     if (authLoading || !pendingDevice || isWizardActive) return;
-    if (!user) {
-      // Not logged in — save intent so it survives the login redirect
-      sessionStorage.setItem("ts_pending_device", JSON.stringify(pendingDevice));
-      sessionStorage.setItem("ts_login_redirect", "/trade-in");
-      router.push("/login?redirect=%2Ftrade-in");
-      setPendingDevice(null);
-      return;
-    }
-    // Logged in — open wizard with pre-selected device
     const isFullDevice = !!pendingDevice.brand; // brand known → jump to Phase 2
     setState({
       category: pendingDevice.category,
@@ -554,8 +546,8 @@ export default function TradeInPage() {
       specs: {}, condition: "", answers: {}, customerNotes: "",
       fulfillment: "", storeId: "",
       contact: {
-        name: user.name || "", email: user.email || "",
-        phone: user.phone || "", address: user.address || "", postcode: "",
+        name: user?.name || "", email: user?.email || "",
+        phone: user?.phone || "", address: user?.address || "", postcode: "",
       },
     });
     if (!isFullDevice) {
@@ -763,8 +755,9 @@ export default function TradeInPage() {
   const guardedOpen = (action: () => void) => {
     if (authLoading) return;
     if (!user) {
-      sessionStorage.setItem("ts_login_redirect", "/trade-in");
-      router.push("/login?redirect=%2Ftrade-in");
+      // Guests can proceed straight into the wizard — they'll give their name and
+      // contact details on the contact step instead of needing an account.
+      action();
       return;
     }
     // Always fetch fresh profile — context can be stale after settings updates
@@ -2592,12 +2585,12 @@ export default function TradeInPage() {
 
                                   {(() => {
                                     const visibleFields = [
-                                      { key: "name",     label: "Full Name",                   type: "text",  placeholder: "e.g. Jordan Mitchell",  span: false },
-                                      { key: "email",    label: "Email Address",                type: "email", placeholder: "e.g. you@domain.com",   span: false },
-                                      { key: "phone",    label: "Phone Number",                 type: "tel",   placeholder: "e.g. +44 7700 900077",  span: false },
+                                      { key: "name",     label: "Full Name",                   type: "text",  placeholder: "e.g. Jordan Mitchell",  span: false, mandatory: true },
+                                      { key: "email",    label: "Email Address",                type: "email", placeholder: "e.g. you@domain.com",   span: false, mandatory: true },
+                                      { key: "phone",    label: "Phone Number",                 type: "tel",   placeholder: "e.g. +44 7700 900077",  span: false, mandatory: true },
                                       ...(state.fulfillment === "ship" ? [
-                                        { key: "address",  label: "Collection / Return Address", type: "text",  placeholder: "e.g. 10 High Street",   span: true },
-                                        { key: "postcode", label: "Postcode",                    type: "text",  placeholder: "e.g. LE1 1AA",          span: false },
+                                        { key: "address",  label: "Collection / Return Address", type: "text",  placeholder: "e.g. 10 High Street",   span: true,  mandatory: false },
+                                        { key: "postcode", label: "Postcode",                    type: "text",  placeholder: "e.g. LE1 1AA",          span: false, mandatory: false },
                                       ] : []),
                                     ];
                                     return (
@@ -2622,10 +2615,12 @@ export default function TradeInPage() {
                                         <div className="grid gap-4 sm:grid-cols-2">
                                           {visibleFields.map((inp) => (
                                             <div key={inp.key} className={inp.span ? "sm:col-span-2" : ""}>
-                                              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">{inp.label}</label>
+                                              <label className="text-xs font-bold text-zinc-700 dark:text-zinc-300 block mb-1.5">
+                                                {inp.label} {inp.mandatory && <span className="text-red-500">*</span>}
+                                              </label>
                                               <input
                                                 type={inp.type}
-                                                required
+                                                required={inp.mandatory}
                                                 placeholder={inp.placeholder}
                                                 value={state.contact[inp.key as keyof typeof state.contact] || (user ? (user[inp.key as keyof typeof user] as string || "") : "")}
                                                 onChange={(e) => setState(s => ({
