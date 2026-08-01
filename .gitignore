@@ -62,3 +62,5 @@ packages/*/node_modules
 
 # Local-only credentials reference — never commit real secrets/passwords
 docs/TESTING_CREDENTIALS.md
+
+.playwright-mcp/
