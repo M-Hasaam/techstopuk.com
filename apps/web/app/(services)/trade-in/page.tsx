@@ -1683,7 +1683,10 @@ export default function TradeInPage() {
                                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Auto-price</span>
                                       )}
                                       {tradeInMode === 'manual_price' && (
-                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Manual Price</span>
+                                        // Same customer-facing text as the real "auto" badge — the blue
+                                        // (vs emerald) color is only an internal signal that an admin
+                                        // manually set/adjusted this price, not for the customer to notice.
+                                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Auto-price</span>
                                       )}
                                       {tradeInMode === 'unpriced' && (
                                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">Manual Review</span>

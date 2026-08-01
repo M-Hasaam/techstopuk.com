@@ -203,8 +203,11 @@ export default function DeviceSearchBox({
                         </span>
                       )}
                       {sug.tradeInMode === "manual_price" && (
+                        // Customer-facing text is identical to the real "auto" badge — the blue
+                        // (vs emerald) color is purely an internal signal that an admin manually
+                        // set/adjusted this price, not something we want the customer to notice.
                         <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                          Manual Price
+                          Auto-price
                         </span>
                       )}
                       {!sug.catalogId && (
