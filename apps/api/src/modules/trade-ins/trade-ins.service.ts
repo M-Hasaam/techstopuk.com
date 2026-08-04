@@ -450,16 +450,45 @@ Respond with ONLY: {"price": <number rounded to nearest 5, minimum 10>}`;
         return { price: applyMargin(marketPrice, marginPct), aiUsed: true, source: 'ai' };
     }
 
+    // Categories that already have their own dedicated spec fields elsewhere in the trade-in
+    // wizard — the AI must never invent a field that duplicates these (e.g. a generic
+    // "Accessories Included" bucket that re-asks about controllers/cables already covered
+    // by the "Controllers"/"Cables" fields below).
+    private static readonly CATEGORY_STANDARD_FIELDS: Record<string, string[]> = {
+        Phone: ['Storage', 'Network'],
+        Tablet: ['Storage', 'Connectivity'],
+        Console: ['Controllers', 'Cables'],
+        Laptop: ['RAM', 'Storage'],
+        Smartwatch: ['Case Size', 'Connectivity'],
+        Audio: ['Type', 'Colorway'],
+    };
+
+    private static readonly GENERIC_ACCESSORY_LABEL =
+        /^(accessories( included)?|included accessories|bundled items|extras included|optional extras|included extras)$/i;
+
+    // We never ask a trade-in customer which region/import variant their device is —
+    // it doesn't affect grading or payout, so any field the model invents for it is dropped.
+    private static readonly REGION_VARIANT_LABEL =
+        /^(region|region\s*\/\s*model variant|model variant|import region|carrier region|network region)$/i;
+
     async suggestSpecs(brand: string, model: string, category: string): Promise<{ label: string; options: string[] }[]> {
         const apiKey = process.env.OPENAI_API_KEY;
         if (!apiKey) return [];
 
         const openai = new OpenAI({ apiKey });
 
+        const standardFields = TradeInsService.CATEGORY_STANDARD_FIELDS[category];
+        const overlapRule = standardFields
+            ? `This device's category already asks the customer about "${standardFields.join('", "')}" in a separate, dedicated part of the form. Do NOT generate a field for those, and do NOT invent a catch-all field like "Accessories Included" that duplicates them — only suggest fields for details not already covered (e.g. Storage, Color).`
+            : `This is an unlisted/other category with no standard fields yet — generic fields like Storage, Accessories Included, Color are fine here.`;
+
         const prompt = `Device trade-in assistant. Customer wants to sell: brand="${brand}", model="${model}", category="${category}".
 Return JSON with 2-4 relevant specification fields and their options so we can log key details about this device.
 Example: { "specs": [{ "label": "Storage", "options": ["64GB","128GB","256GB","512GB"] }, { "label": "Connectivity", "options": ["Wi-Fi Only","Wi-Fi + Cellular"] }] }
-For unknown/other categories use generic fields like Storage, Accessories Included, Color.
+${overlapRule}
+Never return two fields that cover the same concept (e.g. don't return both "Accessories" and "Cables" — pick one, or omit both if already standard).
+Never include a field about region, import variant, or carrier/network region — that has no bearing on grading or payout and must not be asked.
+If you include a "Color" field, its options must be the exact, real color names this specific brand and model was actually released in — use your factual knowledge of the real product lineup, not generic placeholder swatch names. If you are not confident of the real colors for this exact model, omit the Color field entirely rather than guessing.
 Do NOT include a condition/grade/physical-state field — that is captured separately by our own condition grading step.
 Respond only with valid JSON.`;
 
@@ -474,9 +503,15 @@ Respond only with valid JSON.`;
 
             const parsed = JSON.parse(response.choices[0]?.message?.content ?? '{}') as { specs?: { label: string; options: string[] }[] };
             const specs = parsed.specs ?? [];
-            // Defensive filter in case the model ignores the instruction above —
-            // condition/grade is always handled by the dedicated grading step, never here.
-            return specs.filter(s => !/condition|grade|physical state/i.test(s.label));
+            // Defensive filters in case the model ignores the instructions above: condition/grade
+            // is always handled by the dedicated grading step, never here; region/variant is never
+            // relevant to a trade-in; and known categories already ask their own accessory-style
+            // fields, so a generic catch-all would just duplicate them.
+            return specs.filter(s =>
+                !/condition|grade|physical state/i.test(s.label) &&
+                !TradeInsService.REGION_VARIANT_LABEL.test(s.label.trim()) &&
+                !(standardFields && TradeInsService.GENERIC_ACCESSORY_LABEL.test(s.label.trim())),
+            );
         } catch {
             return [];
         }

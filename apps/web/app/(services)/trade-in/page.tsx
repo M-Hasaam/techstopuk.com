@@ -1786,8 +1786,10 @@ export default function TradeInPage() {
                       // AI-guessed specs, which in turn win over the generic per-category fallback list.
                       // Condition/grade is always captured by the dedicated Physical Grade selector
                       // below, so drop any spec (AI-guessed or otherwise) that would duplicate it.
+                      // Region/import-variant is never relevant to a trade-in and must never be asked.
                       const dropConditionSpec = (specs: { label: string; options: string[] }[]) =>
-                        specs.filter(s => !/condition|grade|physical state/i.test(s.label));
+                        specs.filter(s => !/condition|grade|physical state/i.test(s.label))
+                             .filter(s => !/^(region|region\s*\/\s*model variant|model variant|import region|carrier region|network region)$/i.test(s.label.trim()));
                       const isMultiSelectSpec = (spec: { label: string; options: string[]; isMulti?: boolean }) => {
                         if (typeof spec.isMulti === "boolean") return spec.isMulti;
                         const label = spec.label.trim();
@@ -1801,8 +1803,16 @@ export default function TradeInPage() {
                         );
                         return !hasMutuallyExclusiveOptions;
                       };
+                      // A category that already has its own dedicated fields (e.g. Controllers/Cables
+                      // for consoles) should never also get the AI's generic catch-all accessory
+                      // bucket merged in — that's what was asking "Controllers" and "Cables" twice,
+                      // once standalone and once folded into "Accessories Included".
+                      const GENERIC_ACCESSORY_LABEL = /^(accessories( included)?|included accessories|bundled items|extras included|optional extras|included extras)$/i;
+                      const dedupedAiSpecs = currentSpecs.length > 0
+                        ? aiSpecs.filter(s => !GENERIC_ACCESSORY_LABEL.test(s.label.trim()))
+                        : aiSpecs;
                       const rawSpecs = catalogAttributeOptions.length > 0 ? catalogAttributeOptions
-                        : aiSpecs.length > 0 ? aiSpecs : currentSpecs;
+                        : dedupedAiSpecs.length > 0 ? dedupedAiSpecs : currentSpecs;
                       const mergedSpecs = [...rawSpecs];
                       currentSpecs.forEach(sysSpec => {
                         const exists = mergedSpecs.some(s => s.label.trim().toLowerCase() === sysSpec.label.trim().toLowerCase());
@@ -1816,12 +1826,12 @@ export default function TradeInPage() {
                       return (
                         <div className="space-y-8 flex-1 flex flex-col justify-between">
                           <div className="space-y-2.5 sm:space-y-3">
-                            <div>
-                              <StepHeader label="Device Specifications" />
+                            <div className="flex items-center gap-2">
+                              <h2 className="font-sans text-lg sm:text-2xl md:text-3xl font-extrabold tracking-tight text-zinc-950 dark:text-white">
+                                Device Specifications
+                              </h2>
                               {aiSpecs.length > 0 && !aiSpecsLoading && (
-                                <p className="font-bold text-amber-500 text-[10px] sm:text-xs mt-0.5">
-                                  · AI generated
-                                </p>
+                                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-zinc-950 dark:text-white shrink-0" strokeWidth={2} />
                               )}
                             </div>
 
