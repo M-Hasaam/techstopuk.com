@@ -8,6 +8,7 @@ import OpenAI from 'openai';
 import { TradeInsService } from './trade-ins.service';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../../common/services/storage.service';
+import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { ScraperDataService } from '../scraper-data/scraper-data.service';
@@ -42,6 +43,7 @@ describe('TradeInsService', () => {
     let service: TradeInsService;
     let prismaMock: any;
     let storageMock: any;
+    let emailMock: any;
     let notificationsMock: any;
     let shippingMock: any;
     let scraperMock: any;
@@ -67,6 +69,11 @@ describe('TradeInsService', () => {
             generatePresignedUrl: jest.fn<(k: string) => Promise<any>>().mockImplementation(async (k: string) => `https://cdn/${k}`),
             deleteFiles: jest.fn<() => Promise<any>>(),
         };
+        emailMock = {
+            sendTradeInApproved: jest.fn<() => Promise<any>>(),
+            sendTradeInRejected: jest.fn<() => Promise<any>>(),
+            sendTradeInCounterOffer: jest.fn<() => Promise<any>>(),
+        };
         notificationsMock = { create: jest.fn<() => Promise<any>>() };
         shippingMock = {
             generatePrepaidLabel: jest.fn<() => Promise<any>>().mockResolvedValue({ trackingNumber: 'TRACK1', labelPdf: Buffer.from('pdf') }),
@@ -85,6 +92,7 @@ describe('TradeInsService', () => {
                 TradeInsService,
                 { provide: PrismaService, useValue: prismaMock },
                 { provide: StorageService, useValue: storageMock },
+                { provide: EmailService, useValue: emailMock },
                 { provide: NotificationsService, useValue: notificationsMock },
                 { provide: ShippingService, useValue: shippingMock },
                 { provide: ScraperDataService, useValue: scraperMock },
@@ -274,6 +282,43 @@ describe('TradeInsService', () => {
         });
     });
 
+    // Guests have no account, so these are the only way they can respond to a
+    // counter-offer — reached via the link in their email, keyed off the reference
+    // rather than a userId.
+    describe('acceptCounterOfferByReference', () => {
+        it('throws NotFoundException when no trade-in has that reference', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(null);
+            await expect(service.acceptCounterOfferByReference('TI-9999')).rejects.toThrow(NotFoundException);
+        });
+
+        it('throws BadRequestException when status is not COUNTER_OFFERED', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'SUBMITTED' }));
+            await expect(service.acceptCounterOfferByReference('TI-1001')).rejects.toThrow(BadRequestException);
+        });
+
+        it('approves with the counter offer amount, looked up by reference alone', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'COUNTER_OFFERED', counterOffer: 150, offerPrice: 100, userId: null }));
+            await service.acceptCounterOfferByReference('TI-1001');
+            expect(prismaMock.tradeIn.update).toHaveBeenCalledWith({
+                where: { id: 'ti-1' },
+                data: { status: 'APPROVED', offerPrice: 150 },
+            });
+        });
+    });
+
+    describe('declineCounterOfferByReference', () => {
+        it('throws NotFoundException when no trade-in has that reference', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(null);
+            await expect(service.declineCounterOfferByReference('TI-9999')).rejects.toThrow(NotFoundException);
+        });
+
+        it('cancels the trade-in, looked up by reference alone', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'COUNTER_OFFERED', userId: null }));
+            await service.declineCounterOfferByReference('TI-1001');
+            expect(prismaMock.tradeIn.update).toHaveBeenCalledWith({ where: { id: 'ti-1' }, data: { status: 'CANCELLED' } });
+        });
+    });
+
     describe('markUnderReview', () => {
         it('throws BadRequestException when not SUBMITTED', async () => {
             prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'APPROVED' }));
@@ -321,6 +366,27 @@ describe('TradeInsService', () => {
             expect(notificationsMock.create).toHaveBeenCalledWith(
                 'user-1', 'trade_in_approved', expect.any(String), expect.any(String), expect.any(Object),
             );
+        });
+
+        it('emails the contact even when there is no account (guest trade-in)', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'SUBMITTED', userId: null, offerPrice: 100, fulfillment: 'dropoff' }));
+            prismaMock.tradeIn.update.mockResolvedValueOnce(makeTradeIn({ status: 'APPROVED', offerPrice: 100 }));
+
+            await service.approve('ti-1', {});
+
+            expect(notificationsMock.create).not.toHaveBeenCalled();
+            expect(emailMock.sendTradeInApproved).toHaveBeenCalledWith(expect.objectContaining({
+                to: 'jane@example.com', reference: 'TI-1001', price: 100, fulfillment: 'dropoff',
+            }));
+        });
+
+        it('skips the email when the trade-in has no contact email on file', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'SUBMITTED', offerPrice: 100, contact: { name: 'Jane' } }));
+            prismaMock.tradeIn.update.mockResolvedValueOnce(makeTradeIn({ status: 'APPROVED' }));
+
+            await service.approve('ti-1', {});
+
+            expect(emailMock.sendTradeInApproved).not.toHaveBeenCalled();
         });
 
         it('generates and emails a prepaid label for ship fulfillment', async () => {
@@ -371,11 +437,14 @@ describe('TradeInsService', () => {
             expect(notificationsMock.create).toHaveBeenCalled();
         });
 
-        it('does not notify when there is no userId', async () => {
+        it('does not notify in-app when there is no userId, but still emails the contact', async () => {
             prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'SUBMITTED', userId: null }));
             prismaMock.tradeIn.update.mockResolvedValueOnce(makeTradeIn({ status: 'REJECTED' }));
-            await service.reject('ti-1', {});
+            await service.reject('ti-1', { adminNotes: 'too damaged' });
             expect(notificationsMock.create).not.toHaveBeenCalled();
+            expect(emailMock.sendTradeInRejected).toHaveBeenCalledWith(expect.objectContaining({
+                to: 'jane@example.com', reference: 'TI-1001', reason: 'too damaged',
+            }));
         });
     });
 
@@ -396,6 +465,19 @@ describe('TradeInsService', () => {
                 data: { status: 'COUNTER_OFFERED', counterOffer: 75, adminNotes: 'note' },
             });
             expect(notificationsMock.create).toHaveBeenCalled();
+            expect(emailMock.sendTradeInCounterOffer).toHaveBeenCalledWith(expect.objectContaining({
+                to: 'jane@example.com', reference: 'TI-1001', originalPrice: 100, counterOffer: 75,
+            }));
+        });
+
+        it('emails a guest contact too, since accept/decline only works via the emailed reference link', async () => {
+            prismaMock.tradeIn.findUnique.mockResolvedValueOnce(makeTradeIn({ status: 'SUBMITTED', userId: null }));
+            prismaMock.tradeIn.update.mockResolvedValueOnce(makeTradeIn({ status: 'COUNTER_OFFERED', counterOffer: 60 }));
+
+            await service.counterOffer('ti-1', { counterOffer: 60 });
+
+            expect(notificationsMock.create).not.toHaveBeenCalled();
+            expect(emailMock.sendTradeInCounterOffer).toHaveBeenCalledWith(expect.objectContaining({ to: 'jane@example.com', counterOffer: 60 }));
         });
     });
 

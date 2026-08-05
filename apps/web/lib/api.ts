@@ -231,6 +231,16 @@ export const tradeInsApi = {
 
   stats: () =>
     apiFetch<{ devicesRepurposed: number; lifespanExtension: number; idleElectronics: number }>('/trade-ins/stats'),
+
+  // Public lookup + counter-offer response by reference — works for guests, since it's
+  // the only way to check status or accept/decline an offer without an account.
+  getByRef: (reference: string) => apiFetch<TradeInDetail>(`/trade-ins/ref/${reference}`),
+
+  acceptCounterByRef: (reference: string) =>
+    apiFetch<TradeIn>(`/trade-ins/ref/${reference}/accept-counter`, { method: 'POST' }),
+
+  declineCounterByRef: (reference: string) =>
+    apiFetch<TradeIn>(`/trade-ins/ref/${reference}/decline-counter`, { method: 'POST' }),
 };
 
 // ── Repairs ───────────────────────────────────────────────────────────────────

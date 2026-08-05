@@ -82,6 +82,19 @@ export class TradeInsController {
         return this.tradeInsService.findByReference(reference);
     }
 
+    // Public — lets a guest (no account) respond to a counter-offer from the link in
+    // their email. The reference is the same identifier already treated as a public
+    // bearer token by the lookup above.
+    @Post('ref/:reference/accept-counter')
+    acceptCounterByRef(@Param('reference') reference: string) {
+        return this.tradeInsService.acceptCounterOfferByReference(reference);
+    }
+
+    @Post('ref/:reference/decline-counter')
+    declineCounterByRef(@Param('reference') reference: string) {
+        return this.tradeInsService.declineCounterOfferByReference(reference);
+    }
+
     // Public statistics for trade-in page
     @Get('stats')
     getPublicStats() {

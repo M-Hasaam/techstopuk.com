@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import OpenAI from 'openai';
-import { Condition } from '@prisma/client';
+import { Condition, TradeIn } from '@prisma/client';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../../common/services/storage.service';
+import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ShippingService } from '../shipping/shipping.service';
 import { CreateTradeInDto } from './dto/create-trade-in.dto';
@@ -25,6 +26,7 @@ export class TradeInsService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly storage: StorageService,
+        private readonly email: EmailService,
         private readonly notifications: NotificationsService,
         private readonly shipping: ShippingService,
         private readonly scraper: ScraperDataService,
@@ -128,11 +130,36 @@ export class TradeInsService {
     async acceptCounterOffer(id: string, userId: string) {
         const tradeIn = await this.prisma.tradeIn.findFirst({ where: { id, userId } });
         if (!tradeIn) throw new NotFoundException('Trade-in not found');
+        return this.acceptCounterOfferInternal(tradeIn);
+    }
+
+    async declineCounterOffer(id: string, userId: string) {
+        const tradeIn = await this.prisma.tradeIn.findFirst({ where: { id, userId } });
+        if (!tradeIn) throw new NotFoundException('Trade-in not found');
+        return this.declineCounterOfferInternal(tradeIn);
+    }
+
+    // Reference-based variants — the only way a guest (no account) can respond to a
+    // counter-offer, since /my/:id/accept-counter requires a login. The reference is
+    // the same identifier already used as a public bearer token by ref/:reference.
+    async acceptCounterOfferByReference(reference: string) {
+        const tradeIn = await this.prisma.tradeIn.findUnique({ where: { reference } });
+        if (!tradeIn) throw new NotFoundException('Trade-in not found');
+        return this.acceptCounterOfferInternal(tradeIn);
+    }
+
+    async declineCounterOfferByReference(reference: string) {
+        const tradeIn = await this.prisma.tradeIn.findUnique({ where: { reference } });
+        if (!tradeIn) throw new NotFoundException('Trade-in not found');
+        return this.declineCounterOfferInternal(tradeIn);
+    }
+
+    private async acceptCounterOfferInternal(tradeIn: TradeIn) {
         if (tradeIn.status !== 'COUNTER_OFFERED') {
             throw new BadRequestException('No counter offer to accept');
         }
         const updated = await this.prisma.tradeIn.update({
-            where: { id },
+            where: { id: tradeIn.id },
             data: { status: 'APPROVED', offerPrice: tradeIn.counterOffer ?? tradeIn.offerPrice },
         });
 
@@ -140,20 +167,18 @@ export class TradeInsService {
             try {
                 await this.issueShippingLabel(tradeIn);
             } catch (err) {
-                this.logger.error(`Failed to generate shipping label for trade-in ${id}`, err);
+                this.logger.error(`Failed to generate shipping label for trade-in ${tradeIn.id}`, err);
             }
         }
 
         return updated;
     }
 
-    async declineCounterOffer(id: string, userId: string) {
-        const tradeIn = await this.prisma.tradeIn.findFirst({ where: { id, userId } });
-        if (!tradeIn) throw new NotFoundException('Trade-in not found');
+    private async declineCounterOfferInternal(tradeIn: TradeIn) {
         if (tradeIn.status !== 'COUNTER_OFFERED') {
             throw new BadRequestException('No counter offer to decline');
         }
-        return this.prisma.tradeIn.update({ where: { id }, data: { status: 'CANCELLED' } });
+        return this.prisma.tradeIn.update({ where: { id: tradeIn.id }, data: { status: 'CANCELLED' } });
     }
 
     async update(id: string, dto: UpdateTradeInDto) {
@@ -192,6 +217,11 @@ export class TradeInsService {
             );
         }
 
+        // Email the customer directly — this is the only way a guest (no account) ever
+        // finds out their offer was approved, and it reaches signed-in customers too,
+        // not just whoever happens to check their in-app notification bell.
+        await this.sendApprovalEmail(tradeIn, finalPrice);
+
         // Generate prepaid label for mail-in trade-ins
         if (tradeIn.fulfillment === 'ship') {
             try {
@@ -202,6 +232,30 @@ export class TradeInsService {
         }
 
         return updated;
+    }
+
+    private async sendApprovalEmail(
+        tradeIn: { reference: string; contact: unknown; brand: string; model: string; fulfillment: string; storeId: string | null },
+        finalPrice: number,
+    ) {
+        const contact = tradeIn.contact as Record<string, string>;
+        if (!contact?.email) return;
+
+        let store: { name: string; address: string; city: string; postcode: string; openingHours: string | null } | null = null;
+        if (tradeIn.fulfillment === 'dropoff' && tradeIn.storeId) {
+            store = await this.prisma.store.findUnique({ where: { id: tradeIn.storeId } });
+        }
+
+        await this.email.sendTradeInApproved({
+            to: contact.email,
+            customerName: contact.name || 'Customer',
+            reference: tradeIn.reference,
+            brand: tradeIn.brand,
+            model: tradeIn.model,
+            price: finalPrice,
+            fulfillment: tradeIn.fulfillment,
+            store,
+        });
     }
 
     /**
@@ -285,6 +339,17 @@ export class TradeInsService {
                 { tradeInId: id, reference: tradeIn.reference },
             );
         }
+        const rejectContact = tradeIn.contact as Record<string, string>;
+        if (rejectContact?.email) {
+            await this.email.sendTradeInRejected({
+                to: rejectContact.email,
+                customerName: rejectContact.name || 'Customer',
+                reference: tradeIn.reference,
+                brand: tradeIn.brand,
+                model: tradeIn.model,
+                reason: dto.adminNotes,
+            });
+        }
         return updated;
     }
 
@@ -309,6 +374,18 @@ export class TradeInsService {
                 `We've reviewed your ${tradeIn.brand} ${tradeIn.model} and are offering £${dto.counterOffer}. Check your trade-in to accept or decline.`,
                 { tradeInId: id, reference: tradeIn.reference, counterOffer: dto.counterOffer },
             );
+        }
+        const counterContact = tradeIn.contact as Record<string, string>;
+        if (counterContact?.email) {
+            await this.email.sendTradeInCounterOffer({
+                to: counterContact.email,
+                customerName: counterContact.name || 'Customer',
+                reference: tradeIn.reference,
+                brand: tradeIn.brand,
+                model: tradeIn.model,
+                originalPrice: tradeIn.offerPrice,
+                counterOffer: dto.counterOffer,
+            });
         }
         return updated;
     }
