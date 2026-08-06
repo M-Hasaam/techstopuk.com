@@ -149,7 +149,7 @@ export default function DeviceSearchBox({
             }
           }}
           placeholder={placeholder}
-          className={`h-14 w-full rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border-2 border-zinc-200 dark:border-zinc-800 focus:border-accent focus:bg-white dark:focus:bg-zinc-900 text-sm font-semibold outline-none text-zinc-900 dark:text-white transition-all shadow-sm ${showSearchButton ? "pl-12 pr-28" : "pl-12 pr-6"}`}
+          className={`h-14 w-full max-w-full overflow-hidden truncate placeholder:truncate rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border-2 border-zinc-200 dark:border-zinc-800 focus:border-accent focus:bg-white dark:focus:bg-zinc-900 text-sm font-semibold outline-none text-zinc-900 dark:text-white transition-all shadow-sm ${showSearchButton ? "pl-12 pr-28" : "pl-12 pr-6"}`}
         />
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-zinc-400 group-focus-within:text-accent transition-colors pointer-events-none" />
         {showSearchButton && (

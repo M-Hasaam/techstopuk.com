@@ -117,7 +117,7 @@ export default function AccordionGallery({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onTouchStart={() => pauseTemporarily(4000)}
-      className="w-full relative flex flex-col md:flex-row select-none h-[520px] md:h-[420px]"
+      className="w-full max-w-full overflow-hidden relative flex flex-col md:flex-row select-none h-[520px] md:h-[420px]"
       style={{
         gap: `${gap}px`,
       }}
