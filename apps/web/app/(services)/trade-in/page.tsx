@@ -7,6 +7,7 @@ import Fuse from "fuse.js";
 import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, type Store, type CatalogCategory, type Product } from "@/lib/api";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import AccordionGallery from "@/components/AccordionGallery";
 import {
   Smartphone, Tablet, Gamepad2, Laptop, ArrowLeft, ArrowRight,
   Check, ChevronRight, MapPin, Zap, Shield, Clock,
@@ -928,122 +929,100 @@ export default function TradeInPage() {
           {/* Hero Section */}
           <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 lg:pt-16 pb-12">
             
-            <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start text-left mb-12">
+            <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center text-left mb-12">
               
               {/* Left Column: Headline and Search */}
-              <div className="lg:col-span-5 flex flex-col items-start text-left">
-                {/* Trustpilot-style Rating Badge */}
-                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/30 px-3.5 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-400 mb-6 shadow-sm">
-                  <span className="flex items-center gap-0.5 text-emerald-600">
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                  </span>
-                  <span>4.8/5 on Trustpilot</span>
-                </div>
-
-                <h1 className="font-sans text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-950 dark:text-white mb-4 leading-none">
-                  Sell your tech <br className="hidden sm:inline" />
+              <div className="lg:col-span-5 flex flex-col justify-center items-start text-left space-y-5">
+                <h1 className="font-sans text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-[1.05]">
+                  Sell your tech <br />
                   for cash. <br />
-                  <span className="text-transparent bg-clip-text bg-linear-to-r from-zinc-500 via-zinc-800 to-zinc-950 dark:from-zinc-300 dark:via-zinc-100 dark:to-white">Fast. Fair. Easy.</span>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-600">Fast. Fair. Easy.</span>
                 </h1>
-                
-                <p className="text-zinc-500 dark:text-zinc-400 font-semibold text-sm md:text-base mb-8 leading-relaxed">
-                  Get an instant online offer on your phone, tablet, laptop, or gaming console. Free fully-insured Royal Mail shipping is included with every trade.
-                </p>
 
                 {/* Shared DeviceSearchBox — same component as home page */}
-                <DeviceSearchBox
-                  className="w-full max-w-xl mb-4 z-20"
-                  placeholder="Search your device (e.g. iPhone 15 Pro...)"
-                  onSelect={(sug) => handleSelectSuggestion(sug)}
-                  onManualEntry={(q) => startWizard("Other", q)}
-                />
+                <div className="w-full max-w-xl">
+                  <DeviceSearchBox
+                    className="w-full shadow-md border border-zinc-200 dark:border-zinc-800 rounded-2xl"
+                    placeholder="Search your device (e.g. iPhone 15 Pro...)"
+                    onSelect={(sug) => handleSelectSuggestion(sug)}
+                    onManualEntry={(q) => startWizard("Other", q)}
+                  />
 
-                {/* Popular quick links */}
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-zinc-500 mb-8">
-                  <span className="text-zinc-500 font-extrabold">Popular:</span>
-                  {[
-                    { name: "iPhone 15 Pro Max", category: "Phone", brand: "Apple" },
-                    { name: "PS5 Disc Edition", category: "Console", brand: "Sony PlayStation" },
-                    { name: "MacBook Air 13\" M2", category: "Laptop", brand: "Apple" },
-                  ].map((item, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => handleSelectSuggestion({ name: item.name, category: item.category, brand: item.brand })}
-                      className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg transition-colors font-bold shadow-sm"
-                    >
-                      {item.name}
-                    </button>
-                  ))}
+                  {/* Popular quick links */}
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-zinc-500 mt-3">
+                    <span className="text-zinc-500 font-extrabold">Popular:</span>
+                    {[
+                      { name: "iPhone 15 Pro Max", category: "Phone", brand: "Apple" },
+                      { name: "PS5 Disc Edition", category: "Console", brand: "Sony PlayStation" },
+                      { name: "MacBook Air 13\" M2", category: "Laptop", brand: "Apple" },
+                    ].map((item, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleSelectSuggestion({ name: item.name, category: item.category, brand: item.brand })}
+                        className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg transition-colors font-bold shadow-2xs"
+                      >
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Right Column: Category Cards Grid */}
-              <div className="lg:col-span-7 w-full">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="font-sans text-xl md:text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-none">
+              {/* Right Column: Category Accordion Gallery */}
+              <div className="lg:col-span-7 w-full flex flex-col justify-center">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="font-sans text-lg md:text-xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-none">
                     Select category to get started
                   </h2>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 gap-4 text-left">
-                  {catalogCats.map((cat) => {
-                    const meta = CAT_METADATA[cat.slug];
-                    const mood = meta?.mood ?? "bg-zinc-500/10 border-zinc-500/20";
-                    const moodIcon = meta?.moodIcon ?? "text-zinc-500";
-                    // Pick a random image from the category's images array, or fall back to single image
-                    const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
-                    const img = catImgs.length > 0
-                      ? catImgs[Math.floor(Math.random() * catImgs.length)]
-                      : (catFallbackImages[cat.slug] ?? "");
-                    const isProductFallback = catImgs.length === 0 && !!catFallbackImages[cat.slug];
-                    const sub = cat.description ?? meta?.sub ?? "";
-                    const catId = meta?.oldId ?? cat.slug;
-                    const modelCount = cat.modelCount > 0 ? `${cat.modelCount}+ models` : null;
-                    return (
-                      <motion.button
-                        key={cat.id}
-                        whileHover={{ y: -4, scale: 1.01 }}
-                        whileTap={{ scale: 0.99 }}
-                        onClick={() => startWizard(catId)}
-                        className="flex flex-col rounded-2xl border border-zinc-200/60 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-xl hover:border-zinc-300 dark:hover:border-zinc-650 transition-all duration-300 group overflow-hidden w-full text-left"
-                      >
-                        <div className={`w-full aspect-[4/3] ${mood} relative overflow-hidden flex items-center justify-center`}>
-                          {img && (
-                            <img
-                              src={img}
-                              alt={cat.name}
-                              className={`transition-transform duration-500 group-hover:scale-[1.03] ${
-                                isProductFallback
-                                  ? "h-[70%] w-[70%] object-contain drop-shadow-lg"
-                                  : "h-full w-full object-cover group-hover:scale-[1.05]"
-                              }`}
-                            />
-                          )}
-                          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-white/60 to-transparent dark:from-zinc-900/60 pointer-events-none" />
-                          {modelCount && (
-                            <div className="absolute top-2.5 right-2.5 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest text-zinc-600 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-700/60">
-                              {modelCount}
-                            </div>
-                          )}
-                        </div>
-                        <div className="px-3.5 py-3 flex items-center justify-between">
-                          <div className="min-w-0">
-                            <h3 className="font-extrabold text-xs sm:text-sm text-zinc-950 dark:text-white leading-tight truncate">{cat.name}</h3>
-                            {sub && <p className="text-[9px] text-zinc-400 mt-0.5 truncate">{sub}</p>}
-                          </div>
-                          <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${mood} group-hover:scale-105 transition-transform duration-200`}>
-                            <ChevronRight className={`h-3 w-3 ${moodIcon} group-hover:translate-x-0.5 transition-transform`} />
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+                <AccordionGallery
+                  items={
+                    catalogCats && catalogCats.length > 0
+                      ? catalogCats.map((cat) => {
+                          const meta = CAT_METADATA[cat.slug];
+                          const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
+                          const img = catImgs.length > 0
+                            ? catImgs[0]
+                            : (catFallbackImages[cat.slug] ?? "/phones/samsung/bento_smartphones.png");
+                          const catId = meta?.oldId ?? cat.slug;
+                          return {
+                            image: img,
+                            label: cat.name,
+                            catId: catId,
+                          };
+                        })
+                      : [
+                          { image: "/phones/samsung/bento_smartphones.png", label: "Phones", catId: "Phone" },
+                          { image: "/laptops/MacBook/showcase_macbook.png", label: "Laptops", catId: "Laptop" },
+                          { image: "/consoles/showcase_ps5.png", label: "Gaming", catId: "Console" },
+                          { image: "/tablets/ipad/showcase_ipad_pro.png", label: "Tablets", catId: "Tablet" },
+                          { image: "/Other/watch/galaxy_watch_promo_1778927696615.png", label: "Smartwatches", catId: "Smartwatch" },
+                          { image: "/audio/bento_audio.png", label: "Audio", catId: "Audio" },
+                        ]
+                  }
+                  defaultIndex={2}
+                  expandRatio={0.52}
+                  trigger="click"
+                  accentColor="#ffffff"
+                  overlayColor="#060010"
+                  textColor="#ffffff"
+                  grayscale
+                  showLabels
+                  duration={1.5}
+                  ease="power3.out"
+                  parallax={0.5}
+                  tilt={8}
+                  stagger={0.06}
+                  height={420}
+                  gap={10}
+                  radius={16}
+                  orientation="horizontal"
+                  autoplay
+                  autoplayInterval={2400}
+                  onSelect={(item) => startWizard(item.catId)}
+                />
               </div>
 
             </div>
