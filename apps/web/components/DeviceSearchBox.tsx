@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ChevronRight, Plus, Smartphone } from "lucide-react";
 import Fuse from "fuse.js";
@@ -68,18 +68,12 @@ export default function DeviceSearchBox({
 }: DeviceSearchBoxProps) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   // No static data — empty until the live sources below resolve.
   const [fuseInstance, setFuseInstance] = useState<Fuse<TradeInModel>>(() => new Fuse<TradeInModel>([], FUSE_OPTIONS));
 
   useEffect(() => {
-    // The only two sources of search results, ever:
-    //  1. DeviceCatalog (forTradeIn=true) — real, priced devices. Carries catalogId +
-    //     attributeOptions so picking one routes into that exact device's real trade-in
-    //     flow instead of the generic "unlisted device" path.
-    //  2. The admin-curated "Other Search Devices" list (trade_in_devices) — fills
-    //     brand/model breadth for devices not yet in the catalog (e.g. "PS3").
-    // No static fallback list — if this call fails, results just stay empty rather
-    // than showing stale/unmanaged data the admin has no way to edit or remove.
     Promise.all([
       fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true`)
         .then(r => r.json()),
@@ -108,7 +102,7 @@ export default function DeviceSearchBox({
       const dbOnly = dbModels.filter(m => !catalogKeys.has(key(m)));
 
       setFuseInstance(new Fuse([...catalogModels, ...dbOnly], FUSE_OPTIONS));
-    }).catch(() => {}); // API unreachable — keep the static STATIC_FUSE fallback already in state
+    }).catch(() => {});
   }, []);
 
   const suggestions: TradeInModel[] = useMemo(
@@ -121,15 +115,65 @@ export default function DeviceSearchBox({
     [query, fuseInstance, filterCategories, maxSuggestions],
   );
 
+  // Reset selected index when query or focus changes
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [query, focused]);
+
+  // Scroll active item into view when navigating via arrow keys
+  useEffect(() => {
+    if (selectedIndex < 0 || !dropdownRef.current) return;
+    const itemEl = dropdownRef.current.querySelector(`[data-index="${selectedIndex}"]`) as HTMLElement | null;
+    if (itemEl) {
+      itemEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedIndex]);
+
   const handleSelect = (device: TradeInModel) => {
     setQuery("");
+    setSelectedIndex(-1);
     onSelect(device);
   };
 
   const handleManual = () => {
     const q = query.trim();
     setQuery("");
+    setSelectedIndex(-1);
     onManualEntry(q);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const totalCount = suggestions.length + (query.trim() ? 1 : 0);
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!focused) setFocused(true);
+      setSelectedIndex((prev) => (prev < totalCount - 1 ? prev + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (!focused) setFocused(true);
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : totalCount - 1));
+    } else if (e.key === "Escape") {
+      setFocused(false);
+      setSelectedIndex(-1);
+    } else if (e.key === "Enter") {
+      if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+        e.preventDefault();
+        handleSelect(suggestions[selectedIndex]);
+      } else if (selectedIndex === suggestions.length && query.trim()) {
+        e.preventDefault();
+        handleManual();
+      } else if (suggestions.length > 0) {
+        e.preventDefault();
+        handleSelect(suggestions[0]);
+      } else if (query.trim()) {
+        e.preventDefault();
+        handleManual();
+      } else if (onSubmit) {
+        e.preventDefault();
+        onSubmit(query);
+      }
+    }
   };
 
   return (
@@ -141,13 +185,7 @@ export default function DeviceSearchBox({
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 220)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              if (suggestions.length > 0) handleSelect(suggestions[0]);
-              else if (query.trim()) handleManual();
-              else onSubmit?.(query);
-            }
-          }}
+          onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={`h-14 w-full max-w-full overflow-hidden truncate placeholder:truncate rounded-2xl bg-zinc-50 dark:bg-zinc-900/40 border-2 border-zinc-200 dark:border-zinc-800 focus:border-accent focus:bg-white dark:focus:bg-zinc-900 text-sm font-semibold outline-none text-zinc-900 dark:text-white transition-all shadow-sm ${showSearchButton ? "pl-12 pr-28" : "pl-12 pr-6"}`}
         />
@@ -177,62 +215,79 @@ export default function DeviceSearchBox({
                 No results for &quot;{query}&quot; — use the option below to start a manual quote.
               </p>
             ) : (
-              <div className="overflow-y-auto" style={{ maxHeight: 420 }}>
-                {suggestions.map((sug, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleSelect(sug)}
-                    className="w-full flex items-center justify-between p-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex items-center justify-center text-zinc-500 shrink-0">
-                        <Smartphone className="h-4 w-4" />
+              <div ref={dropdownRef} className="overflow-y-auto" style={{ maxHeight: 420 }}>
+                {suggestions.map((sug, i) => {
+                  const isSelected = i === selectedIndex;
+                  return (
+                    <button
+                      key={i}
+                      data-index={i}
+                      type="button"
+                      onClick={() => handleSelect(sug)}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all text-left ${
+                        isSelected
+                          ? "bg-red-500/10 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30"
+                          : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected ? "bg-red-500/20 text-red-600 dark:text-red-400" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                        }`}>
+                          <Smartphone className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-extrabold text-zinc-950 dark:text-white">{sug.name}</p>
+                          <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                            {sug.brand} · {sug.category}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs font-extrabold text-zinc-950 dark:text-white">{sug.name}</p>
-                        <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
-                          {sug.brand} · {sug.category}
-                        </p>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {sug.tradeInMode === "auto" && (
+                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                            Auto-price
+                          </span>
+                        )}
+                        {sug.tradeInMode === "manual_price" && (
+                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            Auto-price
+                          </span>
+                        )}
+                        {!sug.catalogId && (
+                          <span title="Not yet in the device catalog — priced manually after a photo review"
+                            className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-help">
+                            Other
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
+                          Get Cash <ChevronRight className="h-3.5 w-3.5" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {sug.tradeInMode === "auto" && (
-                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                          Auto-price
-                        </span>
-                      )}
-                      {sug.tradeInMode === "manual_price" && (
-                        // Customer-facing text is identical to the real "auto" badge — the blue
-                        // (vs emerald) color is purely an internal signal that an admin manually
-                        // set/adjusted this price, not something we want the customer to notice.
-                        <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                          Auto-price
-                        </span>
-                      )}
-                      {!sug.catalogId && (
-                        <span title="Not yet in the device catalog — priced manually after a photo review"
-                          className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-help">
-                          Other
-                        </span>
-                      )}
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
-                        Get Cash <ChevronRight className="h-3.5 w-3.5" />
-                      </div>
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             <div className="border-t border-zinc-100 dark:border-zinc-800 mt-1 pt-1">
               <button
+                key="manual"
+                data-index={suggestions.length}
                 type="button"
                 onClick={handleManual}
-                className="w-full flex items-center gap-3 p-3.5 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors text-left"
+                className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left ${
+                  selectedIndex === suggestions.length
+                    ? "bg-red-500/10 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30"
+                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                }`}
               >
-                <div className="h-8 w-8 bg-zinc-950 dark:bg-white rounded-lg flex items-center justify-center shrink-0">
-                  <Plus className="h-4 w-4 text-white dark:text-zinc-950" />
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                  selectedIndex === suggestions.length
+                    ? "bg-red-500 text-white"
+                    : "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950"
+                }`}>
+                  <Plus className="h-4 w-4" />
                 </div>
                 <div>
                   <p className="text-xs font-extrabold text-zinc-950 dark:text-white">
