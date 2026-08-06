@@ -14,7 +14,7 @@ import {
   Check, ChevronRight, MapPin, Zap, Shield, Clock,
   Star, CheckCircle2, Truck, Gift, RefreshCw,
   Search, ChevronDown, Sparkles, HelpCircle, Watch, Headphones,
-  Upload, X, Plus, Package, Loader2, UserCircle, Camera
+  Upload, X, Plus, Package, Loader2, UserCircle, Camera, CircleAlert
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/auth-context";
@@ -1340,6 +1340,8 @@ export default function TradeInPage() {
                 onClose={() => setCameraOpen(false)}
                 onCapture={(file) => handleImageFiles([file])}
                 continuous
+                capturedPreviews={images}
+                onRemoveCaptured={(idx) => setImages(prev => prev.filter((_, i) => i !== idx))}
               />
 
               {/* Wizard Content Inner wrapper with scroll */}
@@ -1957,7 +1959,7 @@ export default function TradeInPage() {
                                       onClick={() => setState(s => ({ ...s, condition: c.id }))}
                                       className={`relative p-3 sm:p-3.5 w-full rounded-2xl border-2 text-left transition-all duration-200 flex flex-col justify-between group overflow-hidden ${
                                         isSelected
-                                          ? "border-red-600 dark:border-red-500 bg-white dark:bg-zinc-900 shadow-xl ring-2 ring-red-500/20"
+                                          ? "border-zinc-950 dark:border-white bg-white dark:bg-zinc-900 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
                                           : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs"
                                       }`}
                                     >
@@ -1976,7 +1978,7 @@ export default function TradeInPage() {
                                         <div className="absolute top-2 right-2">
                                           <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-2xs backdrop-blur-md ${
                                             isSelected
-                                              ? "bg-red-600 text-white"
+                                              ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
                                               : "bg-black/60 text-white/90"
                                           }`}>
                                             {c.tag}
@@ -1985,7 +1987,7 @@ export default function TradeInPage() {
 
                                         {/* Selected Checkmark Badge */}
                                         {isSelected && (
-                                          <div className="absolute top-2 left-2 h-5 w-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow-sm">
+                                          <div className="absolute top-2 left-2 h-5 w-5 rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center shadow-sm">
                                             <Check className="h-3 w-3 stroke-[3]" />
                                           </div>
                                         )}
@@ -2077,17 +2079,24 @@ export default function TradeInPage() {
                               >
                                 {q.options.map((opt) => {
                                   const isSelected = state.answers[q.id] === opt;
+                                  const optLower = opt.toLowerCase();
+                                  const isSevereDamage = /crack|shatter|unusable|faulty|broken|damaged|shattered|heavy|significant/i.test(optLower);
+                                  const isMinorWear = /minor|light|small|surface|scratches|scuffs|used/i.test(optLower) && !isSevereDamage;
+                                  const isPositive = !isSevereDamage && !isMinorWear && (
+                                    /like new|flawless|perfect|no crack|no scratch|working|yes|clean|original|good|1 |2 |included/i.test(optLower) ||
+                                    /yes/i.test(optLower)
+                                  );
                                   return (
-                                    <button
+                                    <motion.button
                                       key={opt}
                                       type="button"
+                                      whileHover={{ y: -2 }}
+                                      whileTap={{ scale: 0.99 }}
                                       onClick={() => {
-                                        // Build new answers with this answer included
                                         const newAnswers = { ...state.answers, [q.id]: opt };
                                         setState(s => ({ ...s, answers: newAnswers }));
 
                                         if (isLast) {
-                                          // Last question: auto-advance to offer once all are answered
                                           const nowComplete = currentQuestions.every(
                                             cq => typeof newAnswers[cq.id] === "string" && newAnswers[cq.id].length > 0
                                           );
@@ -2098,15 +2107,44 @@ export default function TradeInPage() {
                                           setTimeout(() => setDiagIndex(i => i + 1), 260);
                                         }
                                       }}
-                                      className={`w-full px-5 py-4 rounded-2xl border text-sm font-semibold text-left transition-all flex items-center justify-between ${
+                                      className={`w-full p-4 sm:p-4.5 rounded-2xl border-2 text-left transition-all duration-200 flex items-center justify-between group ${
                                         isSelected
-                                          ? "border-zinc-950 bg-zinc-950 text-white shadow-sm dark:border-white dark:bg-white dark:text-zinc-950"
-                                          : "border-zinc-200 bg-white hover:border-zinc-400 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white dark:hover:bg-zinc-950"
+                                          ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
+                                          : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs text-zinc-800 dark:text-zinc-200"
                                       }`}
                                     >
-                                      <span>{opt}</span>
-                                      {isSelected && <Check className="h-4 w-4 shrink-0 text-white dark:text-zinc-950" strokeWidth={3} />}
-                                    </button>
+                                      <div className="flex items-center gap-3.5">
+                                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                          isSelected
+                                            ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950"
+                                            : isPositive
+                                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/40"
+                                            : isMinorWear
+                                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/40"
+                                            : isSevereDamage
+                                            ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/80 dark:border-red-900/40"
+                                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800"
+                                        }`}>
+                                          {isPositive ? (
+                                            <CheckCircle2 className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-emerald-600 dark:text-emerald-400"}`} />
+                                          ) : isMinorWear ? (
+                                            <CircleAlert className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-amber-600 dark:text-amber-400"}`} />
+                                          ) : isSevereDamage ? (
+                                            <CircleAlert className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-red-600 dark:text-red-400"}`} />
+                                          ) : (
+                                            <Check className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-500"}`} />
+                                          )}
+                                        </div>
+                                        <span className={`text-xs sm:text-sm font-extrabold ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
+                                          {opt}
+                                        </span>
+                                      </div>
+                                      {isSelected && (
+                                        <div className="h-5 w-5 rounded-full bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950 flex items-center justify-center shadow-sm shrink-0">
+                                          <Check className="h-3 w-3 stroke-[3]" />
+                                        </div>
+                                      )}
+                                    </motion.button>
                                   );
                                 })}
                               </motion.div>
@@ -2432,15 +2470,26 @@ export default function TradeInPage() {
                                 Instant Offer Generated
                               </div>
 
-                              <div className="bg-gradient-to-b from-emerald-500/5 to-emerald-500/10 border border-emerald-500/20 rounded-3xl p-8 relative overflow-hidden max-w-sm mx-auto shadow-sm">
-                                <div className="absolute -top-12 -right-12 w-24 h-24 bg-emerald-400/25 rounded-full blur-2xl pointer-events-none" />
-                                <div className="absolute -bottom-12 -left-12 w-24 h-24 bg-emerald-400/25 rounded-full blur-2xl pointer-events-none" />
-                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 relative z-10">Guaranteed Offer</div>
-                                <div className="text-6xl font-black font-mono text-zinc-950 dark:text-white my-2 relative z-10">
+                              <div className="bg-gradient-to-b from-emerald-500/5 via-emerald-500/10 to-transparent border-2 border-emerald-500/30 dark:border-emerald-500/40 rounded-3xl p-6 sm:p-8 relative overflow-hidden max-w-md mx-auto shadow-xl">
+                                <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+                                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
+                                <div className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 relative z-10">Guaranteed Cash Valuation</div>
+                                <div className="text-5xl sm:text-6xl font-black font-mono text-zinc-950 dark:text-white my-3 relative z-10 tracking-tight">
                                   <AnimatedPrice value={aiPrice} />
                                 </div>
-                                <div className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-1 relative z-10">
-                                  <Clock className="h-3.5 w-3.5" /> Price locked for 14 days
+                                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-emerald-500/20 relative z-10">
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Shield className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">14-Day Price Lock</span>
+                                  </div>
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Truck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Free Postage</span>
+                                  </div>
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Same-Day Payout</span>
+                                  </div>
                                 </div>
                               </div>
 

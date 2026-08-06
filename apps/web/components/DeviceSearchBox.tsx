@@ -226,41 +226,47 @@ export default function DeviceSearchBox({
                       onClick={() => handleSelect(sug)}
                       className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all text-left ${
                         isSelected
-                          ? "bg-red-500/10 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30"
-                          : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                          ? "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-md"
+                          : "hover:bg-zinc-100 dark:hover:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100"
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                          isSelected ? "bg-red-500/20 text-red-600 dark:text-red-400" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                          isSelected ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
                         }`}>
                           <Smartphone className="h-4 w-4" />
                         </div>
                         <div>
-                          <p className="text-xs font-extrabold text-zinc-950 dark:text-white">{sug.name}</p>
-                          <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                          <p className={`text-xs font-extrabold ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-950 dark:text-white"}`}>{sug.name}</p>
+                          <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isSelected ? "text-white/70 dark:text-zinc-950/70" : "text-zinc-400"}`}>
                             {sug.brand} · {sug.category}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {sug.tradeInMode === "auto" && (
-                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isSelected ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                          }`}>
                             Auto-price
                           </span>
                         )}
                         {sug.tradeInMode === "manual_price" && (
-                          <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                          <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                            isSelected ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950" : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          }`}>
                             Auto-price
                           </span>
                         )}
                         {!sug.catalogId && (
                           <span title="Not yet in the device catalog — priced manually after a photo review"
-                            className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400 cursor-help">
+                            className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full cursor-help ${
+                              isSelected ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950" : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+                            }`}>
                             Other
                           </span>
                         )}
-                        <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-400">
+                        <div className={`flex items-center gap-1 text-[10px] font-bold ${isSelected ? "text-white/80 dark:text-zinc-950/80" : "text-zinc-400"}`}>
                           Get Cash <ChevronRight className="h-3.5 w-3.5" />
                         </div>
                       </div>
@@ -278,26 +284,26 @@ export default function DeviceSearchBox({
                 onClick={handleManual}
                 className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all text-left ${
                   selectedIndex === suggestions.length
-                    ? "bg-red-500/10 dark:bg-red-600/20 text-red-600 dark:text-red-400 border border-red-500/30"
-                    : "hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+                    ? "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 shadow-md"
+                    : "hover:bg-zinc-100 dark:hover:bg-zinc-800/80 text-zinc-900 dark:text-zinc-100"
                 }`}
               >
                 <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
                   selectedIndex === suggestions.length
-                    ? "bg-red-500 text-white"
+                    ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950"
                     : "bg-zinc-950 dark:bg-white text-white dark:text-zinc-950"
                 }`}>
                   <Plus className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-xs font-extrabold text-zinc-950 dark:text-white">
+                  <p className={`text-xs font-extrabold ${selectedIndex === suggestions.length ? "text-white dark:text-zinc-950" : "text-zinc-950 dark:text-white"}`}>
                     &quot;{query}&quot; — not in our list?
                   </p>
-                  <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider mt-0.5">
+                  <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${selectedIndex === suggestions.length ? "text-white/70 dark:text-zinc-950/70" : "text-zinc-400"}`}>
                     Start a manual trade-in · Our team will review &amp; quote
                   </p>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5 text-zinc-400 ml-auto shrink-0" />
+                <ChevronRight className={`h-3.5 w-3.5 ml-auto shrink-0 ${selectedIndex === suggestions.length ? "text-white dark:text-zinc-950" : "text-zinc-400"}`} />
               </button>
             </div>
           </motion.div>

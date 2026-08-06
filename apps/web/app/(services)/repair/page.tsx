@@ -818,6 +818,8 @@ export default function RepairPage() {
                 onClose={() => setCameraOpen(false)}
                 onCapture={(file) => handleImageFiles([file])}
                 continuous
+                capturedPreviews={images}
+                onRemoveCaptured={(idx) => setImages(prev => prev.filter((_, i) => i !== idx))}
               />
 
               {/* Scrollable content */}
