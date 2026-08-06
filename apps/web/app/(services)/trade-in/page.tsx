@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo, cloneElement } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
@@ -14,7 +14,9 @@ import {
   Check, ChevronRight, MapPin, Zap, Shield, Clock,
   Star, CheckCircle2, Truck, Gift, RefreshCw,
   Search, ChevronDown, Sparkles, HelpCircle, Watch, Headphones,
-  Upload, X, Plus, Package, Loader2, UserCircle, Camera, CircleAlert
+  Upload, X, Plus, Package, Loader2, UserCircle, Camera, CircleAlert,
+  BatteryCharging, BatteryMedium, BatteryWarning, BatteryLow, Power, PowerOff, AlertTriangle,
+  ScanFace, ZapOff, RotateCcw, Disc, Disc3, Keyboard, Volume2, Volume1, VolumeX
 } from "lucide-react";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/auth-context";
@@ -154,6 +156,233 @@ const CONDITION_QUESTIONS: Record<string, { id: string; question: string; option
     { id: "reset",    question: "Will you factory reset before sending?", options: ["Yes, already done", "I'll do it before sending"] },
   ],
 };
+
+const OPTION_IMAGES: Record<string, string> = {
+  // Screen condition options
+  "No cracks or scratches": "/diagnostics/screen_flawless.png",
+  "No damage at all": "/diagnostics/screen_flawless.png",
+  "Pristine - no scratches": "/diagnostics/screen_flawless.png",
+  "No damage": "/diagnostics/screen_flawless.png",
+
+  "Light surface scratches": "/diagnostics/screen_scratches.png",
+  "Light micro-scratches": "/diagnostics/screen_scratches.png",
+
+  "Cracked but display works": "/diagnostics/screen_cracked.png",
+  "Cracked but usable": "/diagnostics/screen_cracked.png",
+  "Cracked": "/diagnostics/screen_cracked.png",
+  "Cracked screen": "/diagnostics/screen_cracked.png",
+
+  "Shattered / unusable display": "/diagnostics/screen_shattered.png",
+  "Shattered": "/diagnostics/screen_shattered.png",
+  "Deep scratches or chips": "/diagnostics/screen_shattered.png",
+
+  // Back panel & body condition options
+  "Perfect — no marks": "/diagnostics/back_flawless.png",
+  "Like new": "/diagnostics/back_flawless.png",
+  "Like new — no damage": "/diagnostics/back_flawless.png",
+  "None": "/diagnostics/back_flawless.png",
+
+  "Minor scuffs": "/diagnostics/back_minor.png",
+  "Light scratches": "/diagnostics/back_minor.png",
+  "Minor scratches": "/diagnostics/back_minor.png",
+  "Minor wear or scratches": "/diagnostics/back_minor.png",
+  "Minor dents or scratches": "/diagnostics/back_minor.png",
+
+  "Cracked back glass": "/diagnostics/back_cracked.png",
+  "Dents or significant marks": "/diagnostics/back_cracked.png",
+  "Significant damage": "/diagnostics/back_cracked.png",
+  "Heavy wear or damage": "/diagnostics/back_cracked.png",
+  "Heavy wear or staining": "/diagnostics/back_cracked.png",
+};
+
+function renderOptionBadge(qId: string, opt: string, isSelected: boolean) {
+  const optLower = opt.toLowerCase();
+
+  const getUnselectedState = () => {
+    // 1. Battery Health & Life
+    if (qId === "battery" || /battery/i.test(qId)) {
+      if (/90|excellent|holds charge well|1\+ day/i.test(optLower)) {
+        return {
+          icon: <BatteryCharging className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      if (/80|good|3–5 hours/i.test(optLower)) {
+        return {
+          icon: <BatteryMedium className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
+          bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
+        };
+      }
+      if (/70|fair|1–3 hours|drains/i.test(optLower)) {
+        return {
+          icon: <BatteryWarning className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
+          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
+        };
+      }
+      return {
+        icon: <BatteryLow className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 2. Power & Overall Function
+    if (qId === "power" || qId === "function") {
+      if (/perfect|fully working|yes, works/i.test(optLower)) {
+        return {
+          icon: <Power className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      if (/issues|partial|some/i.test(optLower)) {
+        return {
+          icon: <AlertTriangle className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
+          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
+        };
+      }
+      return {
+        icon: <PowerOff className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 3. Biometrics (Face ID / Touch ID)
+    if (qId === "biometrics") {
+      if (/yes/i.test(optLower)) {
+        return {
+          icon: <ScanFace className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      return {
+        icon: <ScanFace className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 4. Charging Port
+    if (qId === "charging") {
+      if (/yes/i.test(optLower)) {
+        return {
+          icon: <Zap className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      return {
+        icon: <ZapOff className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 5. Factory Reset / iCloud Lock
+    if (qId === "reset") {
+      if (/already|fully removed/i.test(optLower)) {
+        return {
+          icon: <RotateCcw className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      return {
+        icon: <Clock className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
+        bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
+      };
+    }
+
+    // 6. Disc Drive
+    if (qId === "disc") {
+      if (/works great|yes/i.test(optLower)) {
+        return {
+          icon: <Disc className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      if (/digital/i.test(optLower)) {
+        return {
+          icon: <Disc3 className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
+          bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
+        };
+      }
+      return {
+        icon: <Disc3 className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 7. Keyboard & Trackpad
+    if (qId === "input") {
+      if (/working|yes/i.test(optLower)) {
+        return {
+          icon: <Keyboard className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      if (/minor/i.test(optLower)) {
+        return {
+          icon: <Keyboard className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
+          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
+        };
+      }
+      return {
+        icon: <Keyboard className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // 8. Sound & Audio
+    if (qId === "sound") {
+      if (/perfect|crisp/i.test(optLower)) {
+        return {
+          icon: <Volume2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
+          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
+        };
+      }
+      if (/muffled|static/i.test(optLower)) {
+        return {
+          icon: <Volume1 className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
+          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
+        };
+      }
+      return {
+        icon: <VolumeX className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
+        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
+      };
+    }
+
+    // Fallback default
+    const isSevereDamage = /crack|shatter|unusable|faulty|broken|damaged|shattered|heavy|significant/i.test(optLower);
+    const isMinorWear = /minor|light|small|surface|scratches|scuffs|used/i.test(optLower) && !isSevereDamage;
+    const isPositive = !isSevereDamage && !isMinorWear && (/like new|flawless|perfect|no crack|no scratch|working|yes|clean|original|good|1 |2 |included/i.test(optLower) || /yes/i.test(optLower));
+
+    return {
+      icon: isPositive ? (
+        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
+      ) : isMinorWear ? (
+        <CircleAlert className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+      ) : isSevereDamage ? (
+        <CircleAlert className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />
+      ) : (
+        <Check className="h-4.5 w-4.5 text-zinc-500" />
+      ),
+      bg: isPositive
+        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/40"
+        : isMinorWear
+        ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/40"
+        : isSevereDamage
+        ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/80 dark:border-red-900/40"
+        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800",
+    };
+  };
+
+  const res = getUnselectedState();
+
+  if (isSelected) {
+    return {
+      icon: cloneElement(res.icon, { className: "h-4.5 w-4.5 text-white dark:text-zinc-950" }),
+      bg: "bg-white/20 border border-white/30 text-white dark:bg-zinc-950/20 dark:border-zinc-950/30 dark:text-zinc-950",
+    };
+  }
+
+  return res;
+}
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -2075,78 +2304,117 @@ export default function TradeInPage() {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -16 }}
                                 transition={{ duration: 0.2 }}
-                                className="space-y-2.5"
+                                className={
+                                  q.options.some(opt => OPTION_IMAGES[opt])
+                                    ? "grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4"
+                                    : "space-y-2.5"
+                                }
                               >
-                                {q.options.map((opt) => {
-                                  const isSelected = state.answers[q.id] === opt;
-                                  const optLower = opt.toLowerCase();
-                                  const isSevereDamage = /crack|shatter|unusable|faulty|broken|damaged|shattered|heavy|significant/i.test(optLower);
-                                  const isMinorWear = /minor|light|small|surface|scratches|scuffs|used/i.test(optLower) && !isSevereDamage;
-                                  const isPositive = !isSevereDamage && !isMinorWear && (
-                                    /like new|flawless|perfect|no crack|no scratch|working|yes|clean|original|good|1 |2 |included/i.test(optLower) ||
-                                    /yes/i.test(optLower)
-                                  );
-                                  return (
-                                    <motion.button
-                                      key={opt}
-                                      type="button"
-                                      whileHover={{ y: -2 }}
-                                      whileTap={{ scale: 0.99 }}
-                                      onClick={() => {
-                                        const newAnswers = { ...state.answers, [q.id]: opt };
-                                        setState(s => ({ ...s, answers: newAnswers }));
+                                {(() => {
+                                  const hasPhotoOptions = q.options.some(opt => OPTION_IMAGES[opt]);
+                                  return q.options.map((opt) => {
+                                    const isSelected = state.answers[q.id] === opt;
+                                    const optImg = OPTION_IMAGES[opt];
+                                    const badge = renderOptionBadge(q.id, opt, isSelected);
 
-                                        if (isLast) {
-                                          const nowComplete = currentQuestions.every(
-                                            cq => typeof newAnswers[cq.id] === "string" && newAnswers[cq.id].length > 0
-                                          );
-                                          if (nowComplete) {
-                                            setTimeout(() => goToPhase(4), 350);
-                                          }
-                                        } else {
-                                          setTimeout(() => setDiagIndex(i => i + 1), 260);
+                                    const handleSelect = () => {
+                                      const newAnswers = { ...state.answers, [q.id]: opt };
+                                      setState(s => ({ ...s, answers: newAnswers }));
+
+                                      if (isLast) {
+                                        const nowComplete = currentQuestions.every(
+                                          cq => typeof newAnswers[cq.id] === "string" && newAnswers[cq.id].length > 0
+                                        );
+                                        if (nowComplete) {
+                                          setTimeout(() => goToPhase(4), 350);
                                         }
-                                      }}
-                                      className={`w-full p-4 sm:p-4.5 rounded-2xl border-2 text-left transition-all duration-200 flex items-center justify-between group ${
-                                        isSelected
-                                          ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
-                                          : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs text-zinc-800 dark:text-zinc-200"
-                                      }`}
-                                    >
-                                      <div className="flex items-center gap-3.5">
-                                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                                      } else {
+                                        setTimeout(() => setDiagIndex(i => i + 1), 260);
+                                      }
+                                    };
+
+                                    if (hasPhotoOptions) {
+                                      return (
+                                        <motion.button
+                                          key={opt}
+                                          type="button"
+                                          whileHover={{ y: -3 }}
+                                          whileTap={{ scale: 0.98 }}
+                                          onClick={handleSelect}
+                                          className={`w-full rounded-2xl border-2 text-left transition-all duration-200 overflow-hidden flex flex-col group ${
+                                            isSelected
+                                              ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
+                                              : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs text-zinc-800 dark:text-zinc-200"
+                                          }`}
+                                        >
+                                          {/* Top Image Banner */}
+                                          <div className="h-36 sm:h-44 w-full relative overflow-hidden bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200/60 dark:border-zinc-800">
+                                            {optImg ? (
+                                              <img
+                                                src={optImg}
+                                                alt={opt}
+                                                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                                  isSelected ? "scale-105" : "opacity-95"
+                                                }`}
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800">
+                                                <div className={`h-12 w-12 rounded-2xl flex items-center justify-center ${badge.bg}`}>
+                                                  {badge.icon}
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Selected Badge */}
+                                            {isSelected && (
+                                              <div className="absolute top-2.5 right-2.5 h-6 w-6 rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center shadow-md">
+                                                <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                              </div>
+                                            )}
+                                          </div>
+
+                                          {/* Bottom Text Header */}
+                                          <div className="p-3.5 sm:p-4 flex items-center justify-between min-w-0 flex-1">
+                                            <span className={`text-xs sm:text-sm font-extrabold leading-snug ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-900 dark:text-zinc-100"}`}>
+                                              {opt}
+                                            </span>
+                                          </div>
+                                        </motion.button>
+                                      );
+                                    }
+
+                                    return (
+                                      <motion.button
+                                        key={opt}
+                                        type="button"
+                                        whileHover={{ y: -2 }}
+                                        whileTap={{ scale: 0.99 }}
+                                        onClick={handleSelect}
+                                        className={`w-full p-3.5 sm:p-4 rounded-2xl border-2 text-left transition-all duration-200 flex items-center justify-between group ${
                                           isSelected
-                                            ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950"
-                                            : isPositive
-                                            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/40"
-                                            : isMinorWear
-                                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/40"
-                                            : isSevereDamage
-                                            ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/80 dark:border-red-900/40"
-                                            : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800"
-                                        }`}>
-                                          {isPositive ? (
-                                            <CheckCircle2 className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-emerald-600 dark:text-emerald-400"}`} />
-                                          ) : isMinorWear ? (
-                                            <CircleAlert className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-amber-600 dark:text-amber-400"}`} />
-                                          ) : isSevereDamage ? (
-                                            <CircleAlert className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-red-600 dark:text-red-400"}`} />
-                                          ) : (
-                                            <Check className={`h-4.5 w-4.5 ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-500"}`} />
-                                          )}
+                                            ? "border-zinc-950 bg-zinc-950 text-white dark:border-white dark:bg-white dark:text-zinc-950 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
+                                            : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs text-zinc-800 dark:text-zinc-200"
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-colors ${badge.bg}`}>
+                                            {badge.icon}
+                                          </div>
+                                          <span className={`text-xs sm:text-sm font-extrabold ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
+                                            {opt}
+                                          </span>
                                         </div>
-                                        <span className={`text-xs sm:text-sm font-extrabold ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
-                                          {opt}
-                                        </span>
-                                      </div>
-                                      {isSelected && (
-                                        <div className="h-5 w-5 rounded-full bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950 flex items-center justify-center shadow-sm shrink-0">
-                                          <Check className="h-3 w-3 stroke-[3]" />
-                                        </div>
-                                      )}
-                                    </motion.button>
-                                  );
-                                })}
+                                        {isSelected && (
+                                          <div className={`h-5 w-5 rounded-full flex items-center justify-center shadow-sm shrink-0 ml-2 ${
+                                            isSelected ? "bg-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950" : "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
+                                          }`}>
+                                            <Check className="h-3 w-3 stroke-[3]" />
+                                          </div>
+                                        )}
+                                      </motion.button>
+                                    );
+                                  });
+                                })()}
                               </motion.div>
                             </AnimatePresence>
                           </div>
