@@ -7,6 +7,7 @@ export interface AccordionItem {
   label: string;
   catId?: string;
   link?: string;
+  ctaText?: string;
 }
 
 export interface AccordionGalleryProps {
@@ -30,6 +31,7 @@ export interface AccordionGalleryProps {
   orientation?: "horizontal" | "vertical";
   autoplay?: boolean;
   autoplayInterval?: number;
+  ctaText?: string;
   onSelect?: (item: AccordionItem, index: number) => void;
 }
 
@@ -59,6 +61,7 @@ export default function AccordionGallery({
   orientation = "horizontal",
   autoplay = true,
   autoplayInterval = 2400,
+  ctaText = "TRADE IN NOW",
   onSelect,
 }: AccordionGalleryProps) {
   const displayItems = items && items.length > 0 ? items : DEFAULT_FALLBACK_ITEMS;
@@ -205,7 +208,7 @@ export default function AccordionGallery({
                       onClick={(e) => handleCtaClick(e, item, index)}
                       className="text-[10px] sm:text-[11px] font-extrabold text-red-500 hover:text-red-400 uppercase tracking-wider flex items-center gap-1 cursor-pointer transition-colors pt-1 whitespace-nowrap overflow-hidden"
                     >
-                      <span>TRADE IN NOW</span>
+                      <span>{item.ctaText ?? ctaText ?? "TRADE IN NOW"}</span>
                       <span>→</span>
                     </button>
                   </div>

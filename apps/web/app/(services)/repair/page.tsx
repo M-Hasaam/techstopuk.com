@@ -15,6 +15,8 @@ import Footer from "@/components/Footer";
 import { useAuth } from "@/context/auth-context";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
+import AccordionGallery from "@/components/AccordionGallery";
+import { LayoutTextFlip } from "@/components/ui/layout-text-flip";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002";
 
@@ -122,9 +124,10 @@ export default function RepairPage() {
   useEffect(() => {
     catalogApi.listCategories()
       .then(cats => {
-        const repairable = cats.filter(c => c.isRepairable);
-        setCatalogCats(repairable);
-        repairable.forEach(c => {
+        const active = cats.filter(c => c.isActive !== false);
+        const displayCats = active.length > 0 ? active : cats;
+        setCatalogCats(displayCats);
+        displayCats.forEach(c => {
           productsApi.list({ category: c.name, limit: 12 })
             .then(r => {
               const pool = r.items.flatMap(p => p.images ?? []);
@@ -385,185 +388,183 @@ export default function RepairPage() {
         <div className="bg-background relative text-foreground">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-mood-violet blur-[130px] rounded-full pointer-events-none -z-10" />
 
-          <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 lg:pt-16 pb-12">
+          <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-10 sm:pt-14 md:pt-20 lg:pt-24 pb-8 md:pb-12 w-full">
             
-            <div className="grid lg:grid-cols-12 gap-12 lg:gap-16 items-start text-left mb-12">
+            <div className="grid lg:grid-cols-12 gap-6 lg:gap-12 items-center text-left mb-8 md:mb-12 w-full min-w-0">
               
-              {/* Left Column: Headline and Info */}
-              <div className="lg:col-span-5 flex flex-col items-start text-left font-sans">
-                {/* Trustpilot-style Rating Badge */}
-                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100/50 dark:border-emerald-900/30 px-3.5 py-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-400 mb-6 shadow-sm">
-                  <span className="flex items-center gap-0.5 text-emerald-600">
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                    <Star className="h-3 w-3 fill-emerald-500 text-emerald-500" />
-                  </span>
-                  <span>4.9/5 on Trustpilot</span>
-                </div>
-
-                <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-zinc-950 dark:text-white mb-4 leading-none font-sans">
+              {/* Left Column: Headline and Search */}
+              <div className="lg:col-span-5 min-w-0 flex flex-col justify-center items-start text-left w-full mb-6 lg:mb-0 relative z-30">
+                <h1 className="font-sans text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-[1.04] mb-5 md:mb-8">
                   Professional <br />
                   device repairs. <br />
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-zinc-800 to-zinc-950 dark:from-red-500 dark:via-zinc-300 dark:to-white">Done fast &amp; right.</span>
+                  <LayoutTextFlip
+                    words={["Fast. Fair. Right.", "1-Year Warranty.", "Same-Day Service.", "Free Postage."]}
+                    wordClassName="text-transparent bg-clip-text bg-gradient-to-r from-red-600 via-rose-500 to-red-600 pb-1"
+                  />
                 </h1>
-                
-                <p className="text-zinc-500 dark:text-zinc-400 font-semibold text-sm md:text-base mb-8 leading-relaxed">
-                  Certified technicians. Premium OEM-grade parts. 1-year warranty on all repairs. Same-day service in Leicester, or free mail-in postage UK-wide.
-                </p>
 
                 {/* Device search — finds device and opens repair wizard with it pre-filled */}
-                <DeviceSearchBox
-                  className="w-full max-w-md mb-6"
-                  placeholder="Search device to repair (e.g. iPhone, Galaxy S24...)"
-                  filterCategories={["Phone", "Tablet", "Console", "Laptop"]}
-                  onSelect={(sug) => {
-                    const CAT_TO_DEVICE: Record<string, string> = {
-                      Phone: "Phone", Tablet: "Tablet", Console: "Console", Laptop: "Laptop",
-                    };
-                    const deviceType = CAT_TO_DEVICE[sug.category];
-                    if (!deviceType) return;
-                    guardedOpen(() => {
-                      setState(prev => ({
-                        ...prev,
-                        deviceType,
-                        brand: sug.brand,
-                        model: sug.name,
-                        issue: [], issueNotes: "", fulfillment: "",
-                      }));
-                      setImages([]);
-                      setBatchId(crypto.randomUUID());
-                      setStep(1);
-                      setIsWizardActive(true);
-                    });
-                  }}
-                  onManualEntry={(q) => {
-                    guardedOpen(() => {
-                      setState(prev => ({
-                        ...prev,
-                        deviceType: "Phone",
-                        brand: "",
-                        model: q,
-                        issue: [], issueNotes: "", fulfillment: "",
-                      }));
-                      setImages([]);
-                      setBatchId(crypto.randomUUID());
-                      setStep(1);
-                      setIsWizardActive(true);
-                    });
-                  }}
-                />
-
-                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold text-zinc-500 mb-8">
-                  <span className="text-zinc-500 font-extrabold">Popular:</span>
-                  {[
-                    { name: "iPhone Screen", category: "Phone", brand: "Apple", issue: "screen" },
-                    { name: "MacBook Battery", category: "Laptop", brand: "Apple", issue: "battery" },
-                    { name: "Switch Drift Fix", category: "Console", brand: "Nintendo", issue: "controller" },
-                  ].map((item, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => guardedOpen(() => {
-                        setState({
-                          deviceType: item.category, brand: item.brand,
-                          model: `${item.brand} ${item.category} (Est. Repair)`,
-                          issue: [item.issue], issueNotes: `Shortcut select: ${item.name}`,
-                          fulfillment: "", contact: { name: "", email: "", phone: "", address: "", postcode: "" }
-                        });
-                        setStep(3);
+                <div className="w-full min-w-0 max-w-full lg:max-w-xl mb-4 md:mb-6 relative z-40">
+                  <DeviceSearchBox
+                    className="w-full shadow-md border border-zinc-200 dark:border-zinc-800 rounded-2xl"
+                    placeholder="Search device to repair (e.g. iPhone, Galaxy S24...)"
+                    filterCategories={["Phone", "Tablet", "Console", "Laptop"]}
+                    onSelect={(sug) => {
+                      const CAT_TO_DEVICE: Record<string, string> = {
+                        Phone: "Phone", Tablet: "Tablet", Console: "Console", Laptop: "Laptop",
+                      };
+                      const deviceType = CAT_TO_DEVICE[sug.category];
+                      if (!deviceType) return;
+                      guardedOpen(() => {
+                        setState(prev => ({
+                          ...prev,
+                          deviceType,
+                          brand: sug.brand,
+                          model: sug.name,
+                          issue: [], issueNotes: "", fulfillment: "",
+                        }));
+                        setImages([]);
+                        setBatchId(crypto.randomUUID());
+                        setStep(1);
                         setIsWizardActive(true);
-                      })}
-                      className="px-2.5 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg transition-colors font-bold shadow-sm"
+                      });
+                    }}
+                    onManualEntry={(q) => {
+                      guardedOpen(() => {
+                        setState(prev => ({
+                          ...prev,
+                          deviceType: "Phone",
+                          brand: "",
+                          model: q,
+                          issue: [], issueNotes: "", fulfillment: "",
+                        }));
+                        setImages([]);
+                        setBatchId(crypto.randomUUID());
+                        setStep(1);
+                        setIsWizardActive(true);
+                      });
+                    }}
+                  />
+                </div>
+
+                {/* Popular quick links — Full Width Infinite Sliding Marquee */}
+                <div className="flex flex-col gap-2.5 w-full min-w-0 max-w-full lg:max-w-xl">
+                  <div className="flex items-center gap-1.5 text-zinc-600 dark:text-zinc-300 font-extrabold uppercase tracking-wider text-[10px]">
+                    <Sparkles className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    <span>Popular Repairs:</span>
+                  </div>
+
+                  <div className="relative overflow-hidden w-full flex items-center group py-1">
+                    {/* Left & Right gradient edge masks */}
+                    <div className="absolute left-0 top-0 bottom-0 w-12 sm:w-16 bg-gradient-to-r from-white via-white/80 to-transparent dark:from-zinc-950 dark:via-zinc-950/80 z-20 pointer-events-none" />
+                    <div className="absolute right-0 top-0 bottom-0 w-12 sm:w-16 bg-gradient-to-l from-white via-white/80 to-transparent dark:from-zinc-950 dark:via-zinc-950/80 z-20 pointer-events-none" />
+
+                    <motion.div
+                      className="flex gap-2.5 whitespace-nowrap shrink-0"
+                      animate={{ x: ["0%", "-50%"] }}
+                      transition={{
+                        repeat: Infinity,
+                        repeatType: "loop",
+                        duration: 22,
+                        ease: "linear",
+                      }}
                     >
-                      {item.name}
-                    </button>
-                  ))}
+                      {[
+                        { name: "iPhone Screen Repair", category: "Phone", brand: "Apple", issue: "screen" },
+                        { name: "MacBook Battery Fix", category: "Laptop", brand: "Apple", issue: "battery" },
+                        { name: "PS5 HDMI Port", category: "Console", brand: "Sony PlayStation", issue: "hdmi" },
+                        { name: "Switch Drift Fix", category: "Console", brand: "Nintendo", issue: "controller" },
+                        { name: "Galaxy Screen Fix", category: "Phone", brand: "Samsung", issue: "screen" },
+                        { name: "iPad Glass Repair", category: "Tablet", brand: "Apple", issue: "screen" },
+                        // Duplicated array for 100% infinite seamless loop
+                        { name: "iPhone Screen Repair", category: "Phone", brand: "Apple", issue: "screen" },
+                        { name: "MacBook Battery Fix", category: "Laptop", brand: "Apple", issue: "battery" },
+                        { name: "PS5 HDMI Port", category: "Console", brand: "Sony PlayStation", issue: "hdmi" },
+                        { name: "Switch Drift Fix", category: "Console", brand: "Nintendo", issue: "controller" },
+                        { name: "Galaxy Screen Fix", category: "Phone", brand: "Samsung", issue: "screen" },
+                        { name: "iPad Glass Repair", category: "Tablet", brand: "Apple", issue: "screen" },
+                      ].map((item, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => guardedOpen(() => {
+                            setState({
+                              deviceType: item.category, brand: item.brand,
+                              model: `${item.brand} ${item.category} (Est. Repair)`,
+                              issue: [item.issue], issueNotes: `Shortcut select: ${item.name}`,
+                              fulfillment: "", contact: { name: "", email: "", phone: "", address: "", postcode: "" }
+                            });
+                            setStep(3);
+                            setIsWizardActive(true);
+                          })}
+                          className="px-3.5 py-1 bg-zinc-100 dark:bg-zinc-900 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 border border-zinc-200/80 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-full transition-all duration-200 font-bold text-[11px] shrink-0 cursor-pointer shadow-2xs"
+                        >
+                          {item.name}
+                        </button>
+                      ))}
+                    </motion.div>
+                  </div>
                 </div>
               </div>
 
-              {/* Right Column: Device Types Grid */}
-              <div className="lg:col-span-7 w-full font-sans">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl md:text-2xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-none">
-                    Select your device type to start
+              {/* Right Column: Category Accordion Gallery */}
+              <div className="lg:col-span-7 min-w-0 w-full flex flex-col justify-center">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="font-sans text-lg md:text-xl font-extrabold tracking-tight text-zinc-950 dark:text-white leading-none">
+                    Select category to get started
                   </h2>
                 </div>
 
-                {/* auto-fill grid: min 200px per card, scales gracefully to any count */}
-                <div
-                  className="grid gap-4 text-left"
-                  style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}
-                >
-                  {catalogCats.map((cat) => {
-                    const meta = DEVICE_TYPE_META[cat.slug] ?? {
-                      oldId: cat.slug,
-                      Icon: Package,
-                      gradient: "from-zinc-700 via-zinc-800 to-zinc-950",
-                      glow: "hover:shadow-zinc-500/20",
-                      accent: "bg-zinc-500",
-                    };
-                    // Prefer the curated category image; only fall back to a random product photo when none is set
-                    const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
-                    const img = catImgs.length > 0
-                      ? catImgs[Math.floor(Math.random() * catImgs.length)]
-                      : (catFallbackImages[cat.slug] ?? "");
-                    const isProductFallback = catImgs.length === 0 && !!catFallbackImages[cat.slug];
-                    const modelCount = cat.modelCount > 0 ? `${cat.modelCount}+ models` : null;
-                    return (
-                      <motion.button
-                        key={cat.id}
-                        whileHover={{ y: -5, scale: 1.02 }}
-                        whileTap={{ scale: 0.97 }}
-                        onClick={() => guardedOpen(() => openWizardWithDevice(meta.oldId))}
-                        className={`relative rounded-[1.75rem] overflow-hidden h-44 flex flex-col justify-between p-5 text-left group shadow-md hover:shadow-2xl transition-all duration-300 w-full ${meta.glow}`}
-                      >
-                        {/* Dark fallback background when no image */}
-                        <div className="absolute inset-0 bg-zinc-900" />
-
-                        {/* Product image — full opacity, no tint */}
-                        {img && (
-                          <img
-                            src={img}
-                            alt={cat.name}
-                            className={`transition-all duration-700 group-hover:scale-105 ${
-                              isProductFallback
-                                ? "absolute inset-0 m-auto h-[65%] w-[65%] object-contain drop-shadow-lg"
-                                : "absolute inset-0 h-full w-full object-cover"
-                            }`}
-                          />
-                        )}
-
-                        {/* Readability gradient overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-
-                        {/* Top: category badge with icon */}
-                        <div className="relative z-10 flex items-center gap-2">
-                          <div className={`h-8 w-8 rounded-xl ${meta.accent} bg-opacity-30 backdrop-blur-sm flex items-center justify-center shrink-0`}>
-                            <meta.Icon className="h-4 w-4 text-white" strokeWidth={1.8} />
-                          </div>
-                          <span className="text-[9px] font-black uppercase tracking-widest text-white/70">
-                            Repair
-                          </span>
-                        </div>
-
-                        {/* Bottom: name + CTA */}
-                        <div className="relative z-10 flex items-end justify-between gap-2">
-                          <div>
-                            <p className="text-base font-extrabold text-white leading-tight">{cat.name}</p>
-                            {modelCount && (
-                              <p className="text-[9px] text-white/50 font-bold mt-0.5 uppercase tracking-wider">{modelCount}</p>
-                            )}
-                          </div>
-                          <div className="shrink-0 h-8 w-8 rounded-full bg-white/15 backdrop-blur-sm group-hover:bg-white flex items-center justify-center transition-all duration-300">
-                            <ChevronRight className="h-4 w-4 text-white group-hover:text-zinc-900 group-hover:translate-x-0.5 transition-all" />
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+                <AccordionGallery
+                  ctaText="BOOK REPAIR"
+                  items={
+                    catalogCats && catalogCats.length > 0
+                      ? catalogCats.map((cat) => {
+                          const meta = DEVICE_TYPE_META[cat.slug] ?? {
+                            oldId: cat.slug,
+                            Icon: Package,
+                            gradient: "from-zinc-700 via-zinc-800 to-zinc-950",
+                            glow: "hover:shadow-zinc-500/20",
+                            accent: "bg-zinc-500",
+                          };
+                          const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
+                          const img = catImgs.length > 0
+                            ? catImgs[0]
+                            : (catFallbackImages[cat.slug] ?? "");
+                          return {
+                            label: cat.name,
+                            catId: meta.oldId ?? cat.slug,
+                            image: img || "https://images.unsplash.com/photo-1597740985671-2a8a3b80502e?q=80&w=1200&auto=format&fit=crop",
+                          };
+                        })
+                      : [
+                          { label: "Audio", catId: "Audio", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1200&auto=format&fit=crop" },
+                          { label: "Gaming", catId: "Console", image: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200&auto=format&fit=crop" },
+                          { label: "Laptops", catId: "Laptop", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop" },
+                          { label: "Phones", catId: "Phone", image: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=1200&auto=format&fit=crop" },
+                          { label: "Tablets", catId: "Tablet", image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=1200&auto=format&fit=crop" },
+                        ]
+                  }
+                  defaultIndex={2}
+                  expandRatio={0.52}
+                  trigger="click"
+                  accentColor="#ffffff"
+                  overlayColor="#060010"
+                  textColor="#ffffff"
+                  grayscale
+                  showLabels
+                  duration={1.5}
+                  ease="power3.out"
+                  parallax={0.5}
+                  tilt={8}
+                  stagger={0.06}
+                  height={420}
+                  gap={10}
+                  radius={16}
+                  onSelect={(item) => {
+                    guardedOpen(() => openWizardWithDevice(item.catId ?? "Phone"));
+                  }}
+                />
               </div>
 
             </div>
