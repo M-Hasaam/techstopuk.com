@@ -98,10 +98,10 @@ const SPECS: Record<string, { label: string; options: string[] }[]> = {
 };
 
 const CONDITIONS = [
-  { id: "A", label: "A Grade", desc: "Used but like new — zero visible marks.",  color: "border-emerald-500/40 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/20", dot: "bg-emerald-500", descColor: "text-emerald-700 dark:text-emerald-400" },
-  { id: "B", label: "B Grade", desc: "Minor signs of usage, small scratches.",   color: "border-blue-500/40 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-950/20",      dot: "bg-blue-500",    descColor: "text-blue-700 dark:text-blue-400" },
-  { id: "C", label: "C Grade", desc: "Heavy scratches or marks, fully working.", color: "border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/20",    dot: "bg-amber-500",   descColor: "text-amber-700 dark:text-amber-400" },
-  { id: "F", label: "F Grade", desc: "Non-working — for parts or repair only.",  color: "border-red-500/40 bg-red-50 dark:border-red-500/30 dark:bg-red-950/20",        dot: "bg-red-500",     descColor: "text-red-700 dark:text-red-400" },
+  { id: "A", label: "A Grade", tag: "Like New", desc: "Used but like new — zero visible marks.", color: "border-emerald-500/40 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/20", dot: "bg-emerald-500", descColor: "text-emerald-700 dark:text-emerald-400", image: "/conditions/grade_a.png" },
+  { id: "B", label: "B Grade", tag: "Good",     desc: "Minor signs of usage, small scratches.", color: "border-blue-500/40 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-950/20", dot: "bg-blue-500", descColor: "text-blue-700 dark:text-blue-400", image: "/conditions/grade_b.png" },
+  { id: "C", label: "C Grade", tag: "Fair",     desc: "Heavy scratches or marks, fully working.", color: "border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/20", dot: "bg-amber-500", descColor: "text-amber-700 dark:text-amber-400", image: "/conditions/grade_c.png" },
+  { id: "F", label: "F Grade", tag: "Faulty",   desc: "Non-working — for parts or repair only.", color: "border-red-500/40 bg-red-50 dark:border-red-500/30 dark:bg-red-950/20", dot: "bg-red-500", descColor: "text-red-700 dark:text-red-400", image: "/conditions/grade_f.png" },
 ];
 
 const CONDITION_QUESTIONS: Record<string, { id: string; question: string; options: string[] }[]> = {
@@ -1940,28 +1940,72 @@ export default function TradeInPage() {
                               </p>
                             )}
 
-                            {/* Condition grade selector */}
-                            <div className="space-y-3 pt-1">
-                              <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Condition</h4>
-                              <div className="grid gap-3 sm:grid-cols-2">
+                            {/* Condition grade selector — BackMarket Style Visual Cards */}
+                            <div className="space-y-4 pt-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-400">Condition</h4>
+                                <span className="text-[10px] font-extrabold text-zinc-400">See visual guide below</span>
+                              </div>
+                              <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
                                 {CONDITIONS.map((c) => {
                                   const isSelected = state.condition === c.id;
                                   return (
-                                    <button
+                                    <motion.button
                                       key={c.id}
+                                      whileHover={{ y: -3, scale: 1.01 }}
+                                      whileTap={{ scale: 0.98 }}
                                       onClick={() => setState(s => ({ ...s, condition: c.id }))}
-                                      className={`p-4 w-full rounded-2xl border text-left transition-all flex items-start gap-3 ${
+                                      className={`relative p-3 sm:p-3.5 w-full rounded-2xl border-2 text-left transition-all duration-200 flex flex-col justify-between group overflow-hidden ${
                                         isSelected
-                                          ? "border-zinc-950 bg-zinc-950 text-white shadow-md dark:border-white dark:bg-white dark:text-zinc-950"
-                                          : `${c.color} hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-800 dark:text-zinc-200`
+                                          ? "border-red-600 dark:border-red-500 bg-white dark:bg-zinc-900 shadow-xl ring-2 ring-red-500/20"
+                                          : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs"
                                       }`}
                                     >
-                                      <div className={`h-3 w-3 rounded-full mt-1 shrink-0 ${c.dot}`} />
-                                      <div className="flex-1">
-                                        <p className={`text-xs font-black ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-900 dark:text-zinc-100"}`}>{c.label}</p>
-                                        <p className={`text-[10px] leading-snug mt-1 ${isSelected ? "text-white/70 dark:text-zinc-950/70" : c.descColor}`}>{c.desc}</p>
+                                      {/* Visual image preview header */}
+                                      <div className="relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 mb-3 border border-zinc-200/50 dark:border-zinc-800 shrink-0">
+                                        <img
+                                          src={c.image}
+                                          alt={c.label}
+                                          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                            isSelected ? "scale-105" : "opacity-90"
+                                          }`}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+
+                                        {/* Top-Right Badge Tag */}
+                                        <div className="absolute top-2 right-2">
+                                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-2xs backdrop-blur-md ${
+                                            isSelected
+                                              ? "bg-red-600 text-white"
+                                              : "bg-black/60 text-white/90"
+                                          }`}>
+                                            {c.tag}
+                                          </span>
+                                        </div>
+
+                                        {/* Selected Checkmark Badge */}
+                                        {isSelected && (
+                                          <div className="absolute top-2 left-2 h-5 w-5 rounded-full bg-red-600 text-white flex items-center justify-center shadow-sm">
+                                            <Check className="h-3 w-3 stroke-[3]" />
+                                          </div>
+                                        )}
                                       </div>
-                                    </button>
+
+                                      {/* Title & Description */}
+                                      <div className="flex flex-col flex-1 justify-between">
+                                        <div>
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <div className={`h-2.5 w-2.5 rounded-full shrink-0 ${c.dot}`} />
+                                            <p className={`text-xs font-black tracking-tight ${isSelected ? "text-zinc-950 dark:text-white" : "text-zinc-900 dark:text-zinc-100"}`}>
+                                              {c.label}
+                                            </p>
+                                          </div>
+                                          <p className="text-[10px] leading-snug font-semibold text-zinc-500 dark:text-zinc-400">
+                                            {c.desc}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </motion.button>
                                   );
                                 })}
                               </div>
