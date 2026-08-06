@@ -2195,85 +2195,120 @@ export default function TradeInPage() {
 
                         {/* Manual Review Path — no pricing data available for this model */}
                         {state.tradeInMode === 'unpriced' && (
-                          <div className="flex-1 flex flex-col justify-between animate-fade-in">
+                          <div className="flex-1 flex flex-col justify-between animate-fade-in space-y-6">
                             <div className="space-y-6">
-                              <div className="flex flex-col items-center text-center gap-4 pt-4">
-                                <div className="h-16 w-16 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 flex items-center justify-center">
-                                  <Clock className="h-8 w-8 text-amber-500" />
+                              {/* Hero Assessment Card */}
+                              <div className="bg-gradient-to-b from-amber-500/5 via-amber-500/10 to-transparent border-2 border-amber-500/30 dark:border-amber-500/40 rounded-3xl p-6 sm:p-8 relative overflow-hidden max-w-md mx-auto shadow-xl text-center">
+                                <div className="absolute -top-12 -right-12 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
+                                <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-amber-400/20 rounded-full blur-3xl pointer-events-none" />
+
+                                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 px-3.5 py-1 text-[10px] font-black uppercase tracking-wider mb-3">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  Custom Valuation Review
                                 </div>
-                                <div className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 text-amber-700 border border-amber-500/25 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
-                                  Manual Review Required
-                                </div>
-                                <h3 className="text-xl font-black text-zinc-950 dark:text-white leading-snug max-w-xs">
+
+                                <h3 className="text-xl sm:text-2xl font-black text-zinc-950 dark:text-white leading-tight mb-2">
                                   We'll personally assess your {state.model}
                                 </h3>
-                                <p className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 max-w-sm leading-relaxed">
+
+                                <p className="text-xs sm:text-sm font-semibold text-zinc-600 dark:text-zinc-400 max-w-sm mx-auto leading-relaxed mb-4">
                                   {aiManualFallback
-                                    ? "Our instant pricing service is unavailable right now. Add a few photos so our team can assess the condition, then submit and we'll send you a custom cash offer within 24 hours."
-                                    : "We don't have live market pricing for this model yet. Add a few photos so our team can assess the condition, then submit and we'll send you a custom cash offer within 24 hours."}
+                                    ? "Add photos so our technicians can inspect the physical condition and issue your guaranteed cash offer."
+                                    : "We perform custom manual valuations for this model. Add photos of your device to get a cash quote within 24 hours."}
                                 </p>
+
+                                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-amber-500/20 relative z-10">
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Quote in 24h</span>
+                                  </div>
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Expert Review</span>
+                                  </div>
+                                  <div className="flex flex-col items-center text-center p-1.5 rounded-xl bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xs">
+                                    <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400 mb-1" />
+                                    <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Price Locked</span>
+                                  </div>
+                                </div>
                               </div>
 
+                              {/* Device Photos Upload Section */}
                               <div className="max-w-md mx-auto w-full space-y-3">
-                                <span className="text-xs font-black uppercase tracking-widest text-zinc-400 block">Device Photos <span className="text-red-500 dark:text-red-400">(Required · min 1)</span></span>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black uppercase tracking-widest text-zinc-400">Device Photos</span>
+                                  <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full ${
+                                    images.length > 0
+                                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                                      : "bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400"
+                                  }`}>
+                                    {images.length > 0 ? `${images.length} of 6 photos added` : "At least 1 required"}
+                                  </span>
+                                </div>
 
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 gap-3">
                                   <motion.button
-                                    whileHover={{ scale: 1.01 }}
-                                    whileTap={{ scale: 0.99 }}
+                                    whileHover={{ y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={imageUploading}
-                                    className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-6 flex flex-col items-center gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
+                                    className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2.5 transition-all bg-zinc-50/80 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-900 group disabled:opacity-60 disabled:pointer-events-none shadow-2xs"
                                   >
-                                    <div className="h-11 w-11 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                    <div className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
                                       {imageUploading ? (
-                                        <div className="h-5 w-5 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin" />
+                                        <div className="h-4 w-4 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin" />
                                       ) : (
-                                        <Upload className="h-5 w-5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
+                                        <Upload className="h-4.5 w-4.5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
                                       )}
                                     </div>
                                     <div className="text-center">
-                                      <p className="text-xs font-black text-zinc-800 dark:text-zinc-200">{imageUploading ? "Uploading…" : "Upload photos"}</p>
-                                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-1">JPEG or PNG · up to 6</p>
+                                      <p className="text-xs font-black text-zinc-900 dark:text-white">{imageUploading ? "Uploading…" : "Upload photos"}</p>
+                                      <p className="text-[10px] text-zinc-400 font-bold mt-0.5">JPEG or PNG · 1–6 photos</p>
                                     </div>
                                   </motion.button>
+
                                   <motion.button
-                                    whileHover={{ scale: 1.01 }}
-                                    whileTap={{ scale: 0.99 }}
+                                    whileHover={{ y: -2 }}
+                                    whileTap={{ scale: 0.98 }}
                                     onClick={() => setCameraOpen(true)}
                                     disabled={imageUploading}
-                                    className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-6 flex flex-col items-center gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
+                                    className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2.5 transition-all bg-zinc-50/80 dark:bg-zinc-900/50 hover:bg-white dark:hover:bg-zinc-900 group disabled:opacity-60 disabled:pointer-events-none shadow-2xs"
                                   >
-                                    <div className="h-11 w-11 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
-                                      <Camera className="h-5 w-5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
+                                    <div className="h-10 w-10 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                      <Camera className="h-4.5 w-4.5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
                                     </div>
                                     <div className="text-center">
-                                      <p className="text-xs font-black text-zinc-800 dark:text-zinc-200">Take photo</p>
-                                      <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold mt-1">Use your camera</p>
+                                      <p className="text-xs font-black text-zinc-900 dark:text-white">Take photo</p>
+                                      <p className="text-[10px] text-zinc-400 font-bold mt-0.5">Use camera</p>
                                     </div>
                                   </motion.button>
                                 </div>
 
+                                {/* Captured Photos Grid */}
                                 {images.length > 0 && (
-                                  <div className="grid grid-cols-3 gap-2">
+                                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2">
                                     {images.map((img, i) => (
-                                      <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 group">
-                                        <img src={img.previewUrl} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                                      <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-800 group shadow-sm">
+                                        <img src={img.previewUrl} alt={`Preview ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                         <button
+                                          type="button"
                                           onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}
-                                          className="absolute top-1.5 right-1.5 h-6 w-6 bg-zinc-950/80 hover:bg-red-500 rounded-full flex items-center justify-center transition-colors"
+                                          className="absolute top-1.5 right-1.5 h-6 w-6 bg-red-600 hover:bg-red-700 rounded-full flex items-center justify-center transition-colors shadow-md"
+                                          title="Remove photo"
                                         >
-                                          <X className="h-3.5 w-3.5 text-white" />
+                                          <X className="h-3.5 w-3.5 text-white stroke-[3]" />
                                         </button>
                                       </div>
                                     ))}
                                     {images.length < 6 && (
                                       <button
+                                        type="button"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={imageUploading}
-                                        className="aspect-square rounded-xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white bg-zinc-50 dark:bg-zinc-900 flex items-center justify-center transition-colors text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
+                                        className="aspect-square rounded-2xl border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white bg-zinc-50 dark:bg-zinc-900 flex flex-col items-center justify-center gap-1 transition-colors text-zinc-400 hover:text-zinc-900 dark:hover:text-white disabled:opacity-50"
                                       >
                                         <Plus className="h-5 w-5" />
+                                        <span className="text-[9px] font-black uppercase">Add More</span>
                                       </button>
                                     )}
                                   </div>
