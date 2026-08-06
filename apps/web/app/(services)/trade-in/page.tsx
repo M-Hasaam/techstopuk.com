@@ -2612,40 +2612,76 @@ export default function TradeInPage() {
                                     {
                                       id: "ship", title: "Ship via Royal Mail", icon: Truck,
                                       desc: "Prepaid insured label emailed instantly. Drop at any Post Office.",
-                                      badge: "Free Insured Shipping"
+                                      badge: "Free Insured Shipping",
+                                      image: "/fulfillment/royal_mail_shipping.png"
                                     },
                                     {
                                       id: "dropoff", title: "Drop off In Store", icon: MapPin,
                                       desc: "Visit TechStop Leicester for instant inspection and cash hand-off.",
-                                      badge: "Instant Cash Payout"
+                                      badge: "Instant Cash Payout",
+                                      image: "/fulfillment/store_dropoff.png"
                                     }
                                   ].map((m) => {
                                     const Icon = m.icon;
                                     const isSelected = state.fulfillment === m.id;
                                     return (
-                                      <button
+                                      <motion.button
                                         key={m.id}
                                         type="button"
+                                        whileHover={{ y: -3, scale: 1.01 }}
+                                        whileTap={{ scale: 0.98 }}
                                         onClick={() => setState(s => ({ ...s, fulfillment: m.id }))}
-                                        className={`p-5 rounded-2xl border text-left transition-all flex items-start gap-4 ${
+                                        className={`relative p-3.5 sm:p-4 w-full rounded-2xl border-2 text-left transition-all duration-200 flex flex-col justify-between group overflow-hidden ${
                                           isSelected
-                                            ? "border-zinc-950 bg-zinc-950 text-white shadow-md dark:border-white dark:bg-white dark:text-zinc-950"
-                                            : "border-zinc-200 bg-white hover:border-zinc-400 text-zinc-800 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:border-white"
+                                            ? "border-zinc-950 dark:border-white bg-white dark:bg-zinc-900 shadow-xl ring-2 ring-zinc-950/10 dark:ring-white/10"
+                                            : "border-zinc-200/90 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-white dark:hover:bg-zinc-900 shadow-2xs"
                                         }`}
                                       >
-                                        <div className={`h-11 w-11 rounded-xl flex items-center justify-center border shrink-0 ${isSelected ? "bg-white/10 border-white/20 text-white dark:bg-zinc-950/20 dark:text-zinc-950 dark:border-zinc-950" : "bg-zinc-50 border-zinc-200 text-zinc-600 dark:bg-zinc-950 dark:border-zinc-800 dark:text-zinc-400"}`}>
-                                          <Icon className="h-5 w-5" strokeWidth={1.6} />
+                                        {/* Visual image preview header */}
+                                        <div className="relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 mb-3 border border-zinc-200/50 dark:border-zinc-800 shrink-0">
+                                          <img
+                                            src={m.image}
+                                            alt={m.title}
+                                            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                              isSelected ? "scale-105" : "opacity-90"
+                                            }`}
+                                          />
+                                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+
+                                          {/* Top-Right Badge Tag */}
+                                          <div className="absolute top-2 right-2">
+                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-2xs backdrop-blur-md ${
+                                              isSelected
+                                                ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950"
+                                                : "bg-black/60 text-white/90"
+                                            }`}>
+                                              {m.badge}
+                                            </span>
+                                          </div>
+
+                                          {/* Selected Checkmark Badge */}
+                                          {isSelected && (
+                                            <div className="absolute top-2 left-2 h-6 w-6 rounded-full bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 flex items-center justify-center shadow-md">
+                                              <Check className="h-3.5 w-3.5 stroke-[3]" />
+                                            </div>
+                                          )}
                                         </div>
-                                        <div className="space-y-1">
-                                          <p className="text-xs font-black">{m.title}</p>
-                                          <p className={`text-[10px] leading-normal ${isSelected ? "text-white/70 dark:text-zinc-950/70" : "text-zinc-500 dark:text-zinc-400"}`}>{m.desc}</p>
-                                          <span className={`inline-block text-[9px] font-extrabold px-2 py-0.5 rounded-full border mt-2 ${
-                                            isSelected ? "bg-white/10 text-white border-white/20 dark:bg-zinc-950/30 dark:text-zinc-950 dark:border-zinc-950/30" : "bg-zinc-100 text-zinc-700 border-zinc-200 dark:bg-zinc-950 dark:text-zinc-400 dark:border-zinc-800"
+
+                                        {/* Title & Description */}
+                                        <div className="flex items-start gap-3">
+                                          <div className={`h-9 w-9 rounded-xl flex items-center justify-center border shrink-0 transition-colors ${
+                                            isSelected
+                                              ? "bg-zinc-950 text-white dark:bg-white dark:text-zinc-950 border-transparent"
+                                              : "bg-zinc-100 border-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
                                           }`}>
-                                            {m.badge}
-                                          </span>
+                                            <Icon className="h-4.5 w-4.5" strokeWidth={1.8} />
+                                          </div>
+                                          <div className="space-y-0.5">
+                                            <p className="text-xs font-black text-zinc-950 dark:text-white">{m.title}</p>
+                                            <p className="text-[11px] leading-snug text-zinc-500 dark:text-zinc-400 font-semibold">{m.desc}</p>
+                                          </div>
                                         </div>
-                                      </button>
+                                      </motion.button>
                                     );
                                   })}
                                 </div>
