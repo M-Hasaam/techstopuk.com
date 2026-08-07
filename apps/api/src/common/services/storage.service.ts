@@ -206,6 +206,9 @@ export class StorageService implements OnModuleInit {
   async resolveImageUrl(filePathOrUrl: string | null | undefined): Promise<string | null> {
     if (!filePathOrUrl) return null;
 
+    // App-relative static path (e.g. a web app /public asset used as a seed default) — pass through unchanged
+    if (filePathOrUrl.startsWith('/')) return filePathOrUrl;
+
     // External URL (e.g. scraped image, Unsplash) — pass through unchanged
     if (filePathOrUrl.startsWith('http')) {
       const isOwnStorage = filePathOrUrl.startsWith(this.publicBase);

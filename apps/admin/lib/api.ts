@@ -943,6 +943,50 @@ export const tradeInDevicesApi = {
     apiFetch<{ seeded: number }>('/trade-in-devices/seed', { method: 'POST' }),
 };
 
+export interface TradeInQuestionOptionItem {
+  id?: string; // absent for an option not yet saved
+  label: string;
+  order: number;
+  image?: string | null;
+  icon?: string | null;
+  tone?: string | null;
+}
+export interface TradeInQuestionItem {
+  id: string;
+  category: string;
+  key: string;
+  question: string;
+  order: number;
+  isActive: boolean;
+  options: TradeInQuestionOptionItem[];
+}
+export type UpsertTradeInQuestion = {
+  category: string;
+  key?: string;
+  question: string;
+  order?: number;
+  isActive?: boolean;
+  options: TradeInQuestionOptionItem[];
+};
+
+export const tradeInQuestionsApi = {
+  list: (all = true) =>
+    apiFetch<TradeInQuestionItem[]>(`/trade-in-questions${all ? '?all=true' : ''}`),
+  create: (data: UpsertTradeInQuestion) =>
+    apiFetch<TradeInQuestionItem>('/trade-in-questions', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: UpsertTradeInQuestion) =>
+    apiFetch<TradeInQuestionItem>(`/trade-in-questions/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  remove: (id: string) =>
+    apiFetch<void>(`/trade-in-questions/${id}`, { method: 'DELETE' }),
+  removeAll: () =>
+    apiFetch<{ deleted: number }>('/trade-in-questions/all', { method: 'DELETE' }),
+  seedDefaults: () =>
+    apiFetch<{ seeded: number }>('/trade-in-questions/seed', { method: 'POST' }),
+  // Uploads eagerly to Garage (no entity needed yet) — the returned key is attached
+  // to the option in the question form and only persisted when the question is saved.
+  uploadImage: (file: File) => presignedUpload('/uploads/presign-image', file),
+};
+
 export const promoSlidesApi = {
   list: () => apiFetch<PromoSlideItem[]>('/banners/promo-slides/all'),
   create: (data: Omit<PromoSlideItem, 'id' | 'imgUrl'> & { imageUrl?: string }) =>

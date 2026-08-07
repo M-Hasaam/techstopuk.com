@@ -535,3 +535,37 @@ model TradeInDevice {
   @@unique([brand, name])
   @@map("trade_in_devices")
 }
+
+// Condition-assessment questions shown in the trade-in wizard's "Quick Check" step
+// (Phase 3) — admin-managed, grouped by wizard category.
+model TradeInQuestion {
+  id        String   @id @default(cuid())
+  category  String   // wizard category ID: Phone | Tablet | Console | Laptop | Audio | Smartwatch | Other
+  key       String   // stable short id used as the answer dictionary key, e.g. "screen", "battery"
+  question  String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  options   TradeInQuestionOption[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([category, key])
+  @@index([category])
+  @@map("trade_in_questions")
+}
+
+model TradeInQuestionOption {
+  id         String          @id @default(cuid())
+  questionId String
+  question   TradeInQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  label      String
+  order      Int             @default(0)
+  image      String?         // Garage S3 key, or a static "/..." public path for seeded defaults
+  icon       String?         // key into the fixed icon palette shared by web + admin
+  tone       String?         // success | warning | danger | info | neutral
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([questionId])
+  @@map("trade_in_question_options")
+}

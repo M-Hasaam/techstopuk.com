@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo, cloneElement } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
-import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, type Store, type CatalogCategory, type Product } from "@/lib/api";
+import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, tradeInQuestionsApi, type Store, type CatalogCategory, type Product, type TradeInQuestion } from "@/lib/api";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import AccordionGallery from "@/components/AccordionGallery";
@@ -49,7 +49,7 @@ const CAT_METADATA: Record<string, {
   smartwatches:{ oldId: "Smartwatch", Icon: Watch,      img: "/Other/watch/galaxy_watch_promo_1778927696615.png", mood: "bg-emerald-500/10 border-emerald-500/20",moodIcon:"text-emerald-500", glow: "hover:shadow-emerald-500/10", sub: "Apple Watch, Galaxy Watch, Fitbit"       },
 };
 
-// Maps product.category (DB name) → wizard category ID used by SPECS / CONDITION_QUESTIONS
+// Maps product.category (DB name) → wizard category ID used by SPECS / remoteQuestions
 const CAT_NAME_TO_WIZARD_ID: Record<string, string> = {
   Phones: "Phone", Tablets: "Tablet", Gaming: "Console",
   Laptops: "Laptop", Audio: "Audio", Smartwatches: "Smartwatch",
@@ -106,403 +106,57 @@ const CONDITIONS = [
   { id: "F", label: "F Grade", tag: "Faulty",   desc: "Non-working — for parts or repair only.", color: "border-red-500/40 bg-red-50 dark:border-red-500/30 dark:bg-red-950/20", dot: "bg-red-500", descColor: "text-red-700 dark:text-red-400", image: "/conditions/grade_f.png" },
 ];
 
-const CONDITION_QUESTIONS: Record<string, { id: string; question: string; options: string[] }[]> = {
-  Phone: [
-    { id: "screen", question: "How is the screen?", options: ["No cracks or scratches", "Light surface scratches", "Cracked but display works", "Shattered / unusable display"] },
-    { id: "back", question: "How is the back of the phone?", options: ["Perfect — no marks", "Minor scuffs", "Cracked back glass"] },
-    { id: "battery", question: "What's the battery health?", options: ["90%+: (Excellent)", "80–89% (Good)", "70–79% (Fair)", "Below 70% / Unknown"] },
-    { id: "biometrics", question: "Is Face ID / Touch ID working?", options: ["Yes, fully working", "No / Faulty"] },
-    { id: "charging", question: "Is the charging port working?", options: ["Yes", "No / Loose"] },
-    { id: "reset", question: "Is the phone factory reset?", options: ["Yes, already reset", "I'll reset before sending"] },
-  ],
-  Tablet: [
-    { id: "screen", question: "How is the screen?", options: ["No damage at all", "Light surface scratches", "Cracked but usable", "Shattered"] },
-    { id: "body", question: "How is the body / casing?", options: ["Like new", "Light scratches", "Dents or significant marks"] },
-    { id: "battery", question: "How's the battery life?", options: ["Holds charge well (6+ hours)", "Drains a bit fast (3–5 hours)", "Very poor under 3 hours"] },
-    { id: "charging", question: "Is the charging port working?", options: ["Yes", "No / Loose"] },
-    { id: "reset", question: "Is the tablet factory reset?", options: ["Yes, already reset", "I'll reset before sending"] },
-  ],
-  Console: [
-    { id: "power", question: "Does the console power on and work?", options: ["Yes, works perfectly", "Yes but has some issues", "No, won't power on"] },
-    { id: "disc", question: "Is the disc drive working?", options: ["Yes, works great", "No / Faulty", "No disc drive (digital edition)"] },
-    { id: "body", question: "Any visible body damage?", options: ["Like new", "Minor scratches", "Significant damage"] },
-    { id: "reset", question: "Have you done a factory reset?", options: ["Yes, already reset", "I'll reset before sending"] },
-  ],
-  Laptop: [
-    { id: "power", question: "Does it power on?", options: ["Yes, works perfectly", "No"] },
-    { id: "screen", question: "How is the screen?", options: ["No damage", "Minor scratches", "Cracked"] },
-    { id: "input", question: "Are the keyboard and trackpad fully working?", options: ["Yes, all working", "Minor issues", "Major issues"] },
-    { id: "battery", question: "How's the battery?", options: ["Holds charge well (4+ hours)", "Drains quickly (1–3 hours)", "Very poor under 1 hour"] },
-    { id: "body", question: "Any body damage?", options: ["None", "Minor dents or scratches", "Significant damage"] },
-    { id: "reset", question: "Have you done a factory reset?", options: ["Yes, already reset", "I'll reset before sending"] },
-  ],
-  Smartwatch: [
-    { id: "power", question: "Does the watch power on and function?", options: ["Yes, fully working", "Powers on but has screen/sensor issues", "Won't power on"] },
-    { id: "screen", question: "How is the screen glass?", options: ["Pristine - no scratches", "Light micro-scratches", "Deep scratches or chips", "Cracked screen"] },
-    { id: "battery", question: "Does battery hold a normal charge?", options: ["Holds charge well (1+ day)", "Degraded charge (under 12 hours)"] },
-    { id: "charging", question: "Is the charger working and connecting?", options: ["Yes", "No / loose connection"] },
-    { id: "reset", question: "Is Activation Lock / iCloud turned off?", options: ["Yes, fully removed", "I will remove before posting"] },
-  ],
-  Audio: [
-    { id: "sound", question: "How is the sound quality?", options: ["Perfect - crisp audio & active ANC", "Muffled sound or static in one ear", "No sound in one/both ears"] },
-    { id: "body", question: "How is the cosmetic condition?", options: ["Like new - clean pads/tips", "Minor scratches or wear on case", "Heavy wear or staining"] },
-    { id: "battery", question: "How is the battery health?", options: ["Excellent charge", "Low capacity - drains fast"] },
-    { id: "charging", question: "Does the charging case work?", options: ["Yes, charges fully", "No / faulty connection"] },
-  ],
-  Other: [
-    { id: "power",    question: "Does the device power on and work?",    options: ["Yes, fully working", "Powers on but has issues", "No, won't power on"] },
-    { id: "physical", question: "What is the physical condition?",        options: ["Like new — no damage", "Minor wear or scratches", "Heavy wear or damage"] },
-    { id: "function", question: "Is all functionality working?",          options: ["Yes, fully working", "Partial issues", "Major issues"] },
-    { id: "reset",    question: "Will you factory reset before sending?", options: ["Yes, already done", "I'll do it before sending"] },
-  ],
+// Fixed icon palette an admin can assign to a diagnostic option from the trade-in
+// questions manager — keys are stored on TradeInQuestionOption.icon and shared with
+// the admin panel's icon-swatch picker.
+const ICON_LIBRARY: Record<string, React.ElementType> = {
+  "battery-charging": BatteryCharging,
+  "battery-medium": BatteryMedium,
+  "battery-warning": BatteryWarning,
+  "battery-low": BatteryLow,
+  "power-on": Power,
+  "power-off": PowerOff,
+  "alert-triangle": AlertTriangle,
+  "scan-face": ScanFace,
+  "zap": Zap,
+  "zap-off": ZapOff,
+  "rotate-ccw": RotateCcw,
+  "clock": Clock,
+  "disc": Disc,
+  "disc3": Disc3,
+  "keyboard": Keyboard,
+  "volume-high": Volume2,
+  "volume-low": Volume1,
+  "volume-mute": VolumeX,
+  "check-circle": CheckCircle2,
+  "circle-alert": CircleAlert,
+  "check": Check,
 };
 
-const OPTION_IMAGES: Record<string, string> = {
-  // Screen condition options
-  "No cracks or scratches": "/diagnostics/screen_flawless.png",
-  "No damage at all": "/diagnostics/screen_flawless.png",
-  "Pristine - no scratches": "/diagnostics/screen_flawless.png",
-  "No damage": "/diagnostics/screen_flawless.png",
-
-  "Light surface scratches": "/diagnostics/screen_scratches.png",
-  "Light micro-scratches": "/diagnostics/screen_scratches.png",
-
-  "Cracked but display works": "/diagnostics/screen_cracked.png",
-  "Cracked but usable": "/diagnostics/screen_cracked.png",
-  "Cracked": "/diagnostics/screen_cracked.png",
-  "Cracked screen": "/diagnostics/screen_cracked.png",
-
-  "Shattered / unusable display": "/diagnostics/screen_shattered.png",
-  "Shattered": "/diagnostics/screen_shattered.png",
-  "Deep scratches or chips": "/diagnostics/screen_shattered.png",
-
-  // Back panel & body condition options
-  "Perfect — no marks": "/diagnostics/body_flawless.png",
-  "Like new": "/diagnostics/body_flawless.png",
-  "Like new — no damage": "/diagnostics/body_flawless.png",
-  "None": "/diagnostics/body_flawless.png",
-
-  "Minor scuffs": "/diagnostics/body_minor.png",
-  "Light scratches": "/diagnostics/body_minor.png",
-  "Minor scratches": "/diagnostics/body_minor.png",
-  "Minor wear or scratches": "/diagnostics/body_minor.png",
-  "Minor dents or scratches": "/diagnostics/body_minor.png",
-
-  "Cracked back glass": "/diagnostics/back_cracked.png",
-  "Dents or significant marks": "/diagnostics/body_damaged.png",
-  "Significant damage": "/diagnostics/body_damaged.png",
-  "Heavy wear or damage": "/diagnostics/body_damaged.png",
-  "Heavy wear or staining": "/diagnostics/body_damaged.png",
+const TONE_CLASSES: Record<string, string> = {
+  success: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/40",
+  warning: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/40",
+  danger: "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/80 dark:border-red-900/40",
+  info: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/80 dark:border-blue-900/40",
+  neutral: "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800",
 };
 
-const BODY_OPTION_IMAGES: Record<string, string> = {
-  "None": "/diagnostics/body_flawless.png",
-  "Like new": "/diagnostics/body_flawless.png",
-  "Like new — no damage": "/diagnostics/body_flawless.png",
-  "Perfect — no marks": "/diagnostics/body_flawless.png",
-
-  "Minor scuffs": "/diagnostics/body_minor.png",
-  "Light scratches": "/diagnostics/body_minor.png",
-  "Minor scratches": "/diagnostics/body_minor.png",
-  "Minor wear or scratches": "/diagnostics/body_minor.png",
-  "Minor dents or scratches": "/diagnostics/body_minor.png",
-
-  "Cracked back glass": "/diagnostics/back_cracked.png",
-  "Dents or significant marks": "/diagnostics/body_damaged.png",
-  "Significant damage": "/diagnostics/body_damaged.png",
-  "Heavy wear or damage": "/diagnostics/body_damaged.png",
-  "Heavy wear or staining": "/diagnostics/body_damaged.png",
-};
-
-const LAPTOP_OPTION_IMAGES: Record<string, string> = {
-  "No damage": "/diagnostics/laptop_screen_flawless.png",
-  "No cracks or scratches": "/diagnostics/laptop_screen_flawless.png",
-  "No damage at all": "/diagnostics/laptop_screen_flawless.png",
-  "Pristine - no scratches": "/diagnostics/laptop_screen_flawless.png",
-  "Minor scratches": "/diagnostics/laptop_screen_scratches.png",
-  "Light surface scratches": "/diagnostics/laptop_screen_scratches.png",
-  "Light micro-scratches": "/diagnostics/laptop_screen_scratches.png",
-  "Minor dents or scratches": "/diagnostics/body_minor.png",
-  "Cracked": "/diagnostics/laptop_screen_cracked.png",
-  "Cracked screen": "/diagnostics/laptop_screen_cracked.png",
-  "Cracked but usable": "/diagnostics/laptop_screen_cracked.png",
-  "Shattered": "/diagnostics/laptop_screen_cracked.png",
-  "Significant damage": "/diagnostics/body_damaged.png",
-};
-
-const CONSOLE_OPTION_IMAGES: Record<string, string> = {
-  "Like new": "/diagnostics/console_flawless.png",
-  "Like new — no damage": "/diagnostics/console_flawless.png",
-  "None": "/diagnostics/console_flawless.png",
-  "Perfect — no marks": "/diagnostics/console_flawless.png",
-
-  "Minor scratches": "/diagnostics/console_minor.png",
-  "Minor scuffs": "/diagnostics/console_minor.png",
-  "Light scratches": "/diagnostics/console_minor.png",
-  "Minor dents or scratches": "/diagnostics/console_minor.png",
-
-  "Significant damage": "/diagnostics/console_damaged.png",
-  "Dents or significant marks": "/diagnostics/console_damaged.png",
-  "Heavy wear or damage": "/diagnostics/console_damaged.png",
-};
-
-const MOBILE_BODY_OPTION_IMAGES: Record<string, string> = {
-  "Like new": "/diagnostics/back_flawless.png",
-  "Like new — no damage": "/diagnostics/back_flawless.png",
-  "Perfect — no marks": "/diagnostics/back_flawless.png",
-  "None": "/diagnostics/back_flawless.png",
-
-  "Light scratches": "/diagnostics/back_minor.png",
-  "Minor scuffs": "/diagnostics/back_minor.png",
-  "Minor scratches": "/diagnostics/back_minor.png",
-  "Minor wear or scratches": "/diagnostics/back_minor.png",
-  "Minor dents or scratches": "/diagnostics/back_minor.png",
-
-  "Dents or significant marks": "/diagnostics/back_cracked.png",
-  "Cracked back glass": "/diagnostics/back_cracked.png",
-  "Significant damage": "/diagnostics/back_cracked.png",
-  "Heavy wear or damage": "/diagnostics/back_cracked.png",
-  "Heavy wear or staining": "/diagnostics/back_cracked.png",
-};
-
-const AUDIO_OPTION_IMAGES: Record<string, string> = {
-  "Like new - clean pads/tips": "/diagnostics/audio_flawless.png",
-  "Like new": "/diagnostics/audio_flawless.png",
-  "Like new — no damage": "/diagnostics/audio_flawless.png",
-  "Perfect — no marks": "/diagnostics/audio_flawless.png",
-  "None": "/diagnostics/audio_flawless.png",
-
-  "Minor scratches or wear on case": "/diagnostics/audio_minor.png",
-  "Minor scuffs": "/diagnostics/audio_minor.png",
-  "Minor scratches": "/diagnostics/audio_minor.png",
-  "Light scratches": "/diagnostics/audio_minor.png",
-
-  "Heavy wear or staining": "/diagnostics/audio_damaged.png",
-  "Heavy wear or damage": "/diagnostics/audio_damaged.png",
-  "Significant damage": "/diagnostics/audio_damaged.png",
-};
-
-function getOptionImage(category: string, qId: string, opt: string): string | undefined {
-  // Photo previews are strictly for physical screen condition, back glass, and body condition questions
-  if (qId !== "screen" && qId !== "back" && qId !== "body" && qId !== "physical") {
-    return undefined;
-  }
-
-  const isAudio = /audio|headphone|earbud/i.test(category);
-  if (isAudio && AUDIO_OPTION_IMAGES[opt]) {
-    return AUDIO_OPTION_IMAGES[opt];
-  }
-
-  const isTabletOrPhone = /tablet|phone|mobile/i.test(category);
-  if (isTabletOrPhone && (qId === "body" || qId === "back" || qId === "physical") && MOBILE_BODY_OPTION_IMAGES[opt]) {
-    return MOBILE_BODY_OPTION_IMAGES[opt];
-  }
-
-  const isConsole = /console|gaming/i.test(category);
-  if (isConsole && CONSOLE_OPTION_IMAGES[opt]) {
-    return CONSOLE_OPTION_IMAGES[opt];
-  }
-
-  const isLaptop = /laptop/i.test(category);
-  if (isLaptop && LAPTOP_OPTION_IMAGES[opt]) {
-    return LAPTOP_OPTION_IMAGES[opt];
-  }
-
-  if ((qId === "body" || qId === "physical" || qId === "back") && BODY_OPTION_IMAGES[opt]) {
-    return BODY_OPTION_IMAGES[opt];
-  }
-
-  return OPTION_IMAGES[opt];
-}
-
-
-function renderOptionBadge(qId: string, opt: string, isSelected: boolean) {
-  const optLower = opt.toLowerCase();
-
-  const getUnselectedState = () => {
-    // 1. Battery Health & Life
-    if (qId === "battery" || /battery/i.test(qId)) {
-      if (/90|excellent|holds charge well|1\+ day/i.test(optLower)) {
-        return {
-          icon: <BatteryCharging className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      if (/80|good|3–5 hours/i.test(optLower)) {
-        return {
-          icon: <BatteryMedium className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
-          bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
-        };
-      }
-      if (/70|fair|1–3 hours|drains/i.test(optLower)) {
-        return {
-          icon: <BatteryWarning className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
-          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
-        };
-      }
-      return {
-        icon: <BatteryLow className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 2. Power & Overall Function
-    if (qId === "power" || qId === "function") {
-      if (/perfect|fully working|yes, works/i.test(optLower)) {
-        return {
-          icon: <Power className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      if (/issues|partial|some/i.test(optLower)) {
-        return {
-          icon: <AlertTriangle className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
-          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
-        };
-      }
-      return {
-        icon: <PowerOff className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 3. Biometrics (Face ID / Touch ID)
-    if (qId === "biometrics") {
-      if (/yes/i.test(optLower)) {
-        return {
-          icon: <ScanFace className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      return {
-        icon: <ScanFace className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 4. Charging Port
-    if (qId === "charging") {
-      if (/yes/i.test(optLower)) {
-        return {
-          icon: <Zap className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      return {
-        icon: <ZapOff className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 5. Factory Reset / iCloud Lock
-    if (qId === "reset") {
-      if (/already|fully removed/i.test(optLower)) {
-        return {
-          icon: <RotateCcw className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      return {
-        icon: <Clock className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
-        bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
-      };
-    }
-
-    // 6. Disc Drive
-    if (qId === "disc") {
-      if (/works great|yes/i.test(optLower)) {
-        return {
-          icon: <Disc className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      if (/digital/i.test(optLower)) {
-        return {
-          icon: <Disc3 className="h-4.5 w-4.5 text-blue-600 dark:text-blue-400" />,
-          bg: "bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-200/80 dark:border-blue-900/40",
-        };
-      }
-      return {
-        icon: <Disc3 className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 7. Keyboard & Trackpad
-    if (qId === "input") {
-      if (/working|yes/i.test(optLower)) {
-        return {
-          icon: <Keyboard className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      if (/minor/i.test(optLower)) {
-        return {
-          icon: <Keyboard className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
-          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
-        };
-      }
-      return {
-        icon: <Keyboard className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // 8. Sound & Audio
-    if (qId === "sound") {
-      if (/perfect|crisp/i.test(optLower)) {
-        return {
-          icon: <Volume2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />,
-          bg: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 border border-emerald-200/80 dark:border-emerald-900/40",
-        };
-      }
-      if (/muffled|static/i.test(optLower)) {
-        return {
-          icon: <Volume1 className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />,
-          bg: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 border border-amber-200/80 dark:border-amber-900/40",
-        };
-      }
-      return {
-        icon: <VolumeX className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />,
-        bg: "bg-red-50 dark:bg-red-950/40 text-red-600 border border-red-200/80 dark:border-red-900/40",
-      };
-    }
-
-    // Fallback default
-    const isSevereDamage = /crack|shatter|unusable|faulty|broken|damaged|shattered|heavy|significant/i.test(optLower);
-    const isMinorWear = /minor|light|small|surface|scratches|scuffs|used/i.test(optLower) && !isSevereDamage;
-    const isPositive = !isSevereDamage && !isMinorWear && (/like new|flawless|perfect|no crack|no scratch|working|yes|clean|original|good|1 |2 |included/i.test(optLower) || /yes/i.test(optLower));
-
-    return {
-      icon: isPositive ? (
-        <CheckCircle2 className="h-4.5 w-4.5 text-emerald-600 dark:text-emerald-400" />
-      ) : isMinorWear ? (
-        <CircleAlert className="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
-      ) : isSevereDamage ? (
-        <CircleAlert className="h-4.5 w-4.5 text-red-600 dark:text-red-400" />
-      ) : (
-        <Check className="h-4.5 w-4.5 text-zinc-500" />
-      ),
-      bg: isPositive
-        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/80 dark:border-emerald-900/40"
-        : isMinorWear
-        ? "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/80 dark:border-amber-900/40"
-        : isSevereDamage
-        ? "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200/80 dark:border-red-900/40"
-        : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border border-zinc-200/60 dark:border-zinc-800",
-    };
-  };
-
-  const res = getUnselectedState();
+// Renders an option's badge (icon + tone) purely from admin-set data — no more
+// text-guessing. Falls back to a neutral checkmark when the admin hasn't set one.
+function renderOptionBadge(icon: string | null | undefined, tone: string | null | undefined, isSelected: boolean) {
+  const Icon = (icon && ICON_LIBRARY[icon]) || Check;
 
   if (isSelected) {
     return {
-      icon: cloneElement(res.icon, { className: "h-4.5 w-4.5 text-white dark:text-zinc-950" }),
+      icon: <Icon className="h-4.5 w-4.5" />,
       bg: "bg-white/20 border border-white/30 text-white dark:bg-zinc-950/20 dark:border-zinc-950/30 dark:text-zinc-950",
     };
   }
 
-  return res;
+  return {
+    icon: <Icon className="h-4.5 w-4.5" />,
+    bg: TONE_CLASSES[tone ?? "neutral"] ?? TONE_CLASSES.neutral,
+  };
 }
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -716,6 +370,22 @@ export default function TradeInPage() {
     catalogApi.listTradeInModels()
       .then(items => setOtherDevices(items))
       .catch(() => {});
+  }, []);
+
+  // Admin-managed "Quick Check" diagnostic questions (Phase 3), grouped by category —
+  // questionsLoaded gates Phase 3 so it doesn't mistake "not fetched yet" for
+  // "this category has no questions" and skip straight to the offer step.
+  const [remoteQuestions, setRemoteQuestions] = useState<Record<string, TradeInQuestion[]>>({});
+  const [questionsLoaded, setQuestionsLoaded] = useState(false);
+  useEffect(() => {
+    tradeInQuestionsApi.list()
+      .then(items => {
+        const byCategory: Record<string, TradeInQuestion[]> = {};
+        for (const q of items) (byCategory[q.category] ??= []).push(q);
+        setRemoteQuestions(byCategory);
+      })
+      .catch(() => {})
+      .finally(() => setQuestionsLoaded(true));
   }, []);
   const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]>([]);
   // Real per-device attributes (e.g. RAM for a specific MacBook) pulled from the catalog entry
@@ -1022,7 +692,7 @@ export default function TradeInPage() {
   };
 
   const currentSpecs = SPECS[state.category] ?? [];
-  const currentQuestions = CONDITION_QUESTIONS[state.category] ?? [];
+  const currentQuestions = remoteQuestions[state.category] ?? [];
 
   async function compressToBlob(file: File): Promise<{ blob: Blob; previewUrl: string }> {
     return new Promise((resolve) => {
@@ -2333,6 +2003,15 @@ export default function TradeInPage() {
                         currentQuestions.every(cq => typeof state.answers[cq.id] === "string" && state.answers[cq.id].length > 0);
 
                       if (!q) {
+                        if (!questionsLoaded) {
+                          // Still fetching admin-managed questions — don't mistake "not loaded
+                          // yet" for "this category has none" and skip the step prematurely.
+                          return (
+                            <div className="flex-1 flex items-center justify-center py-24">
+                              <div className="h-8 w-8 border-4 border-zinc-200 dark:border-zinc-800 border-t-zinc-950 dark:border-t-white rounded-full animate-spin" />
+                            </div>
+                          );
+                        }
                         // No questions for this category — skip straight to offer
                         goToPhase(4);
                         return null;
@@ -2369,20 +2048,20 @@ export default function TradeInPage() {
                                 exit={{ opacity: 0, x: -16 }}
                                 transition={{ duration: 0.2 }}
                                 className={
-                                  q.options.some(opt => getOptionImage(state.category, q.id, opt))
+                                  q.options.some(opt => opt.image)
                                     ? "grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4"
                                     : "space-y-2.5"
                                 }
                               >
                                 {(() => {
-                                  const hasPhotoOptions = q.options.some(opt => getOptionImage(state.category, q.id, opt));
+                                  const hasPhotoOptions = q.options.some(opt => opt.image);
                                   return q.options.map((opt) => {
-                                    const isSelected = state.answers[q.id] === opt;
-                                    const optImg = getOptionImage(state.category, q.id, opt);
-                                    const badge = renderOptionBadge(q.id, opt, isSelected);
+                                    const isSelected = state.answers[q.id] === opt.label;
+                                    const optImg = opt.image;
+                                    const badge = renderOptionBadge(opt.icon, opt.tone, isSelected);
 
                                     const handleSelect = () => {
-                                      const newAnswers = { ...state.answers, [q.id]: opt };
+                                      const newAnswers = { ...state.answers, [q.id]: opt.label };
                                       setState(s => ({ ...s, answers: newAnswers }));
 
                                       if (isLast) {
@@ -2400,7 +2079,7 @@ export default function TradeInPage() {
                                     if (hasPhotoOptions) {
                                       return (
                                         <motion.button
-                                          key={opt}
+                                          key={opt.label}
                                           type="button"
                                           whileHover={{ y: -3 }}
                                           whileTap={{ scale: 0.98 }}
@@ -2416,7 +2095,7 @@ export default function TradeInPage() {
                                             {optImg ? (
                                               <img
                                                 src={optImg}
-                                                alt={opt}
+                                                alt={opt.label}
                                                 className={`w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105 ${
                                                   isSelected ? "scale-105" : "opacity-95"
                                                 }`}
@@ -2440,7 +2119,7 @@ export default function TradeInPage() {
                                           {/* Bottom Text Header */}
                                           <div className="p-3.5 sm:p-4 flex items-center justify-between min-w-0 flex-1">
                                             <span className={`text-xs sm:text-sm font-extrabold leading-snug ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-900 dark:text-zinc-100"}`}>
-                                              {opt}
+                                              {opt.label}
                                             </span>
                                           </div>
                                         </motion.button>
@@ -2449,7 +2128,7 @@ export default function TradeInPage() {
 
                                     return (
                                       <motion.button
-                                        key={opt}
+                                        key={opt.label}
                                         type="button"
                                         whileHover={{ y: -2 }}
                                         whileTap={{ scale: 0.99 }}
@@ -2465,7 +2144,7 @@ export default function TradeInPage() {
                                             {badge.icon}
                                           </div>
                                           <span className={`text-xs sm:text-sm font-extrabold ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
-                                            {opt}
+                                            {opt.label}
                                           </span>
                                         </div>
                                         {isSelected && (

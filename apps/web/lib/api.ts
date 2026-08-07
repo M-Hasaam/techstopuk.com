@@ -371,6 +371,28 @@ export const catalogApi = {
     apiFetch<{ name: string; brand: string; category: string; tradeInMode?: 'auto' | 'manual_price' | 'unpriced' }[]>('/trade-in-devices'),
 };
 
+export interface TradeInQuestionOption {
+  id: string;
+  label: string;
+  order: number;
+  image: string | null;
+  icon: string | null;
+  tone: string | null;
+}
+export interface TradeInQuestion {
+  id: string;
+  category: string;
+  key: string;
+  question: string;
+  order: number;
+  options: TradeInQuestionOption[];
+}
+
+// Admin-managed "Quick Check" condition-assessment questions, grouped by wizard category
+export const tradeInQuestionsApi = {
+  list: () => apiFetch<TradeInQuestion[]>('/trade-in-questions'),
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface User {
   id: string;

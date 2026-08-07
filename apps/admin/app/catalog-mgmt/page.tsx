@@ -9,12 +9,14 @@ import {
   otherSubcategoriesApi,
   otherBrandsApi,
   tradeInDevicesApi,
+  tradeInQuestionsApi,
   type CatalogCategoryItem,
   type CatalogBrandItem,
   type BrandCategoryOption,
   type OtherSubcategory,
   type OtherBrand,
   type TradeInDeviceItem,
+  type TradeInQuestionItem,
 } from "../../lib/api";
 import {
   Tag,
@@ -27,6 +29,7 @@ import {
   Sparkles,
   Package,
   Search,
+  ListChecks,
 } from "lucide-react";
 
 export default function CatalogMgmtPage() {
@@ -36,6 +39,7 @@ export default function CatalogMgmtPage() {
   const [otherSubcats, setOtherSubcats]   = useState<OtherSubcategory[]>([]);
   const [otherBrandList, setOtherBrandList] = useState<OtherBrand[]>([]);
   const [searchDevices, setSearchDevices] = useState<TradeInDeviceItem[]>([]);
+  const [questions, setQuestions]         = useState<TradeInQuestionItem[]>([]);
   const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
@@ -46,14 +50,16 @@ export default function CatalogMgmtPage() {
       otherSubcategoriesApi.list(),
       otherBrandsApi.list(),
       tradeInDevicesApi.list(true),
+      tradeInQuestionsApi.list(true),
     ])
-      .then(([cats, brandList, bcList, subcats, oBrands, devices]) => {
+      .then(([cats, brandList, bcList, subcats, oBrands, devices, tradeInQuestions]) => {
         setCategories(cats);
         setBrands(brandList);
         setBcs(bcList);
         setOtherSubcats(subcats);
         setOtherBrandList(oBrands);
         setSearchDevices(devices);
+        setQuestions(tradeInQuestions);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -297,6 +303,38 @@ export default function CatalogMgmtPage() {
             )}
           </div>
         </Link>
+        {/* Trade-In Questions Card */}
+        <Link
+          href="/catalog-mgmt/trade-in-questions"
+          className="group relative bg-white border border-zinc-100 rounded-3xl p-6 shadow-sm hover:border-zinc-300 hover:shadow-md transition-all duration-300 flex flex-col justify-between min-h-[200px]"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="p-3 bg-zinc-50 rounded-2xl group-hover:bg-accent/10 transition-colors">
+                <ListChecks className="h-5 w-5 text-zinc-400 group-hover:text-accent transition-colors" />
+              </div>
+              <ArrowRight className="h-4 w-4 text-zinc-300 group-hover:text-zinc-900 group-hover:translate-x-1 transition-all" />
+            </div>
+            <div>
+              <div className="text-4xl font-black text-zinc-900">{questions.length}</div>
+              <div className="font-bold text-zinc-700 text-sm mt-1">Trade-In Questions</div>
+              <p className="text-xs text-zinc-400 mt-1 font-medium">
+                {questions.filter(q => q.isActive).length} active · the wizard&apos;s per-category &quot;Quick Check&quot; condition questions
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1 mt-4 pt-4 border-t border-zinc-50">
+            {Array.from(new Set(questions.map(q => q.category))).slice(0, 4).map(cat => (
+              <span
+                key={cat}
+                className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-zinc-50 text-zinc-600 border border-zinc-100 group-hover:border-zinc-200 transition-colors"
+              >
+                {cat}
+              </span>
+            ))}
+          </div>
+        </Link>
       </div>
 
       {/* Quick Action Operations Dashboard */}
@@ -313,6 +351,15 @@ export default function CatalogMgmtPage() {
               <Search className="h-4 w-4" />
             </div>
             Manage Other Search Devices
+          </Link>
+          <Link
+            href="/catalog-mgmt/trade-in-questions"
+            className="flex items-center gap-3 p-3 rounded-2xl border border-zinc-100 hover:border-zinc-300 hover:bg-zinc-50/50 transition-all font-bold text-xs text-zinc-700 hover:text-black group"
+          >
+            <div className="h-8 w-8 rounded-xl bg-zinc-50 flex items-center justify-center text-zinc-400 group-hover:text-black group-hover:bg-zinc-100 transition-colors shrink-0">
+              <ListChecks className="h-4 w-4" />
+            </div>
+            Manage Trade-In Questions
           </Link>
           <Link
             href="/catalog-mgmt/brands?create=true"
