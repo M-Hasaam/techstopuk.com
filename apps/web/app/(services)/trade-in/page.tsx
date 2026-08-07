@@ -14,7 +14,7 @@ import {
   Check, ChevronRight, MapPin, Zap, Shield, Clock,
   Star, CheckCircle2, Truck, Gift, RefreshCw,
   Search, ChevronDown, Sparkles, HelpCircle, Watch, Headphones,
-  Upload, X, Plus, Package, Loader2, UserCircle, Camera, CircleAlert,
+  Upload, X, Plus, Loader2, UserCircle, Camera, CircleAlert,
   BatteryCharging, BatteryMedium, BatteryWarning, BatteryLow, Power, PowerOff, AlertTriangle,
   ScanFace, ZapOff, RotateCcw, Disc, Disc3, Keyboard, Volume2, Volume1, VolumeX
 } from "lucide-react";
@@ -1003,8 +1003,6 @@ export default function TradeInPage() {
         setWizardModelSearch("");
       } else if (state.brand) {
         setState(s => ({ ...s, brand: "" }));
-      } else if (state.category) {
-        setState(s => ({ ...s, category: "" }));
       } else {
         closeWizard();
       }
@@ -1801,62 +1799,7 @@ export default function TradeInPage() {
                     {phase === 1 && (
                       <div className="space-y-6 flex-1">
                         <AnimatePresence mode="wait">
-                          {!state.category ? (
-                            <motion.div
-                              key="select-category"
-                              initial={{ opacity: 0, x: 15 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, x: -15 }}
-                              transition={{ duration: 0.2 }}
-                              className="space-y-3 sm:space-y-6"
-                            >
-                              <StepHeader label="What device are we trading in?" sub="Select a category from our supported devices list." />
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {catalogCats.map((cat) => {
-                                  const meta = CAT_METADATA[cat.slug];
-                                  const Icon = meta?.Icon ?? Smartphone;
-                                  const glow = meta?.glow ?? "hover:shadow-zinc-500/10";
-                                  const mood = meta?.mood ?? "bg-zinc-500/10 border-zinc-500/20";
-                                  const moodIcon = meta?.moodIcon ?? "text-zinc-500";
-                                  const catId = meta?.oldId ?? cat.slug;
-                                  const count = cat.modelCount > 0 ? `${cat.modelCount}+ models` : "";
-                                  return (
-                                    <motion.button
-                                      key={cat.id}
-                                      whileHover={{ y: -4, scale: 1.02 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      onClick={() => handleCategorySelect(catId)}
-                                      className={`flex flex-col items-center gap-4 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-zinc-200 transition-all text-center group bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 hover:shadow-lg ${glow}`}
-                                    >
-                                      <div className={`h-14 w-14 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 flex items-center justify-center shadow-sm group-hover:${mood} group-hover:border-transparent transition-all`}>
-                                        <Icon className={`h-6 w-6 text-zinc-500 dark:text-zinc-400 group-hover:${moodIcon} transition-colors`} strokeWidth={1.5} />
-                                      </div>
-                                      <div>
-                                        <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">{cat.name}</p>
-                                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider mt-0.5">{count}</p>
-                                      </div>
-                                    </motion.button>
-                                  );
-                                })}
-                                {/* Other Device tile */}
-                                <motion.button
-                                  key="other"
-                                  whileHover={{ y: -4, scale: 1.02 }}
-                                  whileTap={{ scale: 0.98 }}
-                                  onClick={() => handleCategorySelect("Other")}
-                                  className="flex flex-col items-center gap-4 p-6 rounded-2xl border border-dashed border-zinc-300 dark:border-zinc-700 hover:border-zinc-950 dark:hover:border-white transition-all text-center group bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 hover:shadow-lg"
-                                >
-                                  <div className="h-14 w-14 rounded-2xl bg-white dark:bg-zinc-950 border border-zinc-100 dark:border-zinc-800 flex items-center justify-center shadow-sm transition-all">
-                                    <Package className="h-6 w-6 text-zinc-400 dark:text-zinc-500" strokeWidth={1.5} />
-                                  </div>
-                                  <div>
-                                    <p className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100">Other Device</p>
-                                    <p className="text-[10px] text-zinc-400 dark:text-zinc-500 font-bold uppercase tracking-wider mt-0.5">Not listed above</p>
-                                  </div>
-                                </motion.button>
-                              </div>
-                            </motion.div>
-                          ) : !state.brand ? (
+                          {!state.brand ? (
                             <motion.div
                               key="select-brand"
                               initial={{ opacity: 0, x: 15 }}
