@@ -195,6 +195,35 @@ const OPTION_IMAGES: Record<string, string> = {
   "Heavy wear or staining": "/diagnostics/back_cracked.png",
 };
 
+const LAPTOP_OPTION_IMAGES: Record<string, string> = {
+  "No damage": "/diagnostics/laptop_screen_flawless.png",
+  "No cracks or scratches": "/diagnostics/laptop_screen_flawless.png",
+  "No damage at all": "/diagnostics/laptop_screen_flawless.png",
+  "Pristine - no scratches": "/diagnostics/laptop_screen_flawless.png",
+  "Minor scratches": "/diagnostics/laptop_screen_scratches.png",
+  "Light surface scratches": "/diagnostics/laptop_screen_scratches.png",
+  "Light micro-scratches": "/diagnostics/laptop_screen_scratches.png",
+  "Minor dents or scratches": "/diagnostics/laptop_screen_scratches.png",
+  "Cracked": "/diagnostics/laptop_screen_cracked.png",
+  "Cracked screen": "/diagnostics/laptop_screen_cracked.png",
+  "Cracked but usable": "/diagnostics/laptop_screen_cracked.png",
+  "Shattered": "/diagnostics/laptop_screen_cracked.png",
+  "Significant damage": "/diagnostics/laptop_screen_cracked.png",
+};
+
+function getOptionImage(category: string, qId: string, opt: string): string | undefined {
+  // Photo previews are strictly for physical screen condition & phone back glass questions
+  if (qId !== "screen" && qId !== "back") {
+    return undefined;
+  }
+
+  const isLaptop = /laptop/i.test(category);
+  if (isLaptop && LAPTOP_OPTION_IMAGES[opt]) {
+    return LAPTOP_OPTION_IMAGES[opt];
+  }
+  return OPTION_IMAGES[opt];
+}
+
 function renderOptionBadge(qId: string, opt: string, isSelected: boolean) {
   const optLower = opt.toLowerCase();
 
@@ -2305,16 +2334,16 @@ export default function TradeInPage() {
                                 exit={{ opacity: 0, x: -16 }}
                                 transition={{ duration: 0.2 }}
                                 className={
-                                  q.options.some(opt => OPTION_IMAGES[opt])
+                                  q.options.some(opt => getOptionImage(state.category, q.id, opt))
                                     ? "grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4"
                                     : "space-y-2.5"
                                 }
                               >
                                 {(() => {
-                                  const hasPhotoOptions = q.options.some(opt => OPTION_IMAGES[opt]);
+                                  const hasPhotoOptions = q.options.some(opt => getOptionImage(state.category, q.id, opt));
                                   return q.options.map((opt) => {
                                     const isSelected = state.answers[q.id] === opt;
-                                    const optImg = OPTION_IMAGES[opt];
+                                    const optImg = getOptionImage(state.category, q.id, opt);
                                     const badge = renderOptionBadge(q.id, opt, isSelected);
 
                                     const handleSelect = () => {
@@ -2348,12 +2377,12 @@ export default function TradeInPage() {
                                           }`}
                                         >
                                           {/* Top Image Banner */}
-                                          <div className="h-36 sm:h-44 w-full relative overflow-hidden bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200/60 dark:border-zinc-800">
+                                          <div className="aspect-[16/9] w-full relative overflow-hidden bg-zinc-100 dark:bg-zinc-900/80 border-b border-zinc-200/60 dark:border-zinc-800">
                                             {optImg ? (
                                               <img
                                                 src={optImg}
                                                 alt={opt}
-                                                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                                className={`w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105 ${
                                                   isSelected ? "scale-105" : "opacity-95"
                                                 }`}
                                               />
