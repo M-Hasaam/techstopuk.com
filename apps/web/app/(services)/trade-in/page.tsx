@@ -177,22 +177,41 @@ const OPTION_IMAGES: Record<string, string> = {
   "Deep scratches or chips": "/diagnostics/screen_shattered.png",
 
   // Back panel & body condition options
-  "Perfect — no marks": "/diagnostics/back_flawless.png",
-  "Like new": "/diagnostics/back_flawless.png",
-  "Like new — no damage": "/diagnostics/back_flawless.png",
-  "None": "/diagnostics/back_flawless.png",
+  "Perfect — no marks": "/diagnostics/body_flawless.png",
+  "Like new": "/diagnostics/body_flawless.png",
+  "Like new — no damage": "/diagnostics/body_flawless.png",
+  "None": "/diagnostics/body_flawless.png",
 
-  "Minor scuffs": "/diagnostics/back_minor.png",
-  "Light scratches": "/diagnostics/back_minor.png",
-  "Minor scratches": "/diagnostics/back_minor.png",
-  "Minor wear or scratches": "/diagnostics/back_minor.png",
-  "Minor dents or scratches": "/diagnostics/back_minor.png",
+  "Minor scuffs": "/diagnostics/body_minor.png",
+  "Light scratches": "/diagnostics/body_minor.png",
+  "Minor scratches": "/diagnostics/body_minor.png",
+  "Minor wear or scratches": "/diagnostics/body_minor.png",
+  "Minor dents or scratches": "/diagnostics/body_minor.png",
 
   "Cracked back glass": "/diagnostics/back_cracked.png",
-  "Dents or significant marks": "/diagnostics/back_cracked.png",
-  "Significant damage": "/diagnostics/back_cracked.png",
-  "Heavy wear or damage": "/diagnostics/back_cracked.png",
-  "Heavy wear or staining": "/diagnostics/back_cracked.png",
+  "Dents or significant marks": "/diagnostics/body_damaged.png",
+  "Significant damage": "/diagnostics/body_damaged.png",
+  "Heavy wear or damage": "/diagnostics/body_damaged.png",
+  "Heavy wear or staining": "/diagnostics/body_damaged.png",
+};
+
+const BODY_OPTION_IMAGES: Record<string, string> = {
+  "None": "/diagnostics/body_flawless.png",
+  "Like new": "/diagnostics/body_flawless.png",
+  "Like new — no damage": "/diagnostics/body_flawless.png",
+  "Perfect — no marks": "/diagnostics/body_flawless.png",
+
+  "Minor scuffs": "/diagnostics/body_minor.png",
+  "Light scratches": "/diagnostics/body_minor.png",
+  "Minor scratches": "/diagnostics/body_minor.png",
+  "Minor wear or scratches": "/diagnostics/body_minor.png",
+  "Minor dents or scratches": "/diagnostics/body_minor.png",
+
+  "Cracked back glass": "/diagnostics/back_cracked.png",
+  "Dents or significant marks": "/diagnostics/body_damaged.png",
+  "Significant damage": "/diagnostics/body_damaged.png",
+  "Heavy wear or damage": "/diagnostics/body_damaged.png",
+  "Heavy wear or staining": "/diagnostics/body_damaged.png",
 };
 
 const LAPTOP_OPTION_IMAGES: Record<string, string> = {
@@ -203,26 +222,99 @@ const LAPTOP_OPTION_IMAGES: Record<string, string> = {
   "Minor scratches": "/diagnostics/laptop_screen_scratches.png",
   "Light surface scratches": "/diagnostics/laptop_screen_scratches.png",
   "Light micro-scratches": "/diagnostics/laptop_screen_scratches.png",
-  "Minor dents or scratches": "/diagnostics/laptop_screen_scratches.png",
+  "Minor dents or scratches": "/diagnostics/body_minor.png",
   "Cracked": "/diagnostics/laptop_screen_cracked.png",
   "Cracked screen": "/diagnostics/laptop_screen_cracked.png",
   "Cracked but usable": "/diagnostics/laptop_screen_cracked.png",
   "Shattered": "/diagnostics/laptop_screen_cracked.png",
-  "Significant damage": "/diagnostics/laptop_screen_cracked.png",
+  "Significant damage": "/diagnostics/body_damaged.png",
+};
+
+const CONSOLE_OPTION_IMAGES: Record<string, string> = {
+  "Like new": "/diagnostics/console_flawless.png",
+  "Like new — no damage": "/diagnostics/console_flawless.png",
+  "None": "/diagnostics/console_flawless.png",
+  "Perfect — no marks": "/diagnostics/console_flawless.png",
+
+  "Minor scratches": "/diagnostics/console_minor.png",
+  "Minor scuffs": "/diagnostics/console_minor.png",
+  "Light scratches": "/diagnostics/console_minor.png",
+  "Minor dents or scratches": "/diagnostics/console_minor.png",
+
+  "Significant damage": "/diagnostics/console_damaged.png",
+  "Dents or significant marks": "/diagnostics/console_damaged.png",
+  "Heavy wear or damage": "/diagnostics/console_damaged.png",
+};
+
+const MOBILE_BODY_OPTION_IMAGES: Record<string, string> = {
+  "Like new": "/diagnostics/back_flawless.png",
+  "Like new — no damage": "/diagnostics/back_flawless.png",
+  "Perfect — no marks": "/diagnostics/back_flawless.png",
+  "None": "/diagnostics/back_flawless.png",
+
+  "Light scratches": "/diagnostics/back_minor.png",
+  "Minor scuffs": "/diagnostics/back_minor.png",
+  "Minor scratches": "/diagnostics/back_minor.png",
+  "Minor wear or scratches": "/diagnostics/back_minor.png",
+  "Minor dents or scratches": "/diagnostics/back_minor.png",
+
+  "Dents or significant marks": "/diagnostics/back_cracked.png",
+  "Cracked back glass": "/diagnostics/back_cracked.png",
+  "Significant damage": "/diagnostics/back_cracked.png",
+  "Heavy wear or damage": "/diagnostics/back_cracked.png",
+  "Heavy wear or staining": "/diagnostics/back_cracked.png",
+};
+
+const AUDIO_OPTION_IMAGES: Record<string, string> = {
+  "Like new - clean pads/tips": "/diagnostics/audio_flawless.png",
+  "Like new": "/diagnostics/audio_flawless.png",
+  "Like new — no damage": "/diagnostics/audio_flawless.png",
+  "Perfect — no marks": "/diagnostics/audio_flawless.png",
+  "None": "/diagnostics/audio_flawless.png",
+
+  "Minor scratches or wear on case": "/diagnostics/audio_minor.png",
+  "Minor scuffs": "/diagnostics/audio_minor.png",
+  "Minor scratches": "/diagnostics/audio_minor.png",
+  "Light scratches": "/diagnostics/audio_minor.png",
+
+  "Heavy wear or staining": "/diagnostics/audio_damaged.png",
+  "Heavy wear or damage": "/diagnostics/audio_damaged.png",
+  "Significant damage": "/diagnostics/audio_damaged.png",
 };
 
 function getOptionImage(category: string, qId: string, opt: string): string | undefined {
-  // Photo previews are strictly for physical screen condition & phone back glass questions
-  if (qId !== "screen" && qId !== "back") {
+  // Photo previews are strictly for physical screen condition, back glass, and body condition questions
+  if (qId !== "screen" && qId !== "back" && qId !== "body" && qId !== "physical") {
     return undefined;
+  }
+
+  const isAudio = /audio|headphone|earbud/i.test(category);
+  if (isAudio && AUDIO_OPTION_IMAGES[opt]) {
+    return AUDIO_OPTION_IMAGES[opt];
+  }
+
+  const isTabletOrPhone = /tablet|phone|mobile/i.test(category);
+  if (isTabletOrPhone && (qId === "body" || qId === "back" || qId === "physical") && MOBILE_BODY_OPTION_IMAGES[opt]) {
+    return MOBILE_BODY_OPTION_IMAGES[opt];
+  }
+
+  const isConsole = /console|gaming/i.test(category);
+  if (isConsole && CONSOLE_OPTION_IMAGES[opt]) {
+    return CONSOLE_OPTION_IMAGES[opt];
   }
 
   const isLaptop = /laptop/i.test(category);
   if (isLaptop && LAPTOP_OPTION_IMAGES[opt]) {
     return LAPTOP_OPTION_IMAGES[opt];
   }
+
+  if ((qId === "body" || qId === "physical" || qId === "back") && BODY_OPTION_IMAGES[opt]) {
+    return BODY_OPTION_IMAGES[opt];
+  }
+
   return OPTION_IMAGES[opt];
 }
+
 
 function renderOptionBadge(qId: string, opt: string, isSelected: boolean) {
   const optLower = opt.toLowerCase();
