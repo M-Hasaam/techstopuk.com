@@ -22,18 +22,18 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Phone", key: "screen", question: "How is the screen?", order: 0,
         options: [
-            { label: "No cracks or scratches", image: "device-images/diagnostics-v2/screen_flawless.png" },
-            { label: "Light surface scratches", image: "device-images/diagnostics-v2/screen_scratches.png" },
-            { label: "Cracked but display works", image: "device-images/diagnostics-v2/screen_cracked.png" },
-            { label: "Shattered / unusable display", image: "device-images/diagnostics-v2/screen_shattered.png" },
+            { label: "No cracks or scratches", image: "device-images/diagnostics-v3/screen_flawless.webp" },
+            { label: "Light surface scratches", image: "device-images/diagnostics-v3/screen_scratches.webp" },
+            { label: "Cracked but display works", image: "device-images/diagnostics-v3/screen_cracked.webp" },
+            { label: "Shattered / unusable display", image: "device-images/diagnostics-v3/screen_shattered.webp" },
         ],
     },
     {
         category: "Phone", key: "back", question: "How is the back of the phone?", order: 1,
         options: [
-            { label: "Perfect — no marks", image: "device-images/diagnostics-v2/back_flawless.png" },
-            { label: "Minor scuffs", image: "device-images/diagnostics-v2/back_minor.png" },
-            { label: "Cracked back glass", image: "device-images/diagnostics-v2/back_cracked.png" },
+            { label: "Perfect — no marks", image: "device-images/diagnostics-v3/back_flawless.webp" },
+            { label: "Minor scuffs", image: "device-images/diagnostics-v3/back_minor.webp" },
+            { label: "Cracked back glass", image: "device-images/diagnostics-v3/back_cracked.webp" },
         ],
     },
     {
@@ -71,18 +71,18 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Tablet", key: "screen", question: "How is the screen?", order: 0,
         options: [
-            { label: "No damage at all", image: "device-images/diagnostics-v2/screen_flawless.png" },
-            { label: "Light surface scratches", image: "device-images/diagnostics-v2/screen_scratches.png" },
-            { label: "Cracked but usable", image: "device-images/diagnostics-v2/screen_cracked.png" },
-            { label: "Shattered", image: "device-images/diagnostics-v2/screen_shattered.png" },
+            { label: "No damage at all", image: "device-images/diagnostics-v3/screen_flawless.webp" },
+            { label: "Light surface scratches", image: "device-images/diagnostics-v3/screen_scratches.webp" },
+            { label: "Cracked but usable", image: "device-images/diagnostics-v3/screen_cracked.webp" },
+            { label: "Shattered", image: "device-images/diagnostics-v3/screen_shattered.webp" },
         ],
     },
     {
         category: "Tablet", key: "body", question: "How is the body / casing?", order: 1,
         options: [
-            { label: "Like new", image: "device-images/diagnostics-v2/back_flawless.png" },
-            { label: "Light scratches", image: "device-images/diagnostics-v2/back_minor.png" },
-            { label: "Dents or significant marks", image: "device-images/diagnostics-v2/back_cracked.png" },
+            { label: "Like new", image: "device-images/diagnostics-v3/back_flawless.webp" },
+            { label: "Light scratches", image: "device-images/diagnostics-v3/back_minor.webp" },
+            { label: "Dents or significant marks", image: "device-images/diagnostics-v3/back_cracked.webp" },
         ],
     },
     {
@@ -128,9 +128,9 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Console", key: "body", question: "Any visible body damage?", order: 2,
         options: [
-            { label: "Like new", image: "device-images/diagnostics-v2/console_flawless.png" },
-            { label: "Minor scratches", image: "device-images/diagnostics-v2/console_minor.png" },
-            { label: "Significant damage", image: "device-images/diagnostics-v2/console_damaged.png" },
+            { label: "Like new", image: "device-images/diagnostics-v3/console_flawless.webp" },
+            { label: "Minor scratches", image: "device-images/diagnostics-v3/console_minor.webp" },
+            { label: "Significant damage", image: "device-images/diagnostics-v3/console_damaged.webp" },
         ],
     },
     {
@@ -152,9 +152,9 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Laptop", key: "screen", question: "How is the screen?", order: 1,
         options: [
-            { label: "No damage", image: "device-images/diagnostics-v2/laptop_screen_flawless.png" },
-            { label: "Minor scratches", image: "device-images/diagnostics-v2/laptop_screen_scratches.png" },
-            { label: "Cracked", image: "device-images/diagnostics-v2/laptop_screen_cracked.png" },
+            { label: "No damage", image: "device-images/diagnostics-v3/laptop_screen_flawless.webp" },
+            { label: "Minor scratches", image: "device-images/diagnostics-v3/laptop_screen_scratches.webp" },
+            { label: "Cracked", image: "device-images/diagnostics-v3/laptop_screen_cracked.webp" },
         ],
     },
     {
@@ -176,9 +176,9 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Laptop", key: "body", question: "Any body damage?", order: 4,
         options: [
-            { label: "None", image: "device-images/diagnostics-v2/body_flawless.png" },
-            { label: "Minor dents or scratches", image: "device-images/diagnostics-v2/body_minor.png" },
-            { label: "Significant damage", image: "device-images/diagnostics-v2/body_damaged.png" },
+            { label: "None", image: "device-images/diagnostics-v3/body_flawless.webp" },
+            { label: "Minor dents or scratches", image: "device-images/diagnostics-v3/body_minor.webp" },
+            { label: "Significant damage", image: "device-images/diagnostics-v3/body_damaged.webp" },
         ],
     },
     {
@@ -201,10 +201,10 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Smartwatch", key: "screen", question: "How is the screen glass?", order: 1,
         options: [
-            { label: "Pristine - no scratches", image: "device-images/diagnostics-v2/screen_flawless.png" },
-            { label: "Light micro-scratches", image: "device-images/diagnostics-v2/screen_scratches.png" },
-            { label: "Deep scratches or chips", image: "device-images/diagnostics-v2/screen_shattered.png" },
-            { label: "Cracked screen", image: "device-images/diagnostics-v2/screen_cracked.png" },
+            { label: "Pristine - no scratches", image: "device-images/diagnostics-v3/screen_flawless.webp" },
+            { label: "Light micro-scratches", image: "device-images/diagnostics-v3/screen_scratches.webp" },
+            { label: "Deep scratches or chips", image: "device-images/diagnostics-v3/screen_shattered.webp" },
+            { label: "Cracked screen", image: "device-images/diagnostics-v3/screen_cracked.webp" },
         ],
     },
     {
@@ -241,9 +241,9 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Audio", key: "body", question: "How is the cosmetic condition?", order: 1,
         options: [
-            { label: "Like new - clean pads/tips", image: "device-images/diagnostics-v2/audio_flawless.png" },
-            { label: "Minor scratches or wear on case", image: "device-images/diagnostics-v2/audio_minor.png" },
-            { label: "Heavy wear or staining", image: "device-images/diagnostics-v2/audio_damaged.png" },
+            { label: "Like new - clean pads/tips", image: "device-images/diagnostics-v3/audio_flawless.webp" },
+            { label: "Minor scratches or wear on case", image: "device-images/diagnostics-v3/audio_minor.webp" },
+            { label: "Heavy wear or staining", image: "device-images/diagnostics-v3/audio_damaged.webp" },
         ],
     },
     {
@@ -273,9 +273,9 @@ export const DEFAULT_TRADE_IN_QUESTIONS: TradeInQuestionSeed[] = [
     {
         category: "Other", key: "physical", question: "What is the physical condition?", order: 1,
         options: [
-            { label: "Like new — no damage", image: "device-images/diagnostics-v2/body_flawless.png" },
-            { label: "Minor wear or scratches", image: "device-images/diagnostics-v2/body_minor.png" },
-            { label: "Heavy wear or damage", image: "device-images/diagnostics-v2/body_damaged.png" },
+            { label: "Like new — no damage", image: "device-images/diagnostics-v3/body_flawless.webp" },
+            { label: "Minor wear or scratches", image: "device-images/diagnostics-v3/body_minor.webp" },
+            { label: "Heavy wear or damage", image: "device-images/diagnostics-v3/body_damaged.webp" },
         ],
     },
     {

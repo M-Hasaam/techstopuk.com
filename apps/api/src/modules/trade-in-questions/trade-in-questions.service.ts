@@ -146,11 +146,17 @@ export class TradeInQuestionsService {
     // stale cached 404 for a key that's brand new. These bundled diagnostic images
     // used a single fixed key instead, and one of them got requested (and 404'd, since
     // nothing had uploaded it yet) enough times that Cloudflare cached that 404 for a
-    // year. "-v2" exists purely so this ships on a URL nobody has ever requested before,
-    // matching how every other image in the app already behaves — no CDN purge required,
-    // and if this ever needs to change again, bumping to -v3 has the same effect.
-    private static readonly DIAGNOSTIC_IMAGE_PREFIX = 'device-images/diagnostics-v2/';
-    private static readonly LEGACY_DIAGNOSTIC_IMAGE_PREFIX = 'device-images/diagnostics/';
+    // year. Each "-vN" bump exists purely so this ships on a URL nobody has ever
+    // requested before, matching how every other image in the app already behaves —
+    // no CDN purge required. "-v3" is also where these switched from multi-MB
+    // uncompressed PNGs (some over 6MB for a ~128px-tall UI thumbnail) to resized,
+    // compressed WebP — v1 and v2 are both listed as legacy so any environment still
+    // on either one gets carried forward to v3 in a single seed.
+    private static readonly DIAGNOSTIC_IMAGE_PREFIX = 'device-images/diagnostics-v3/';
+    private static readonly LEGACY_DIAGNOSTIC_IMAGE_PREFIXES = [
+        'device-images/diagnostics/',
+        'device-images/diagnostics-v2/',
+    ];
 
     /** Uploads the diagnostic option photos bundled with this service into storage,
      *  keyed the same way DEFAULT_TRADE_IN_QUESTIONS references them, and migrates any
@@ -175,15 +181,19 @@ export class TradeInQuestionsService {
             const filename = key.slice(TradeInQuestionsService.DIAGNOSTIC_IMAGE_PREFIX.length);
             const filePath = path.join(assetsDir, filename);
             if (!fs.existsSync(filePath)) continue;
-            await this.storage.putObject(key, fs.readFileSync(filePath), 'image/png');
+            await this.storage.putObject(key, fs.readFileSync(filePath), 'image/webp');
 
             // Exact-match only, so an admin's manual image edit is never overwritten —
-            // this only repoints options that still hold the untouched legacy default.
-            const legacyKey = TradeInQuestionsService.LEGACY_DIAGNOSTIC_IMAGE_PREFIX + filename;
-            await this.prisma.tradeInQuestionOption.updateMany({
-                where: { image: legacyKey },
-                data: { image: key },
-            });
+            // this only repoints options that still hold an untouched legacy default.
+            // Legacy keys were .png (pre-v3 predates the WebP conversion), so swap the
+            // extension back when checking for them.
+            const legacyFilename = filename.replace(/\.webp$/, '.png');
+            for (const legacyPrefix of TradeInQuestionsService.LEGACY_DIAGNOSTIC_IMAGE_PREFIXES) {
+                await this.prisma.tradeInQuestionOption.updateMany({
+                    where: { image: legacyPrefix + legacyFilename },
+                    data: { image: key },
+                });
+            }
 
             uploaded++;
         }

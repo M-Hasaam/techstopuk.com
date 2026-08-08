@@ -91,10 +91,10 @@ const SPECS: Record<string, { label: string; options: string[] }[]> = {
 };
 
 const CONDITIONS = [
-  { id: "A", label: "A Grade", tag: "Like New", desc: "Used but like new — zero visible marks.", color: "border-emerald-500/40 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/20", dot: "bg-emerald-500", descColor: "text-emerald-700 dark:text-emerald-400", image: "/conditions/grade_a.png" },
-  { id: "B", label: "B Grade", tag: "Good",     desc: "Minor signs of usage, small scratches.", color: "border-blue-500/40 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-950/20", dot: "bg-blue-500", descColor: "text-blue-700 dark:text-blue-400", image: "/conditions/grade_b.png" },
-  { id: "C", label: "C Grade", tag: "Fair",     desc: "Heavy scratches or marks, fully working.", color: "border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/20", dot: "bg-amber-500", descColor: "text-amber-700 dark:text-amber-400", image: "/conditions/grade_c.png" },
-  { id: "F", label: "F Grade", tag: "Faulty",   desc: "Non-working — for parts or repair only.", color: "border-red-500/40 bg-red-50 dark:border-red-500/30 dark:bg-red-950/20", dot: "bg-red-500", descColor: "text-red-700 dark:text-red-400", image: "/conditions/grade_f.png" },
+  { id: "A", label: "A Grade", tag: "Like New", desc: "Used but like new — zero visible marks.", color: "border-emerald-500/40 bg-emerald-50 dark:border-emerald-500/30 dark:bg-emerald-950/20", dot: "bg-emerald-500", descColor: "text-emerald-700 dark:text-emerald-400", image: "/conditions/grade_a.webp" },
+  { id: "B", label: "B Grade", tag: "Good",     desc: "Minor signs of usage, small scratches.", color: "border-blue-500/40 bg-blue-50 dark:border-blue-500/30 dark:bg-blue-950/20", dot: "bg-blue-500", descColor: "text-blue-700 dark:text-blue-400", image: "/conditions/grade_b.webp" },
+  { id: "C", label: "C Grade", tag: "Fair",     desc: "Heavy scratches or marks, fully working.", color: "border-amber-500/40 bg-amber-50 dark:border-amber-500/30 dark:bg-amber-950/20", dot: "bg-amber-500", descColor: "text-amber-700 dark:text-amber-400", image: "/conditions/grade_c.webp" },
+  { id: "F", label: "F Grade", tag: "Faulty",   desc: "Non-working — for parts or repair only.", color: "border-red-500/40 bg-red-50 dark:border-red-500/30 dark:bg-red-950/20", dot: "bg-red-500", descColor: "text-red-700 dark:text-red-400", image: "/conditions/grade_f.webp" },
 ];
 
 // Fixed icon palette an admin can assign to a diagnostic option from the trade-in
@@ -2659,13 +2659,13 @@ export default function TradeInPage() {
                                       id: "ship", title: "Ship via Royal Mail", icon: Truck,
                                       desc: "Prepaid insured label emailed instantly. Drop at any Post Office.",
                                       badge: "Free Insured Shipping",
-                                      image: "/fulfillment/royal_mail_shipping.png"
+                                      image: "/fulfillment/royal_mail_shipping.webp"
                                     },
                                     {
                                       id: "dropoff", title: "Drop off In Store", icon: MapPin,
                                       desc: "Visit TechStop Leicester for instant inspection and cash hand-off.",
                                       badge: "Instant Cash Payout",
-                                      image: "/fulfillment/store_dropoff.png"
+                                      image: "/fulfillment/store_dropoff.webp"
                                     }
                                   ].map((m) => {
                                     const Icon = m.icon;
