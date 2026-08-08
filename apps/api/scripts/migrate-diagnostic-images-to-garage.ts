@@ -7,6 +7,11 @@
 // admin-uploaded image already lives) fixes admin previews and removes the
 // cross-app coupling. Keys are deterministic (no uuid) so this script is safe to
 // re-run — it just overwrites the same objects.
+//
+// Source PNGs live in ./assets/diagnostics (inside apps/api) rather than
+// apps/web/public — apps/api deploys standalone in production, so a path reaching
+// into apps/web wouldn't resolve there. Keeping the source images alongside this
+// script means it works the same in prod as it does locally.
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import fs from 'fs';
 import path from 'path';
@@ -19,7 +24,7 @@ const credentials = {
 };
 const s3 = new S3Client({ region: 'us-east-1', endpoint, credentials, forcePathStyle: true });
 
-const diagnosticsDir = path.resolve(__dirname, '../../web/public/diagnostics');
+const diagnosticsDir = path.resolve(__dirname, 'assets/diagnostics');
 
 async function main() {
     const files = fs.readdirSync(diagnosticsDir).filter((f) => f.endsWith('.png'));
