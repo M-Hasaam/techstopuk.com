@@ -11,10 +11,10 @@ import AccordionGallery from "@/components/AccordionGallery";
 import TradeInDepreciationChart from "@/components/TradeInDepreciationChart";
 import { LayoutTextFlip } from "@/components/ui/layout-text-flip";
 import {
-  Smartphone, Tablet, Gamepad2, Laptop, ArrowLeft, ArrowRight,
+  ArrowLeft, ArrowRight,
   Check, ChevronRight, MapPin, Zap, Shield, Clock,
   Star, CheckCircle2, Truck, Gift, RefreshCw,
-  Search, ChevronDown, Sparkles, HelpCircle, Watch, Headphones,
+  Search, ChevronDown, Sparkles, HelpCircle,
   Upload, X, Plus, Loader2, UserCircle, Camera, CircleAlert,
   BatteryCharging, BatteryMedium, BatteryWarning, BatteryLow, Power, PowerOff, AlertTriangle,
   ScanFace, ZapOff, RotateCcw, Disc, Disc3, Keyboard, Volume2, Volume1, VolumeX
@@ -37,29 +37,20 @@ function GoogleIcon() {
 
 // ─── Data ──────────────────────────────────────────────────────────────────
 
-// Visual metadata keyed by category slug — the list itself comes from the API
-const CAT_METADATA: Record<string, {
-  oldId: string; Icon: React.ElementType;
-  img: string; mood: string; moodIcon: string; glow: string; sub: string;
-}> = {
-  phones:      { oldId: "Phone",      Icon: Smartphone, img: "/phones/samsung/bento_smartphones.png",             mood: "bg-sky-500/10 border-sky-500/20",     moodIcon: "text-sky-500",     glow: "hover:shadow-sky-500/10",     sub: "iPhone, Galaxy, Pixel, OnePlus"         },
-  tablets:     { oldId: "Tablet",     Icon: Tablet,     img: "/tablets/ipad/showcase_ipad_pro.png",               mood: "bg-rose-500/10 border-rose-500/20",   moodIcon: "text-rose-500",    glow: "hover:shadow-rose-500/10",    sub: "iPad, Galaxy Tab, Surface Pro"          },
-  gaming:      { oldId: "Console",    Icon: Gamepad2,   img: "/consoles/showcase_ps5.png",                        mood: "bg-violet-500/10 border-violet-500/20",moodIcon: "text-violet-500",  glow: "hover:shadow-violet-500/10",  sub: "PS5, Xbox Series, Switch"               },
-  laptops:     { oldId: "Laptop",     Icon: Laptop,     img: "/laptops/MacBook/showcase_macbook.png",             mood: "bg-amber-500/10 border-amber-500/20",  moodIcon: "text-amber-600",   glow: "hover:shadow-amber-500/10",   sub: "MacBook, XPS, ThinkPad"                 },
-  audio:       { oldId: "Audio",      Icon: Headphones, img: "/audio/bento_audio.png",                            mood: "bg-indigo-500/10 border-indigo-500/20",moodIcon: "text-indigo-500",  glow: "hover:shadow-indigo-500/10",  sub: "AirPods, Sony, Bose"                    },
-  smartwatches:{ oldId: "Smartwatch", Icon: Watch,      img: "/Other/watch/galaxy_watch_promo_1778927696615.png", mood: "bg-emerald-500/10 border-emerald-500/20",moodIcon:"text-emerald-500", glow: "hover:shadow-emerald-500/10", sub: "Apple Watch, Galaxy Watch, Fitbit"       },
+// The only thing that genuinely can't come from the catalog API: the wizard's internal
+// taxonomy id (drives SPECS / remoteQuestions / TradeInQuestion.category lookups) doesn't
+// match the catalog's slug or display name ("gaming" / "Gaming" vs "Console"), so some
+// translation has to exist. This single slug-keyed map is now the only one — it used to be
+// duplicated three different ways (by slug, by DB name, and inline in two separate
+// effects) with dead per-category icon/image/color fields nothing actually read.
+const CATEGORY_TAXONOMY: Record<string, string> = {
+  phones: "Phone", tablets: "Tablet", gaming: "Console",
+  laptops: "Laptop", audio: "Audio", smartwatches: "Smartwatch",
 };
-
-// Maps product.category (DB name) → wizard category ID used by SPECS / remoteQuestions
-const CAT_NAME_TO_WIZARD_ID: Record<string, string> = {
-  Phones: "Phone", Tablets: "Tablet", Gaming: "Console",
-  Laptops: "Laptop", Audio: "Audio", Smartwatches: "Smartwatch",
-};
-const CAT_NAME_MOOD: Record<string, string> = {
-  Phones: "bg-sky-500/10", Tablets: "bg-rose-500/10",
-  Gaming: "bg-violet-500/10", Laptops: "bg-amber-500/10",
-  Audio: "bg-indigo-500/10", Smartwatches: "bg-emerald-500/10",
-};
+// Derived once, not hand-maintained, so it can't drift out of sync with the map above.
+const WIZARD_ID_TO_SLUG: Record<string, string> = Object.fromEntries(
+  Object.entries(CATEGORY_TAXONOMY).map(([slug, wizardId]) => [wizardId, slug])
+);
 
 // The "Other Search Devices" list uses different brand strings for the same real
 // brand than DeviceCatalog does ("Sony PlayStation" vs "Sony", "Microsoft Xbox" vs
@@ -354,10 +345,6 @@ export default function TradeInPage() {
   }, [state.fulfillment]);
 
   // Dynamic brand + model loading from catalog API
-  const CATEGORY_SLUG_MAP: Record<string, string> = {
-    Phone: "phones", Tablet: "tablets", Console: "gaming",
-    Laptop: "laptops", Audio: "audio", Smartwatch: "smartwatches",
-  };
   const [dynamicBrands, setDynamicBrands] = useState<string[]>([]);
   // Brands/models that exist only in the "Other Search Devices" list (e.g. Xiaomi,
   // Huawei, Nintendo, Nokia) — dynamicBrands/dynamicModelData above only reflect
@@ -403,7 +390,7 @@ export default function TradeInPage() {
 
   useEffect(() => {
     setDynamicBrands([]); setDynamicModelData([]);
-    const slug = CATEGORY_SLUG_MAP[state.category];
+    const slug = WIZARD_ID_TO_SLUG[state.category];
     if (!slug) return;
     productsApi.brands(slug)
       .then(data => {
@@ -414,7 +401,7 @@ export default function TradeInPage() {
 
   useEffect(() => {
     setDynamicModelData([]);
-    const catSlug = CATEGORY_SLUG_MAP[state.category];
+    const catSlug = WIZARD_ID_TO_SLUG[state.category];
     if (!catSlug || !state.brand) return;
     const brandSlug = state.brand.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true&categorySlug=${catSlug}&brandSlug=${brandSlug}`)
@@ -698,17 +685,18 @@ export default function TradeInPage() {
   const currentQuestions = remoteQuestions[state.category] ?? [];
 
   // state.category holds the internal wizard taxonomy id (e.g. "Console") that SPECS /
-  // remoteQuestions / CAT_METADATA key off of — renaming it wholesale would ripple across
-  // the whole wizard. What the customer should actually see is the live catalog category
-  // name (e.g. "Gaming"), so resolve a display label from the fetched catalog instead of
-  // rendering the internal id directly. Falls back to the static name↔id map for
-  // categories not present in the catalog yet (e.g. before it loads, or "Other").
+  // remoteQuestions key off of — renaming it wholesale would ripple across the whole
+  // wizard. What the customer should actually see is the live catalog category name
+  // (e.g. "Gaming"), so resolve a display label from the fetched catalog instead of
+  // rendering the internal id directly. Falls back to a capitalized slug for categories
+  // not present in the catalog yet (e.g. before it loads, or "Smartwatch", which isn't
+  // catalog-backed at all).
   const categoryDisplayName = useMemo(() => {
     if (!state.category || state.category === "Other") return state.category;
-    const catalogMatch = catalogCats.find((c) => (CAT_METADATA[c.slug]?.oldId ?? c.slug) === state.category);
+    const catalogMatch = catalogCats.find((c) => (CATEGORY_TAXONOMY[c.slug] ?? c.slug) === state.category);
     if (catalogMatch) return catalogMatch.name;
-    const staticMatch = Object.entries(CAT_NAME_TO_WIZARD_ID).find(([, id]) => id === state.category);
-    return staticMatch?.[0] ?? state.category;
+    const slug = WIZARD_ID_TO_SLUG[state.category];
+    return slug ? slug.charAt(0).toUpperCase() + slug.slice(1) : state.category;
   }, [state.category, catalogCats]);
 
   async function compressToBlob(file: File): Promise<{ blob: Blob; previewUrl: string }> {
@@ -877,11 +865,7 @@ export default function TradeInPage() {
 
       // Fallback for callers passing only name/category/brand (e.g. the hardcoded
       // "Popular" quick links) — best-effort catalog lookup by exact model match.
-      const catSlugMap: Record<string, string> = {
-        Phone: "phones", Tablet: "tablets", Console: "gaming",
-        Laptop: "laptops", Audio: "audio", Smartwatch: "smartwatches",
-      };
-      const catSlug = catSlugMap[suggestion.category];
+      const catSlug = WIZARD_ID_TO_SLUG[suggestion.category];
       const brandSlug = suggestion.brand.toLowerCase().replace(/[^a-z0-9]+/g, "-");
       if (catSlug) {
         fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true&categorySlug=${catSlug}&brandSlug=${brandSlug}`)
@@ -1064,10 +1048,9 @@ export default function TradeInPage() {
                     items={
                       catalogCats.length > 0
                         ? catalogCats.map((cat) => {
-                            const meta = CAT_METADATA[cat.slug];
                             const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
                             const img = catImgs.length > 0 ? catImgs[0] : (catFallbackImages[cat.slug] ?? "");
-                            const catId = meta?.oldId ?? cat.slug;
+                            const catId = CATEGORY_TAXONOMY[cat.slug] ?? cat.slug;
                             return {
                               image: img,
                               label: cat.name,
