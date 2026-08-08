@@ -8,6 +8,7 @@ import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, t
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import AccordionGallery from "@/components/AccordionGallery";
+import TradeInDepreciationChart from "@/components/TradeInDepreciationChart";
 import { LayoutTextFlip } from "@/components/ui/layout-text-flip";
 import {
   Smartphone, Tablet, Gamepad2, Laptop, ArrowLeft, ArrowRight,
@@ -2530,6 +2531,7 @@ export default function TradeInPage() {
                                 Instant Offer Generated
                               </div>
 
+                              {/* Guaranteed Cash Valuation Card */}
                               <div className="bg-gradient-to-b from-emerald-500/5 via-emerald-500/10 to-transparent border-2 border-emerald-500/30 dark:border-emerald-500/40 rounded-3xl p-6 sm:p-8 relative overflow-hidden max-w-md mx-auto shadow-xl">
                                 <div className="absolute -top-12 -right-12 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
                                 <div className="absolute -bottom-12 -left-12 w-32 h-32 bg-emerald-400/20 rounded-full blur-3xl pointer-events-none" />
@@ -2553,73 +2555,69 @@ export default function TradeInPage() {
                                 </div>
                               </div>
 
-                              {/* Price adjustment breakdown details */}
-                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-4 sm:p-5 text-left space-y-3">
-                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Device Model</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.model}</span>
+                              {/* Price adjustment breakdown details — a flat, single-line-per-row
+                                  attribute list (model / specs / grade / condition answers), matching
+                                  the terse "spec sheet" style rather than grouped/bolded sections. */}
+                              <div className="max-w-md mx-auto bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl px-4 sm:px-5 py-1 divide-y divide-zinc-200/60 dark:divide-zinc-800 text-xs text-left">
+                                <div className="flex items-center justify-between gap-3 py-2.5">
+                                  <span className="text-zinc-500 dark:text-zinc-400 shrink-0">Model</span>
+                                  <span className="font-normal text-zinc-900 dark:text-zinc-100 truncate text-right">{state.model}</span>
                                 </div>
-                                {Object.keys(state.specs).length > 0 && (
-                                  <>
-                                    <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
-                                      <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Specs selected</span>
-                                      <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right leading-snug">
-                                        {Object.entries(state.specs).filter(([_, val]) => !!val).map(([_, val]) => val).join(" · ")}
+                                {Object.entries(state.specs).filter(([, val]) => !!val).map(([label, val]) => (
+                                  <div key={label} className="flex items-center justify-between gap-3 py-2.5">
+                                    <span className="text-zinc-500 dark:text-zinc-400 shrink-0">{label}</span>
+                                    <span className="font-normal text-zinc-900 dark:text-zinc-100 truncate text-right">{val}</span>
+                                  </div>
+                                ))}
+                                <div className="flex items-center justify-between gap-3 py-2.5">
+                                  <span className="text-zinc-500 dark:text-zinc-400 shrink-0">Grade</span>
+                                  <span className="font-normal text-zinc-900 dark:text-zinc-100 truncate text-right">{state.condition}</span>
+                                </div>
+                                {currentQuestions.filter((q) => !!state.answers[q.id]).map((q) => {
+                                  const ans = state.answers[q.id];
+                                  const opt = q.options.find((o) => o.label === ans);
+                                  const tone = opt?.tone;
+                                  const label = q.key.charAt(0).toUpperCase() + q.key.slice(1);
+                                  return (
+                                    <div key={q.id} className="flex items-center justify-between gap-3 py-2.5">
+                                      <span className="text-zinc-500 dark:text-zinc-400 shrink-0">{label}</span>
+                                      <span
+                                        className={`font-normal truncate text-right ${
+                                          tone === "danger"
+                                            ? "text-red-600 dark:text-red-400"
+                                            : tone === "warning"
+                                            ? "text-amber-600 dark:text-amber-400"
+                                            : "text-zinc-900 dark:text-zinc-100"
+                                        }`}
+                                      >
+                                        {ans}
                                       </span>
                                     </div>
-                                  </>
-                                )}
-                                <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 text-xs">
-                                  <span className="font-extrabold text-zinc-400 uppercase tracking-wide shrink-0">Grade</span>
-                                  <span className="font-black text-zinc-900 dark:text-zinc-100 text-left sm:text-right">{state.condition}</span>
-                                </div>
-                                {Object.entries(state.answers).some(([k, v]) => v.toLowerCase().includes("crack") || v.toLowerCase().includes("faulty") || v.toLowerCase().includes("issue") || v.toLowerCase().includes("no")) && (
-                                  <>
-                                    <div className="h-px bg-zinc-200/60 dark:bg-zinc-800" />
-                                    <div className="space-y-1.5">
-                                      <span className="text-[10px] font-black uppercase tracking-widest text-red-500 block">Condition Adjustments</span>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {Object.entries(state.answers).map(([qid, ans]) => {
-                                          if (ans.toLowerCase().includes("crack") || ans.toLowerCase().includes("faulty") || ans.toLowerCase().includes("issue") || ans.toLowerCase().includes("no")) {
-                                            return (
-                                              <span key={qid} className="inline-block bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 text-red-650 dark:text-red-400 font-bold text-[9px] px-2 py-0.5 rounded-md">
-                                                {ans}
-                                              </span>
-                                            );
-                                          }
-                                          return null;
-                                        })}
-                                      </div>
-                                    </div>
-                                  </>
-                                )}
+                                  );
+                                })}
+                              </div>
+
+                              {/* Best time to sell — Interactive Recharts Depreciation Graph */}
+                              <div className="max-w-md mx-auto w-full">
+                                <TradeInDepreciationChart currentOffer={aiPrice} />
                               </div>
                             </div>
 
-                            <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+                            {/* Action Buttons: No, thanks & Accept */}
+                            <div className="pt-6 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 max-w-md mx-auto w-full">
                               <button
-                                onClick={() => {
-                                  if (aiRecalcCount >= 1) {
-                                    // Already used the one extra recalculation — send to manual review instead.
-                                    setAiManualFallback(true);
-                                    setState(s => ({ ...s, tradeInMode: "unpriced" }));
-                                    return;
-                                  }
-                                  setAiRecalcCount(c => c + 1);
-                                  setAiRetryCount(0);
-                                  setAiPrice(null); setAiError(false);
-                                }}
-                                className="w-full sm:w-auto h-12 px-6 border border-zinc-200 dark:border-zinc-800 rounded-xl font-bold text-xs text-zinc-600 dark:text-zinc-400 hover:border-zinc-950 dark:hover:border-white hover:text-zinc-950 dark:hover:text-white transition-colors flex items-center justify-center shrink-0"
+                                type="button"
+                                onClick={closeWizard}
+                                className="w-full sm:w-1/2 h-12 px-6 border-2 border-zinc-200 dark:border-zinc-800 rounded-2xl font-black text-xs text-zinc-700 dark:text-zinc-300 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all flex items-center justify-center shrink-0"
                               >
-                                <span className="whitespace-nowrap">{aiRecalcCount >= 1 ? "Request Manual Review" : "Recalculate"}</span>
+                                No, thanks
                               </button>
                               <button
+                                type="button"
                                 onClick={() => goToPhase(5)}
-                                className="w-full sm:w-auto h-12 px-8 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-lg shrink-0"
+                                className="w-full sm:w-1/2 h-12 px-8 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 hover:bg-zinc-800 dark:hover:bg-zinc-200 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-xl shrink-0"
                               >
-                                <span className="whitespace-nowrap">Accept Cash Offer</span>
+                                <span>Accept</span>
                                 <ArrowRight className="h-4 w-4 shrink-0" />
                               </button>
                             </div>
