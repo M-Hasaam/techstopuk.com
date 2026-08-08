@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { ImageOff } from "lucide-react";
 
 export interface AccordionItem {
   image: string;
@@ -36,12 +37,12 @@ export interface AccordionGalleryProps {
 }
 
 const DEFAULT_FALLBACK_ITEMS: AccordionItem[] = [
-  { image: "/phones/samsung/bento_smartphones.png", label: "Phones", catId: "Phone" },
-  { image: "/laptops/MacBook/showcase_macbook.png", label: "Laptops", catId: "Laptop" },
-  { image: "/consoles/showcase_ps5.png", label: "Gaming", catId: "Console" },
-  { image: "/tablets/ipad/showcase_ipad_pro.png", label: "Tablets", catId: "Tablet" },
-  { image: "/Other/watch/galaxy_watch_promo_1778927696615.png", label: "Smartwatches", catId: "Smartwatch" },
-  { image: "/audio/bento_audio.png", label: "Audio", catId: "Audio" },
+  { image: "", label: "Phones", catId: "Phone" },
+  { image: "", label: "Laptops", catId: "Laptop" },
+  { image: "", label: "Gaming", catId: "Console" },
+  { image: "", label: "Tablets", catId: "Tablet" },
+  { image: "", label: "Smartwatches", catId: "Smartwatch" },
+  { image: "", label: "Audio", catId: "Audio" },
 ];
 
 export default function AccordionGallery({
@@ -70,6 +71,20 @@ export default function AccordionGallery({
   const [activeIndex, setActiveIndex] = useState<number>(defaultIndex < count ? defaultIndex : 0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Per-tile image load state — shows a shimmer until the image paints, and a
+  // plain icon (never a broken-image glyph) if there's no image or it fails to load.
+  const [loadedIdx, setLoadedIdx] = useState<Set<number>>(new Set());
+  const [erroredIdx, setErroredIdx] = useState<Set<number>>(new Set());
+  // Reset per-tile load/error tracking when the actual image URLs change (e.g. real
+  // catalog images arriving after the initial fallback render) — keyed on the URLs
+  // themselves (not the `items` array reference, which is re-created every parent
+  // render) so this doesn't fire — and flicker the shimmer back in — on every render.
+  const itemsKey = displayItems.map((i) => i.image).join("|");
+  useEffect(() => {
+    setLoadedIdx(new Set());
+    setErroredIdx(new Set());
+  }, [itemsKey]);
 
   // Auto-switch interval effect
   useEffect(() => {
@@ -127,6 +142,12 @@ export default function AccordionGallery({
     >
       {displayItems.map((item, index) => {
         const isActive = index === activeIndex;
+        // The dark gradient overlay below sits on top of everything (needed for label
+        // contrast against real photos) — at its usual ~0.7-0.85 opacity it swallows a
+        // shimmer or placeholder icon almost entirely, reading as plain black instead of
+        // "loading". Dial it back while there's nothing to contrast against yet.
+        const isImageLoading = !!item.image && !loadedIdx.has(index) && !erroredIdx.has(index);
+        const hasVisibleImage = loadedIdx.has(index) && !erroredIdx.has(index);
 
         const activeFlex = expandRatio * 100;
         const collapsedFlex = count > 1 ? ((1 - expandRatio) * 100) / (count - 1) : 100;
@@ -150,23 +171,42 @@ export default function AccordionGallery({
           >
             {/* Category Image */}
             <div className="absolute inset-0 w-full h-full bg-zinc-900">
-              <img
-                src={item.image}
-                alt={item.label}
-                style={{
-                  filter: grayscale && !isActive ? "grayscale(100%) opacity(0.55)" : "grayscale(0%) opacity(1)",
-                  transition: `filter ${duration}s cubic-bezier(0.25, 1, 0.5, 1)`,
-                }}
-                className="w-full h-full object-cover"
-              />
+              {item.image && !erroredIdx.has(index) ? (
+                <>
+                  {/* Shimmer skeleton — visible until the image actually paints */}
+                  {!loadedIdx.has(index) && (
+                    <div className="absolute inset-0 bg-zinc-700 animate-pulse" />
+                  )}
+                  <img
+                    src={item.image}
+                    alt={item.label}
+                    loading={index === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    onLoad={() => setLoadedIdx((prev) => new Set(prev).add(index))}
+                    onError={() => setErroredIdx((prev) => new Set(prev).add(index))}
+                    style={{
+                      filter: grayscale && !isActive ? "grayscale(100%) opacity(0.55)" : "grayscale(0%) opacity(1)",
+                      transition: `filter ${duration}s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease-out`,
+                      opacity: loadedIdx.has(index) ? 1 : 0,
+                    }}
+                    className="w-full h-full object-cover"
+                  />
+                </>
+              ) : (
+                // No image (or it failed to load) — a plain icon reads far better than a broken-image glyph
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-700">
+                  <ImageOff className="h-6 w-6 text-zinc-400" strokeWidth={1.5} />
+                </div>
+              )}
             </div>
 
-            {/* Dark Overlay Gradient */}
+            {/* Dark Overlay Gradient — dialed back while loading/placeholder so the
+                shimmer or icon underneath doesn't just read as solid black */}
             <div
               className="absolute inset-0 pointer-events-none transition-opacity duration-500"
               style={{
                 background: `linear-gradient(to top, ${overlayColor} 0%, rgba(6,0,16,0.35) 60%, transparent 100%)`,
-                opacity: isActive ? 0.85 : 0.7,
+                opacity: hasVisibleImage ? (isActive ? 0.85 : 0.7) : (isImageLoading ? 0.25 : 0.5),
               }}
             />
 

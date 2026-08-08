@@ -128,6 +128,7 @@ export const catalogCategoriesApi = {
     apiFetch<CatalogCategoryItem>(`/catalog/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => apiFetch<void>(`/catalog/categories/${id}`, { method: 'DELETE' }),
   uploadImage: async (id: string, file: File) => {
+    file = await compressImage(file);
     const q = new URLSearchParams({ filename: file.name, contentType: file.type || 'application/octet-stream' });
     const token = getToken();
     const r = await fetch(`${API_BASE}/catalog/categories/${id}/image-presign?${q}`, {
@@ -153,6 +154,7 @@ export const catalogBrandsApi = {
     apiFetch<CatalogBrandItem>(`/catalog/brands/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => apiFetch<void>(`/catalog/brands/${id}`, { method: 'DELETE' }),
   uploadLogo: async (id: string, file: File) => {
+    file = await compressImage(file);
     const q = new URLSearchParams({ filename: file.name, contentType: file.type || 'application/octet-stream' });
     const token = getToken();
     const r = await fetch(`${API_BASE}/catalog/brands/${id}/logo-presign?${q}`, {
@@ -179,6 +181,7 @@ export const catalogBrandCategoryApi = {
   deleteImage: (id: string, imageKey: string) =>
     apiFetch<BrandCategoryOption>(`/catalog/brand-categories/${id}/images/${encodeURIComponent(imageKey)}`, { method: 'DELETE' }),
   uploadImage: async (id: string, file: File) => {
+    file = await compressImage(file);
     const q = new URLSearchParams({ filename: file.name, contentType: file.type || 'application/octet-stream' });
     const token = getToken();
     const r = await fetch(`${API_BASE}/catalog/brand-categories/${id}/image-presign?${q}`, {
@@ -998,6 +1001,7 @@ export const promoSlidesApi = {
   reorder: (items: { id: string; order: number }[]) =>
     apiFetch<void>('/banners/promo-slides/reorder', { method: 'PATCH', body: JSON.stringify({ items }) }),
   uploadImage: async (id: string, file: File) => {
+    file = await compressImage(file);
     const q = new URLSearchParams({ filename: file.name, contentType: file.type || 'application/octet-stream' });
     const token = getToken();
     const r = await fetch(`${API_BASE}/banners/promo-slides/presign-image?${q}`, {

@@ -437,6 +437,7 @@ export default function TradeInPage() {
   }, [state.model, state.brand, state.tradeInMode, state.category]);
 
   const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>([]);
+  const [catalogCatsLoaded, setCatalogCatsLoaded] = useState(false);
   const [catFallbackImages, setCatFallbackImages] = useState<Record<string, string>>({});
   useEffect(() => {
     catalogApi.listCategories()
@@ -454,7 +455,8 @@ export default function TradeInPage() {
             .catch(() => {});
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setCatalogCatsLoaded(true));
   }, []);
 
   const [hotItems, setHotItems] = useState<Product[]>([]);
@@ -1030,52 +1032,64 @@ export default function TradeInPage() {
                   </h2>
                 </div>
 
-                <AccordionGallery
-                  items={
-                    catalogCats && catalogCats.length > 0
-                      ? catalogCats.map((cat) => {
-                          const meta = CAT_METADATA[cat.slug];
-                          const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
-                          const img = catImgs.length > 0
-                            ? catImgs[0]
-                            : (catFallbackImages[cat.slug] ?? "/phones/samsung/bento_smartphones.png");
-                          const catId = meta?.oldId ?? cat.slug;
-                          return {
-                            image: img,
-                            label: cat.name,
-                            catId: catId,
-                          };
-                        })
-                      : [
-                          { image: "/phones/samsung/bento_smartphones.png", label: "Phones", catId: "Phone" },
-                          { image: "/laptops/MacBook/showcase_macbook.png", label: "Laptops", catId: "Laptop" },
-                          { image: "/consoles/showcase_ps5.png", label: "Gaming", catId: "Console" },
-                          { image: "/tablets/ipad/showcase_ipad_pro.png", label: "Tablets", catId: "Tablet" },
-                          { image: "/Other/watch/galaxy_watch_promo_1778927696615.png", label: "Smartwatches", catId: "Smartwatch" },
-                          { image: "/audio/bento_audio.png", label: "Audio", catId: "Audio" },
-                        ]
-                  }
-                  defaultIndex={2}
-                  expandRatio={0.52}
-                  trigger="click"
-                  accentColor="#ffffff"
-                  overlayColor="#060010"
-                  textColor="#ffffff"
-                  grayscale
-                  showLabels
-                  duration={1.5}
-                  ease="power3.out"
-                  parallax={0.5}
-                  tilt={8}
-                  stagger={0.06}
-                  height={420}
-                  gap={10}
-                  radius={16}
-                  orientation="horizontal"
-                  autoplay
-                  autoplayInterval={2400}
-                  onSelect={(item) => startWizard(item.catId)}
-                />
+                {!catalogCatsLoaded ? (
+                  // Matches AccordionGallery's collapsed-tile layout so there's no layout
+                  // shift when the real gallery swaps in — avoids flashing broken/missing
+                  // images while the categories fetch is still in flight.
+                  <div className="flex gap-2.5 h-[420px]">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-2xl bg-zinc-100 dark:bg-zinc-900 animate-pulse"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <AccordionGallery
+                    items={
+                      catalogCats.length > 0
+                        ? catalogCats.map((cat) => {
+                            const meta = CAT_METADATA[cat.slug];
+                            const catImgs = (cat.images ?? []).length > 0 ? cat.images : (cat.image ? [cat.image] : []);
+                            const img = catImgs.length > 0 ? catImgs[0] : (catFallbackImages[cat.slug] ?? "");
+                            const catId = meta?.oldId ?? cat.slug;
+                            return {
+                              image: img,
+                              label: cat.name,
+                              catId: catId,
+                            };
+                          })
+                        : [
+                            { image: "", label: "Phones", catId: "Phone" },
+                            { image: "", label: "Laptops", catId: "Laptop" },
+                            { image: "", label: "Gaming", catId: "Console" },
+                            { image: "", label: "Tablets", catId: "Tablet" },
+                            { image: "", label: "Smartwatches", catId: "Smartwatch" },
+                            { image: "", label: "Audio", catId: "Audio" },
+                          ]
+                    }
+                    defaultIndex={2}
+                    expandRatio={0.52}
+                    trigger="click"
+                    accentColor="#ffffff"
+                    overlayColor="#060010"
+                    textColor="#ffffff"
+                    grayscale
+                    showLabels
+                    duration={1.5}
+                    ease="power3.out"
+                    parallax={0.5}
+                    tilt={8}
+                    stagger={0.06}
+                    height={420}
+                    gap={10}
+                    radius={16}
+                    orientation="horizontal"
+                    autoplay
+                    autoplayInterval={2400}
+                    onSelect={(item) => startWizard(item.catId)}
+                  />
+                )}
               </div>
 
             </div>
