@@ -619,7 +619,7 @@ export default function Navbar() {
               transition={{ duration: 0.2 }}
               className="hidden lg:flex w-full justify-center absolute top-full mt-2 z-0 pointer-events-auto"
             >
-              <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-6">
+              <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 xl:gap-6 max-w-[min(96vw,1400px)] overflow-x-auto scrollbar-hide">
                 
                 {/* Category Links */}
                 <nav
@@ -645,12 +645,12 @@ export default function Navbar() {
                     return (
                       <div
                         key={label}
-                        className="relative"
+                        className="relative shrink-0"
                         onMouseEnter={() => slug ? openDropdown(slug) : setHoveredCat(null)}
                       >
                         <Link
                           href={href}
-                          className={`relative px-4 py-2 rounded-full transition-colors duration-250 flex items-center ${
+                          className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-250 flex items-center whitespace-nowrap ${
                             isActive ? "text-white z-10 font-extrabold" : "text-zinc-400 hover:text-white font-semibold"
                           }`}
                         >
@@ -756,12 +756,12 @@ export default function Navbar() {
                     return (
                       <div
                         key={label}
-                        className="relative"
+                        className="relative shrink-0"
                         onMouseEnter={() => hasDropdown ? openDropdown(slug) : setHoveredCat(null)}
                       >
                         <Link
                           href={href}
-                          className={`relative px-4 py-2 rounded-full flex items-center gap-1.5 transition-colors duration-250 ${
+                          className={`relative px-2.5 xl:px-4 py-2 rounded-full flex items-center gap-1.5 whitespace-nowrap transition-colors duration-250 ${
                             isActive
                               ? "bg-accent text-white shadow-sm font-extrabold"
                               : "text-zinc-400 hover:text-white font-semibold hover:bg-white/5"

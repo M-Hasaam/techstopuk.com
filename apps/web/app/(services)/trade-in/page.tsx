@@ -697,6 +697,20 @@ export default function TradeInPage() {
   const currentSpecs = SPECS[state.category] ?? [];
   const currentQuestions = remoteQuestions[state.category] ?? [];
 
+  // state.category holds the internal wizard taxonomy id (e.g. "Console") that SPECS /
+  // remoteQuestions / CAT_METADATA key off of — renaming it wholesale would ripple across
+  // the whole wizard. What the customer should actually see is the live catalog category
+  // name (e.g. "Gaming"), so resolve a display label from the fetched catalog instead of
+  // rendering the internal id directly. Falls back to the static name↔id map for
+  // categories not present in the catalog yet (e.g. before it loads, or "Other").
+  const categoryDisplayName = useMemo(() => {
+    if (!state.category || state.category === "Other") return state.category;
+    const catalogMatch = catalogCats.find((c) => (CAT_METADATA[c.slug]?.oldId ?? c.slug) === state.category);
+    if (catalogMatch) return catalogMatch.name;
+    const staticMatch = Object.entries(CAT_NAME_TO_WIZARD_ID).find(([, id]) => id === state.category);
+    return staticMatch?.[0] ?? state.category;
+  }, [state.category, catalogCats]);
+
   async function compressToBlob(file: File): Promise<{ blob: Blob; previewUrl: string }> {
     return new Promise((resolve) => {
       const img = new Image();
@@ -1437,7 +1451,7 @@ export default function TradeInPage() {
                     className="shrink-0 whitespace-nowrap text-[10px] sm:text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-2 sm:px-3.5 py-0.5 sm:py-1 text-zinc-700 dark:text-zinc-300 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors shadow-2xs"
                   >
                     <span className="hidden sm:inline text-zinc-400 font-normal mr-1">Category:</span>
-                    {state.category}
+                    {categoryDisplayName}
                   </button>
                 )}
                 {state.brand && (
@@ -1493,7 +1507,7 @@ export default function TradeInPage() {
                               transition={{ duration: 0.2 }}
                               className="space-y-3 sm:space-y-6"
                             >
-                              <StepHeader label="Which brand is it?" sub={`Choose the manufacturer for your ${state.category === "Other" ? "device" : state.category.toLowerCase()}.`} />
+                              <StepHeader label="Which brand is it?" sub={`Choose the manufacturer for your ${state.category === "Other" ? "device" : categoryDisplayName.toLowerCase()}.`} />
 
                               {/* Brand filter / search */}
                               {(() => {
@@ -2863,7 +2877,7 @@ export default function TradeInPage() {
                                   <span className="text-[9px] font-extrabold text-zinc-400 uppercase tracking-wide block">Device</span>
                                   <p className="text-sm font-black text-zinc-900 dark:text-zinc-100">{state.brand} {state.model}</p>
                                   <span className="inline-block bg-zinc-200/60 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold text-[9px] px-2 py-0.5 rounded-md mt-0.5">
-                                    {state.category}
+                                    {categoryDisplayName}
                                   </span>
                                 </div>
 
