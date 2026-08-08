@@ -1427,10 +1427,7 @@ export default function TradeInPage() {
               <div ref={breadcrumbScrollRef} className="w-full max-w-full flex items-center gap-0.5 sm:gap-1.5 flex-nowrap overflow-x-auto scrollbar-hide px-0.5 pr-2 py-1 my-0.5">
                 {state.category && (
                   <button
-                    onClick={() => {
-                      setState(s => ({ ...s, category: "", brand: "", model: "" }));
-                      setPhase(1);
-                    }}
+                    onClick={closeWizard}
                     className="shrink-0 whitespace-nowrap text-[10px] sm:text-[11px] font-bold bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-2 sm:px-3.5 py-0.5 sm:py-1 text-zinc-700 dark:text-zinc-300 hover:border-red-400 hover:text-red-500 dark:hover:border-red-500 transition-colors shadow-2xs"
                   >
                     <span className="hidden sm:inline text-zinc-400 font-normal mr-1">Category:</span>
