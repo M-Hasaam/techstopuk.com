@@ -399,14 +399,19 @@ export class ScraperService implements OnApplicationBootstrap {
                         marketPrice,
                         scrapedAt:        new Date(),
                     },
+                    // A transient failure (site blocked, rate-limited, timeout) makes a
+                    // source resolve to null for this run alone — it must not erase a
+                    // previously known-good price. Undefined omits the field from the
+                    // update entirely, leaving the existing column value untouched;
+                    // `?? null` here would instead overwrite it with null every time.
                     update: {
-                        cexSellPrice:     cex?.sellPrice        ?? null,
-                        cexCashPrice:     cex?.buyCashPrice     ?? null,
-                        cexExchangePrice: cex?.buyExchangePrice ?? null,
-                        backMarketPrice:  backMarket.price,
-                        musicMagpiePrice: musicMagpie.price,
-                        envirofonePrice:  envirofone.price,
-                        marketPrice,
+                        cexSellPrice:     cex?.sellPrice        ?? undefined,
+                        cexCashPrice:     cex?.buyCashPrice     ?? undefined,
+                        cexExchangePrice: cex?.buyExchangePrice ?? undefined,
+                        backMarketPrice:  backMarket.price      ?? undefined,
+                        musicMagpiePrice: musicMagpie.price     ?? undefined,
+                        envirofonePrice:  envirofone.price      ?? undefined,
+                        marketPrice:      marketPrice           ?? undefined,
                         scrapedAt:        new Date(),
                     },
                 });
@@ -759,14 +764,17 @@ export class ScraperService implements OnApplicationBootstrap {
                             envirofonePrice:  envirofone.price,
                             marketPrice, scrapedAt: new Date(),
                         },
+                        // See identical comment above: preserve existing prices on a
+                        // transient per-run failure instead of nulling them out.
                         update: {
-                            cexSellPrice:     cex?.sellPrice        ?? null,
-                            cexCashPrice:     cex?.buyCashPrice     ?? null,
-                            cexExchangePrice: cex?.buyExchangePrice ?? null,
-                            backMarketPrice:  backMarket.price,
-                            musicMagpiePrice: musicMagpie.price,
-                            envirofonePrice:  envirofone.price,
-                            marketPrice, scrapedAt: new Date(),
+                            cexSellPrice:     cex?.sellPrice        ?? undefined,
+                            cexCashPrice:     cex?.buyCashPrice     ?? undefined,
+                            cexExchangePrice: cex?.buyExchangePrice ?? undefined,
+                            backMarketPrice:  backMarket.price      ?? undefined,
+                            musicMagpiePrice: musicMagpie.price     ?? undefined,
+                            envirofonePrice:  envirofone.price      ?? undefined,
+                            marketPrice:      marketPrice           ?? undefined,
+                            scrapedAt: new Date(),
                         },
                     });
 
