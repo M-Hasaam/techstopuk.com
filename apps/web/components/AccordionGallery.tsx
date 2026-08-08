@@ -182,6 +182,15 @@ export default function AccordionGallery({
                     alt={item.label}
                     loading={index === 0 ? "eager" : "lazy"}
                     decoding="async"
+                    ref={(el) => {
+                      // On client-side route transitions the browser can serve this image
+                      // from cache before React's onLoad listener is attached, so `load`
+                      // never fires and the tile stays stuck invisible even though the
+                      // image is fully decoded. Catch that case as soon as the node mounts.
+                      if (el && el.complete && el.naturalWidth > 0) {
+                        setLoadedIdx((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+                      }
+                    }}
                     onLoad={() => setLoadedIdx((prev) => new Set(prev).add(index))}
                     onError={() => setErroredIdx((prev) => new Set(prev).add(index))}
                     style={{

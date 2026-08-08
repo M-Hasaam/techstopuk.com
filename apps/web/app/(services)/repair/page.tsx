@@ -534,15 +534,15 @@ export default function RepairPage() {
                           return {
                             label: cat.name,
                             catId: meta.oldId ?? cat.slug,
-                            image: img || "https://images.unsplash.com/photo-1597740985671-2a8a3b80502e?q=80&w=1200&auto=format&fit=crop",
+                            image: img,
                           };
                         })
                       : [
-                          { label: "Audio", catId: "Audio", image: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?q=80&w=1200&auto=format&fit=crop" },
-                          { label: "Gaming", catId: "Console", image: "https://images.unsplash.com/photo-1606144042614-b2417e99c4e3?q=80&w=1200&auto=format&fit=crop" },
-                          { label: "Laptops", catId: "Laptop", image: "https://images.unsplash.com/photo-1517336714731-489689fd1ca8?q=80&w=1200&auto=format&fit=crop" },
-                          { label: "Phones", catId: "Phone", image: "https://images.unsplash.com/photo-1592750475338-74b7b21085ab?q=80&w=1200&auto=format&fit=crop" },
-                          { label: "Tablets", catId: "Tablet", image: "https://images.unsplash.com/photo-1544244015-0df4b3ffc6b0?q=80&w=1200&auto=format&fit=crop" },
+                          { label: "Audio", catId: "Audio", image: "" },
+                          { label: "Gaming", catId: "Console", image: "" },
+                          { label: "Laptops", catId: "Laptop", image: "" },
+                          { label: "Phones", catId: "Phone", image: "" },
+                          { label: "Tablets", catId: "Tablet", image: "" },
                         ]
                   }
                   defaultIndex={2}
