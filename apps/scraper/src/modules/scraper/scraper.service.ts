@@ -24,6 +24,11 @@ interface DevicePrices {
 type Reason = 'ok' | 'not-found' | 'timeout' | 'error' | 'rate-limit';
 interface JinaResult { price: number | null; reason: Reason; }
 
+// Thrown by scrapeCeX (instead of its usual "swallow and return null") specifically
+// when the response is a Cloudflare bot-challenge page, not an ordinary miss/timeout —
+// callers can react by rotating to a fresh proxy, which a plain retry can't fix.
+class CexBlockedError extends Error {}
+
 // Chromium flags that cut CPU/GPU overhead for a headless, single-tab scraper —
 // we never render or screenshot anything, so compositing/GPU work is pure waste.
 const CHROMIUM_ARGS = [
@@ -365,10 +370,14 @@ export class ScraperService implements OnApplicationBootstrap {
 
                 const num = `[${String(i + 1).padStart(2, '0')}/${String(total).padStart(2, '0')}]`;
 
-                let cex = await this.scrapeCeX(context, item.brand, item.model, item.storage, item.ram, !item.cexOnly);
+                let r = await this.scrapeCeXResilient(browser, context, activeProxy, item.brand, item.model, item.storage, item.ram, !item.cexOnly);
+                context = r.context; activeProxy = r.proxy;
+                let cex = r.cex;
                 if (!cex && item.storage) {
                     await this.delay(500);
-                    cex = await this.scrapeCeX(context, item.brand, item.model, '', item.ram, !item.cexOnly);
+                    r = await this.scrapeCeXResilient(browser, context, activeProxy, item.brand, item.model, '', item.ram, !item.cexOnly);
+                    context = r.context; activeProxy = r.proxy;
+                    cex = r.cex;
                 }
                 await this.delay(500);
                 const ref = cex?.sellPrice ?? undefined;
@@ -640,10 +649,44 @@ export class ScraperService implements OnApplicationBootstrap {
                 buyExchangePrice: typeof exchange       === 'number' && exchange > 0       ? exchange       : null,
             };
         } catch (e: any) {
+            // A Cloudflare bot-challenge doesn't fail navigation — the page loads fine,
+            // but the search.webuy.io response above never arrives, so we land here on
+            // timeout. Checking the title tells "genuinely blocked" apart from an
+            // ordinary transient stall, so the caller can rotate proxies instead of
+            // recording this device as if CeX simply has no listing for it.
+            const title = await page.title().catch(() => '');
+            if (title.includes('Just a moment')) {
+                throw new CexBlockedError(`CeX Cloudflare-blocked for "${query}"`);
+            }
             this.logger.error(`CeX error for "${query}": ${e.message}`);
             return null;
         } finally {
             await page.close();
+        }
+    }
+
+    /** Runs scrapeCeX; on a detected Cloudflare block (not an ordinary miss/timeout,
+     *  which scrapeCeX already resolves to null on its own) rotates to a fresh
+     *  proxy/context and retries once before giving up on this query. Returns the
+     *  (possibly rotated) context/proxy so the caller's loop-scoped variables stay in
+     *  sync for every device scraped afterward, not just this one retry. A no-op
+     *  rotation-wise when SCRAPER_PROXIES isn't configured — same as today. */
+    private async scrapeCeXResilient(
+        browser: Browser, context: BrowserContext, activeProxy: ProxyConfig | null,
+        brand: string, model: string, storage: string, ram: string, isMainDevice: boolean,
+    ): Promise<{ context: BrowserContext; proxy: ProxyConfig | null; cex: CompetitorPrices | null }> {
+        try {
+            const cex = await this.scrapeCeX(context, brand, model, storage, ram, isMainDevice);
+            return { context, proxy: activeProxy, cex };
+        } catch (e) {
+            if (!(e instanceof CexBlockedError) || !this.proxyPool.enabled) {
+                return { context, proxy: activeProxy, cex: null };
+            }
+            this.logger.warn(`CeX blocked — rotating proxy and retrying "${brand} ${model}"…`);
+            if (activeProxy) this.proxyPool.markBad(activeProxy);
+            const rotated = await this.rotateContext(browser, context, 'CeX Cloudflare-blocked');
+            const cex = await this.scrapeCeX(rotated.context, brand, model, storage, ram, isMainDevice).catch(() => null);
+            return { context: rotated.context, proxy: rotated.proxy, cex };
         }
     }
 
@@ -729,7 +772,7 @@ export class ScraperService implements OnApplicationBootstrap {
             headless: true,
             args: CHROMIUM_ARGS,
         });
-        const { context } = await this.openContext(browser);
+        let { context, proxy: activeProxy } = await this.openContext(browser);
 
         try {
             for (const storage of storageOptions) {
@@ -737,10 +780,14 @@ export class ScraperService implements OnApplicationBootstrap {
                     const fullName = [brand, model, ram, storage].filter(Boolean).join(' ');
                     this.logger.log(`  → ${fullName}`);
 
-                    let cex = await this.scrapeCeX(context, brand, model, storage, ram, !!device);
+                    let r = await this.scrapeCeXResilient(browser, context, activeProxy, brand, model, storage, ram, !!device);
+                    context = r.context; activeProxy = r.proxy;
+                    let cex = r.cex;
                     if (!cex && storage) {
                         await this.delay(500);
-                        cex = await this.scrapeCeX(context, brand, model, '', ram, !!device);
+                        r = await this.scrapeCeXResilient(browser, context, activeProxy, brand, model, '', ram, !!device);
+                        context = r.context; activeProxy = r.proxy;
+                        cex = r.cex;
                     }
                     await this.delay(500);
                     const ref2 = cex?.sellPrice ?? undefined;
