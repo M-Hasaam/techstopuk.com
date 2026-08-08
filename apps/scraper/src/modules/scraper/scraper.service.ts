@@ -75,6 +75,20 @@ export class ScraperService implements OnApplicationBootstrap {
         private readonly proxyPool: ProxyPoolService,
     ) {}
 
+    // Same config key/default the admin's "Stuck Run Threshold" setting (and apps/api's
+    // manual stuck-run cleanup) already use — one admin-configurable value governs
+    // "how long is too long" everywhere, instead of this service having its own
+    // silently-inconsistent idea of it.
+    private static readonly STUCK_THRESHOLD_CONFIG_KEY = 'scraper_stuck_threshold_hours';
+    private static readonly DEFAULT_STUCK_THRESHOLD_HOURS = 3;
+
+    private async getStuckThresholdHours(): Promise<number> {
+        const row = await this.prisma.pricingConfig
+            .findUnique({ where: { key: ScraperService.STUCK_THRESHOLD_CONFIG_KEY } })
+            .catch(() => null);
+        return row?.value ?? ScraperService.DEFAULT_STUCK_THRESHOLD_HOURS;
+    }
+
     /** Opens a fresh, fully-configured browser context — with a proxy from the pool if one is set. */
     private async openContext(browser: Browser): Promise<{ context: BrowserContext; proxy: ProxyConfig | null }> {
         const proxy = this.proxyPool.next();
@@ -221,11 +235,22 @@ export class ScraperService implements OnApplicationBootstrap {
             : 'Starting competitor price scraper…',
         );
 
-        // Mark any OTHER stuck RUNNING runs as FAILED (but not if we're in a resume,
-        // since we already handled the stuck run in onApplicationBootstrap).
+        // Mark any OTHER genuinely-stuck RUNNING runs as FAILED (but not if we're in a
+        // resume, since we already handled the stuck run in onApplicationBootstrap).
+        // This used to unconditionally fail *every* RUNNING row the instant a new run
+        // started, with no age check at all — a full catalog run legitimately takes
+        // 5-7+ hours, so any overlap at all (a manual "Run Now" while the scheduled run
+        // was still going, a slightly-early scheduler tick, etc.) killed the older run
+        // out from under itself: its own row got FAILED here mid-flight, then its
+        // in-flight process finished normally minutes/hours later and overwrote status
+        // back to COMPLETED — leaving a COMPLETED run that still shows this run's old
+        // "timed out" error message, since finishing successfully never cleared it.
+        // Only touch rows that have actually exceeded the admin-configured stuck
+        // threshold (same config the manual "stuck run cleanup" in apps/api uses).
         if (!isResume) {
+            const thresholdHours = await this.getStuckThresholdHours();
             const { count: stuckCount } = await this.prisma.scraperRun.updateMany({
-                where: { status: 'RUNNING' },
+                where: { status: 'RUNNING', startedAt: { lt: new Date(Date.now() - thresholdHours * 60 * 60 * 1000) } },
                 data:  { status: 'FAILED', finishedAt: new Date(), errorMessage: 'Run timed out — marked failed automatically' },
             });
             if (stuckCount > 0) this.logger.warn(`Marked ${stuckCount} stuck run(s) as FAILED.`);
@@ -426,7 +451,11 @@ export class ScraperService implements OnApplicationBootstrap {
 
         await this.prisma.scraperRun.update({
             where: { id: run.id },
-            data: { status: 'COMPLETED', finishedAt: new Date(), totalScraped: total },
+            // errorMessage is explicitly cleared here — if this exact row was ever
+            // touched by the stuck-run cleanup above (e.g. a run that legitimately
+            // finishes right around the threshold boundary), a genuine successful
+            // completion should never still be showing a stale "timed out" message.
+            data: { status: 'COMPLETED', finishedAt: new Date(), totalScraped: total, errorMessage: null },
         });
 
         console.log(`${SEP}`);

@@ -1199,7 +1199,13 @@ export default function ScraperPage() {
                       )}
                     </td>
                     <td className="px-6 py-3.5 text-xs max-w-70">
-                      {run.errorMessage
+                      {/* A completed run can still be carrying a stale errorMessage from
+                          before this row's fix shipped (an earlier version marked any
+                          RUNNING row FAILED the instant a new run started, then the
+                          original run went on to finish normally and overwrote status
+                          back to COMPLETED without clearing the message). Status is what
+                          actually happened; don't show a leftover error next to it. */}
+                      {run.errorMessage && run.status !== 'COMPLETED'
                         ? <span className="text-red-500 truncate block cursor-help" title={run.errorMessage}>{run.errorMessage}</span>
                         : <span className="text-zinc-300">—</span>}
                     </td>
