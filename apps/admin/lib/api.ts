@@ -984,7 +984,7 @@ export const tradeInQuestionsApi = {
   removeAll: () =>
     apiFetch<{ deleted: number }>('/trade-in-questions/all', { method: 'DELETE' }),
   seedDefaults: () =>
-    apiFetch<{ seeded: number }>('/trade-in-questions/seed', { method: 'POST' }),
+    apiFetch<{ seeded: number; imagesUploaded: number }>('/trade-in-questions/seed', { method: 'POST' }),
   // Uploads eagerly to Garage (no entity needed yet) — the returned key is attached
   // to the option in the question form and only persisted when the question is saved.
   uploadImage: (file: File) => presignedUpload('/uploads/presign-image', file),

@@ -1,4 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import fs from 'fs';
+import path from 'path';
 import { PrismaService } from '../database/prisma.service';
 import { StorageService } from '../../common/services/storage.service';
 import { UpsertQuestionDto } from './dto/upsert-question.dto';
@@ -138,8 +140,40 @@ export class TradeInQuestionsService {
         return { deleted: result.count };
     }
 
-    /** Creates any default question missing by (category, key) — safe to call repeatedly, never overwrites admin edits. */
+    /** Uploads the diagnostic option photos bundled with this service into storage,
+     *  keyed the same way DEFAULT_TRADE_IN_QUESTIONS references them. Runs every time
+     *  seedDefaults() is called (idempotent overwrite, ~19 small PNGs) rather than only
+     *  when a question row is first created — a DB row referencing an image can already
+     *  exist in an environment (e.g. after a `prisma db push` cloned prod's schema+data)
+     *  while the actual object was never uploaded to *that* environment's storage. This
+     *  makes "Seed defaults" self-contained: it no longer depends on a separate one-off
+     *  script being run by hand against each environment's storage credentials.
+     */
+    private async ensureDiagnosticImages(): Promise<number> {
+        const keys = new Set<string>();
+        for (const q of DEFAULT_TRADE_IN_QUESTIONS) {
+            for (const o of q.options) {
+                if (o.image?.startsWith('device-images/diagnostics/')) keys.add(o.image);
+            }
+        }
+
+        const assetsDir = path.join(__dirname, 'seed-assets/diagnostics');
+        let uploaded = 0;
+        for (const key of keys) {
+            const filename = key.slice('device-images/diagnostics/'.length);
+            const filePath = path.join(assetsDir, filename);
+            if (!fs.existsSync(filePath)) continue;
+            await this.storage.putObject(key, fs.readFileSync(filePath), 'image/png');
+            uploaded++;
+        }
+        return uploaded;
+    }
+
+    /** Creates any default question missing by (category, key), and re-uploads the
+     *  bundled diagnostic images to storage — safe to call repeatedly, never overwrites
+     *  admin edits to existing questions. */
     async seedDefaults() {
+        const imagesUploaded = await this.ensureDiagnosticImages();
         let seeded = 0;
         for (const q of DEFAULT_TRADE_IN_QUESTIONS) {
             const existing = await this.prisma.tradeInQuestion.findUnique({
@@ -165,6 +199,6 @@ export class TradeInQuestionsService {
             });
             seeded++;
         }
-        return { seeded };
+        return { seeded, imagesUploaded };
     }
 }

@@ -284,6 +284,15 @@ export class StorageService implements OnModuleInit {
     return { filePath: key, url };
   }
 
+  /** Writes to a caller-chosen (deterministic) key rather than generating a uuid one —
+   *  used for seed-bundled assets, where the key must stay stable and idempotent
+   *  across environments instead of getting a fresh name every time. */
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.s3Client.send(
+      new PutObjectCommand({ Bucket: this.bucketName, Key: key, Body: body, ContentType: contentType }),
+    );
+  }
+
   // ─── Download ─────────────────────────────────────────────────────────────────
 
   /** Accepts either a raw S3 key or a full own-storage URL and returns the key. */

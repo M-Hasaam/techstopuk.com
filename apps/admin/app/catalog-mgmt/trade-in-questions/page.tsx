@@ -230,8 +230,8 @@ export default function TradeInQuestionsPage() {
   async function handleSeedDefaults() {
     setSeeding(true); setBulkMsg("");
     try {
-      const { seeded } = await tradeInQuestionsApi.seedDefaults();
-      setBulkMsg(`Seeded ${seeded} default question${seeded !== 1 ? "s" : ""} (existing entries left untouched).`);
+      const { seeded, imagesUploaded } = await tradeInQuestionsApi.seedDefaults();
+      setBulkMsg(`Seeded ${seeded} default question${seeded !== 1 ? "s" : ""} (existing entries left untouched) · synced ${imagesUploaded} diagnostic image${imagesUploaded !== 1 ? "s" : ""} to storage.`);
       load();
     } catch (e: any) { setBulkMsg(e.message ?? "Seed failed"); }
     finally { setSeeding(false); }
