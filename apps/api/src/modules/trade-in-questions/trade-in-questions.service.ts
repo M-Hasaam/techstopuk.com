@@ -140,30 +140,51 @@ export class TradeInQuestionsService {
         return { deleted: result.count };
     }
 
+    // Every admin-uploaded image (products, banners, etc.) gets a fresh uuid-prefixed
+    // key per upload via StorageService.uploadFile(), so the exact URL a browser
+    // requests has never been requested before — there's no way for a CDN to have a
+    // stale cached 404 for a key that's brand new. These bundled diagnostic images
+    // used a single fixed key instead, and one of them got requested (and 404'd, since
+    // nothing had uploaded it yet) enough times that Cloudflare cached that 404 for a
+    // year. "-v2" exists purely so this ships on a URL nobody has ever requested before,
+    // matching how every other image in the app already behaves — no CDN purge required,
+    // and if this ever needs to change again, bumping to -v3 has the same effect.
+    private static readonly DIAGNOSTIC_IMAGE_PREFIX = 'device-images/diagnostics-v2/';
+    private static readonly LEGACY_DIAGNOSTIC_IMAGE_PREFIX = 'device-images/diagnostics/';
+
     /** Uploads the diagnostic option photos bundled with this service into storage,
-     *  keyed the same way DEFAULT_TRADE_IN_QUESTIONS references them. Runs every time
-     *  seedDefaults() is called (idempotent overwrite, ~19 small PNGs) rather than only
-     *  when a question row is first created — a DB row referencing an image can already
-     *  exist in an environment (e.g. after a `prisma db push` cloned prod's schema+data)
-     *  while the actual object was never uploaded to *that* environment's storage. This
-     *  makes "Seed defaults" self-contained: it no longer depends on a separate one-off
-     *  script being run by hand against each environment's storage credentials.
-     */
+     *  keyed the same way DEFAULT_TRADE_IN_QUESTIONS references them, and migrates any
+     *  option still pointing at the pre-versioning key onto the new one. Runs every time
+     *  seedDefaults() is called (idempotent, ~19 small PNGs) rather than only when a
+     *  question row is first created — a DB row referencing an image can already exist
+     *  in an environment while the actual object was never uploaded to *that*
+     *  environment's storage. This makes "Seed defaults" fully self-contained: it no
+     *  longer depends on a separate one-off script run by hand against each
+     *  environment's storage credentials. */
     private async ensureDiagnosticImages(): Promise<number> {
         const keys = new Set<string>();
         for (const q of DEFAULT_TRADE_IN_QUESTIONS) {
             for (const o of q.options) {
-                if (o.image?.startsWith('device-images/diagnostics/')) keys.add(o.image);
+                if (o.image?.startsWith(TradeInQuestionsService.DIAGNOSTIC_IMAGE_PREFIX)) keys.add(o.image);
             }
         }
 
         const assetsDir = path.join(__dirname, 'seed-assets/diagnostics');
         let uploaded = 0;
         for (const key of keys) {
-            const filename = key.slice('device-images/diagnostics/'.length);
+            const filename = key.slice(TradeInQuestionsService.DIAGNOSTIC_IMAGE_PREFIX.length);
             const filePath = path.join(assetsDir, filename);
             if (!fs.existsSync(filePath)) continue;
             await this.storage.putObject(key, fs.readFileSync(filePath), 'image/png');
+
+            // Exact-match only, so an admin's manual image edit is never overwritten —
+            // this only repoints options that still hold the untouched legacy default.
+            const legacyKey = TradeInQuestionsService.LEGACY_DIAGNOSTIC_IMAGE_PREFIX + filename;
+            await this.prisma.tradeInQuestionOption.updateMany({
+                where: { image: legacyKey },
+                data: { image: key },
+            });
+
             uploaded++;
         }
         return uploaded;
