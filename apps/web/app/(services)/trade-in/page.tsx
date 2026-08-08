@@ -8,7 +8,6 @@ import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, t
 import DeviceSearchBox from "@/components/DeviceSearchBox";
 import CameraCaptureModal from "@/components/CameraCaptureModal";
 import AccordionGallery from "@/components/AccordionGallery";
-import TradeInDepreciationChart from "@/components/TradeInDepreciationChart";
 import { LayoutTextFlip } from "@/components/ui/layout-text-flip";
 import {
   ArrowLeft, ArrowRight,
@@ -2589,11 +2588,6 @@ export default function TradeInPage() {
                                     </div>
                                   );
                                 })}
-                              </div>
-
-                              {/* Best time to sell — Interactive Recharts Depreciation Graph */}
-                              <div className="max-w-md mx-auto w-full">
-                                <TradeInDepreciationChart currentOffer={aiPrice} />
                               </div>
                             </div>
 
