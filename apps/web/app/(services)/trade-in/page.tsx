@@ -2546,6 +2546,9 @@ export default function TradeInPage() {
                                     <span className="text-[9px] font-extrabold text-zinc-800 dark:text-zinc-200">Same-Day Payout</span>
                                   </div>
                                 </div>
+                                <p className="text-[10px] leading-relaxed text-zinc-500 dark:text-zinc-400 text-center pt-3 mt-3 border-t border-emerald-500/20 relative z-10">
+                                  Based on condition — if the condition matches the description above, this price will be paid out. If the condition of the item is different than described, we will contact you with a new quote.
+                                </p>
                               </div>
 
                               {/* Price adjustment breakdown details — a flat, single-line-per-row
