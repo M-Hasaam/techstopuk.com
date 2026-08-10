@@ -1,23 +1,6 @@
 [
   {
     "index": "01",
-    "tabTitle": "Upgrade iPhone",
-    "tag": "Featured Promotion",
-    "titleLine1": "UPGRADE YOUR",
-    "titleLine2": "IPHONE",
-    "titleItalic": "for less.",
-    "desc": "Get pristine, certified refurbished iPhones with a full 12-month warranty. Rigorously tested by in-house technicians, graded honestly.",
-    "img": "refurbished-iphone.png",
-    "themeColor": "from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-400",
-    "bgGlow": "rgba(59, 130, 246, 0.15)",
-    "specs": ["12-Month Warranty", "Pristine Condition", "Save up to 40%"],
-    "badgeA": "Pristine Grade",
-    "badgeB": "Save up to 40%",
-    "btnText": "Shop Refurbished",
-    "btnLink": "/shop/phones"
-  },
-  {
-    "index": "02",
     "tabTitle": "Sell & Trade-In",
     "tag": "Instant Valuation",
     "titleLine1": "WE BUY TECH",
@@ -34,7 +17,7 @@
     "btnLink": "/sell"
   },
   {
-    "index": "03",
+    "index": "02",
     "tabTitle": "Expert Repairs",
     "tag": "Certified Technicians",
     "titleLine1": "BOOK A DEVICE",
@@ -49,6 +32,23 @@
     "badgeB": "Same-Day Fix",
     "btnText": "Book Repair",
     "btnLink": "/repair"
+  },
+  {
+    "index": "03",
+    "tabTitle": "Upgrade iPhone",
+    "tag": "Featured Promotion",
+    "titleLine1": "UPGRADE YOUR",
+    "titleLine2": "IPHONE",
+    "titleItalic": "for less.",
+    "desc": "Get pristine, certified refurbished iPhones with a full 12-month warranty. Rigorously tested by in-house technicians, graded honestly.",
+    "img": "refurbished-iphone.png",
+    "themeColor": "from-blue-500 to-indigo-600 dark:from-blue-400 dark:to-indigo-400",
+    "bgGlow": "rgba(59, 130, 246, 0.15)",
+    "specs": ["12-Month Warranty", "Pristine Condition", "Save up to 40%"],
+    "badgeA": "Pristine Grade",
+    "badgeB": "Save up to 40%",
+    "btnText": "Shop Refurbished",
+    "btnLink": "/shop/phones"
   },
   {
     "index": "04",
