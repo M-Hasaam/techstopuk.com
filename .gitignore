@@ -24,12 +24,12 @@
 /build
 
 # IDE & Editor settings
-.vscode/
-.idea/
-.code-review-graph/
-.superpowers/
-.claude/
-.cursor/
+.vscode
+.idea
+.code-review-graph
+.superpowers
+.claude
+.cursor
 
 # misc
 .DS_Store
