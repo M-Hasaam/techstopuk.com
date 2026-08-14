@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab anytime
 
 jobs:
   # ----------------------------------------------------
@@ -29,7 +30,7 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Web Deployment
-        if: steps.filter.outputs.src == 'true'
+        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_WEB }}
         run: |
@@ -63,7 +64,7 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Admin Deployment
-        if: steps.filter.outputs.src == 'true'
+        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_ADMIN }}
         run: |
@@ -97,7 +98,7 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger API Deployment
-        if: steps.filter.outputs.src == 'true'
+        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_API }}
         run: |
@@ -131,7 +132,7 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Scraper Deployment
-        if: steps.filter.outputs.src == 'true'
+        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_SCRAPER }}
         run: |
