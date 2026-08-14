@@ -31,6 +31,14 @@
 .claude
 .cursor
 
+# AI Agent & Rules files
+.mcp.json
+.windsurfrules
+.cursorrules
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+
 # misc
 .DS_Store
 *.pem
