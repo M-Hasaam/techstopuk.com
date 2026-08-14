@@ -29,10 +29,16 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Web Deployment
-        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_WEB != ''
+        if: steps.filter.outputs.src == 'true'
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_WEB }}
         run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "Warning: COOLIFY_WEBHOOK_WEB secret is not set. Skipping deployment."
+            exit 0
+          fi
           echo "Triggering Web App deployment on Coolify..."
-          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}" && echo "Web deployment triggered successfully!"
+          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Web deployment triggered successfully!"
 
   # ----------------------------------------------------
   # 2. ADMIN APP DEPLOYMENT (apps/admin)
@@ -57,10 +63,16 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Admin Deployment
-        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_ADMIN != ''
+        if: steps.filter.outputs.src == 'true'
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_ADMIN }}
         run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "Warning: COOLIFY_WEBHOOK_ADMIN secret is not set. Skipping deployment."
+            exit 0
+          fi
           echo "Triggering Admin App deployment on Coolify..."
-          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_ADMIN }}" && echo "Admin deployment triggered successfully!"
+          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Admin deployment triggered successfully!"
 
   # ----------------------------------------------------
   # 3. API APP DEPLOYMENT (apps/api)
@@ -85,10 +97,16 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger API Deployment
-        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_API != ''
+        if: steps.filter.outputs.src == 'true'
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_API }}
         run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "Warning: COOLIFY_WEBHOOK_API secret is not set. Skipping deployment."
+            exit 0
+          fi
           echo "Triggering API App deployment on Coolify..."
-          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_API }}" && echo "API deployment triggered successfully!"
+          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "API deployment triggered successfully!"
 
   # ----------------------------------------------------
   # 4. SCRAPER APP DEPLOYMENT (apps/scraper)
@@ -113,7 +131,13 @@ jobs:
               - 'turbo.json'
 
       - name: Trigger Scraper Deployment
-        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_SCRAPER != ''
+        if: steps.filter.outputs.src == 'true'
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_SCRAPER }}
         run: |
+          if [ -z "$COOLIFY_WEBHOOK" ]; then
+            echo "Warning: COOLIFY_WEBHOOK_SCRAPER secret is not set. Skipping deployment."
+            exit 0
+          fi
           echo "Triggering Scraper deployment on Coolify..."
-          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_SCRAPER }}" && echo "Scraper deployment triggered successfully!"
+          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Scraper deployment triggered successfully!"
