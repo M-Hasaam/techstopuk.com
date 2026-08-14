@@ -2,12 +2,17 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import NextImage from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import Fuse from "fuse.js";
-import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, tradeInQuestionsApi, type Store, type CatalogCategory, type Product, type TradeInQuestion } from "@/lib/api";
+import { tradeInsApi, storesApi, uploadsApi, catalogApi, productsApi, authApi, tradeInQuestionsApi, type Store, type CatalogCategory, type TradeInQuestion } from "@/lib/api";
 import DeviceSearchBox from "@/components/DeviceSearchBox";
-import CameraCaptureModal from "@/components/CameraCaptureModal";
 import AccordionGallery from "@/components/AccordionGallery";
+
+// Only needed once the customer opens the camera — keeping it out of the
+// initial /trade-in bundle noticeably shrinks first-load JS on mobile.
+const CameraCaptureModal = dynamic(() => import("@/components/CameraCaptureModal"), { ssr: false });
 import { LayoutTextFlip } from "@/components/ui/layout-text-flip";
 import {
   ArrowLeft, ArrowRight,
@@ -444,22 +449,6 @@ export default function TradeInPage() {
       })
       .catch(() => {})
       .finally(() => setCatalogCatsLoaded(true));
-  }, []);
-
-  const [hotItems, setHotItems] = useState<Product[]>([]);
-  useEffect(() => {
-    productsApi.list({ limit: 20, condition: "Pristine" }).then(r => {
-      // pick the most expensive product from each category, up to 4
-      const seen = new Set<string>();
-      const picks: Product[] = [];
-      for (const p of [...r.items].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))) {
-        if (!seen.has(p.category) && picks.length < 4) {
-          seen.add(p.category);
-          picks.push(p);
-        }
-      }
-      setHotItems(picks.length > 0 ? picks : r.items.slice(0, 4));
-    }).catch(() => {});
   }, []);
 
   const [submitting, setSubmitting] = useState(false);
@@ -1936,10 +1925,12 @@ export default function TradeInPage() {
                                     >
                                       {/* Visual image preview header */}
                                       <div className="relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 mb-3 border border-zinc-200/50 dark:border-zinc-800 shrink-0">
-                                        <img
+                                        <NextImage
                                           src={c.image}
                                           alt={c.label}
-                                          className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                          fill
+                                          sizes="(max-width: 640px) 45vw, 240px"
+                                          className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
                                             isSelected ? "scale-105" : "opacity-90"
                                           }`}
                                         />
@@ -2101,10 +2092,12 @@ export default function TradeInPage() {
                                           {/* Top Image Banner */}
                                           <div className="aspect-[16/9] w-full relative overflow-hidden bg-zinc-100 dark:bg-zinc-900/80 border-b border-zinc-200/60 dark:border-zinc-800">
                                             {optImg ? (
-                                              <img
+                                              <NextImage
                                                 src={optImg}
                                                 alt={opt.label}
-                                                className={`w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105 ${
+                                                fill
+                                                sizes="(max-width: 640px) 90vw, 45vw"
+                                                className={`object-cover object-center transition-transform duration-500 group-hover:scale-105 ${
                                                   isSelected ? "scale-105" : "opacity-95"
                                                 }`}
                                               />
@@ -2688,10 +2681,12 @@ export default function TradeInPage() {
                                       >
                                         {/* Visual image preview header */}
                                         <div className="relative w-full h-28 sm:h-32 rounded-xl overflow-hidden bg-zinc-900 mb-3 border border-zinc-200/50 dark:border-zinc-800 shrink-0">
-                                          <img
+                                          <NextImage
                                             src={m.image}
                                             alt={m.title}
-                                            className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                                            fill
+                                            sizes="(max-width: 640px) 45vw, 240px"
+                                            className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
                                               isSelected ? "scale-105" : "opacity-90"
                                             }`}
                                           />

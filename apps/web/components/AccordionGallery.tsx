@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { ImageOff } from "lucide-react";
 
 export interface AccordionItem {
@@ -177,11 +178,12 @@ export default function AccordionGallery({
                   {!loadedIdx.has(index) && (
                     <div className="absolute inset-0 bg-zinc-700 animate-pulse" />
                   )}
-                  <img
+                  <Image
                     src={item.image}
                     alt={item.label}
-                    loading={index === 0 ? "eager" : "lazy"}
-                    decoding="async"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 20vw"
+                    priority={index === 0}
                     ref={(el) => {
                       // On client-side route transitions the browser can serve this image
                       // from cache before React's onLoad listener is attached, so `load`
@@ -198,7 +200,7 @@ export default function AccordionGallery({
                       transition: `filter ${duration}s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.3s ease-out`,
                       opacity: loadedIdx.has(index) ? 1 : 0,
                     }}
-                    className="w-full h-full object-cover"
+                    className="object-cover"
                   />
                 </>
               ) : (
