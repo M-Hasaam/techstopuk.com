@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab anytime
+  workflow_dispatch:
 
 jobs:
   # ----------------------------------------------------
@@ -39,7 +39,15 @@ jobs:
             exit 0
           fi
           echo "Triggering Web App deployment on Coolify..."
-          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Web deployment triggered successfully!"
+          response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+          echo "$response"
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Web deployment triggered successfully!"
+          else
+            echo "❌ Coolify returned HTTP $http_code"
+            exit 1
+          fi
 
   # ----------------------------------------------------
   # 2. ADMIN APP DEPLOYMENT (apps/admin)
@@ -73,7 +81,15 @@ jobs:
             exit 0
           fi
           echo "Triggering Admin App deployment on Coolify..."
-          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Admin deployment triggered successfully!"
+          response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+          echo "$response"
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Admin deployment triggered successfully!"
+          else
+            echo "❌ Coolify returned HTTP $http_code"
+            exit 1
+          fi
 
   # ----------------------------------------------------
   # 3. API APP DEPLOYMENT (apps/api)
@@ -107,7 +123,15 @@ jobs:
             exit 0
           fi
           echo "Triggering API App deployment on Coolify..."
-          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "API deployment triggered successfully!"
+          response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+          echo "$response"
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ API deployment triggered successfully!"
+          else
+            echo "❌ Coolify returned HTTP $http_code"
+            exit 1
+          fi
 
   # ----------------------------------------------------
   # 4. SCRAPER APP DEPLOYMENT (apps/scraper)
@@ -141,4 +165,12 @@ jobs:
             exit 0
           fi
           echo "Triggering Scraper deployment on Coolify..."
-          curl -s -f -X GET "$COOLIFY_WEBHOOK" && echo "Scraper deployment triggered successfully!"
+          response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+          echo "$response"
+          http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
+          if [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+            echo "✅ Scraper deployment triggered successfully!"
+          else
+            echo "❌ Coolify returned HTTP $http_code"
+            exit 1
+          fi
