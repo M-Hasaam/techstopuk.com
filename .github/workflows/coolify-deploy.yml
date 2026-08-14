@@ -1,0 +1,119 @@
+name: Coolify Monorepo Deployments
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  # ----------------------------------------------------
+  # 1. WEB APP DEPLOYMENT (apps/web)
+  # ----------------------------------------------------
+  deploy-web:
+    name: Deploy Web App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Web changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'apps/web/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+
+      - name: Trigger Web Deployment
+        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_WEB != ''
+        run: |
+          echo "Triggering Web App deployment on Coolify..."
+          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_WEB }}" && echo "Web deployment triggered successfully!"
+
+  # ----------------------------------------------------
+  # 2. ADMIN APP DEPLOYMENT (apps/admin)
+  # ----------------------------------------------------
+  deploy-admin:
+    name: Deploy Admin App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Admin changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'apps/admin/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+
+      - name: Trigger Admin Deployment
+        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_ADMIN != ''
+        run: |
+          echo "Triggering Admin App deployment on Coolify..."
+          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_ADMIN }}" && echo "Admin deployment triggered successfully!"
+
+  # ----------------------------------------------------
+  # 3. API APP DEPLOYMENT (apps/api)
+  # ----------------------------------------------------
+  deploy-api:
+    name: Deploy API App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for API changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'apps/api/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+
+      - name: Trigger API Deployment
+        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_API != ''
+        run: |
+          echo "Triggering API App deployment on Coolify..."
+          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_API }}" && echo "API deployment triggered successfully!"
+
+  # ----------------------------------------------------
+  # 4. SCRAPER APP DEPLOYMENT (apps/scraper)
+  # ----------------------------------------------------
+  deploy-scraper:
+    name: Deploy Scraper App
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check for Scraper changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            src:
+              - 'apps/scraper/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+
+      - name: Trigger Scraper Deployment
+        if: steps.filter.outputs.src == 'true' && secrets.COOLIFY_WEBHOOK_SCRAPER != ''
+        run: |
+          echo "Triggering Scraper deployment on Coolify..."
+          curl -s -f -X GET "${{ secrets.COOLIFY_WEBHOOK_SCRAPER }}" && echo "Scraper deployment triggered successfully!"
