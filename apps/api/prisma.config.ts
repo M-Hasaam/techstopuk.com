@@ -1,4 +1,8 @@
-import 'dotenv/config';
+try {
+    require('dotenv/config');
+} catch {
+    // Optional in bare CI runners without node_modules
+}
 import { defineConfig } from 'prisma/config';
 
 const databaseUrl =
