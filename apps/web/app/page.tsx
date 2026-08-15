@@ -1905,7 +1905,7 @@ function SavingsComparison() {
                     className="group flex items-center gap-3 md:gap-6 p-3 md:p-5 rounded-2xl border border-zinc-100 hover:shadow-md hover:border-zinc-200 transition-all cursor-pointer"
                   >
                     <div className="relative h-12 w-12 md:h-16 md:w-16 rounded-2xl bg-image-light flex-shrink-0 overflow-hidden">
-                      <ProductImage src={item.img} alt={item.device} hover={false} sizes="64px" />
+                      <ProductImage src={item.img} alt={item.device} hover={false} sizes="64px" className="!p-1.5 md:!p-2" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-zinc-950 text-xs sm:text-sm truncate">{item.device}</p>
