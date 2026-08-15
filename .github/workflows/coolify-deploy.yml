@@ -8,33 +8,60 @@ on:
 
 jobs:
   # ----------------------------------------------------
-  # 1. WEB APP DEPLOYMENT (apps/web)
+  # 0. DETECT PATH CHANGES
   # ----------------------------------------------------
-  deploy-web:
-    name: Deploy Web App
+  changes:
+    name: Detect Changes
     runs-on: ubuntu-latest
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      admin: ${{ steps.filter.outputs.admin }}
+      api: ${{ steps.filter.outputs.api }}
+      scraper: ${{ steps.filter.outputs.scraper }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check for Web changes
+      - name: Check for App changes
         uses: dorny/paths-filter@v3
         id: filter
         with:
           filters: |
-            src:
+            web:
               - 'apps/web/**'
               - 'packages/**'
               - 'package.json'
               - 'package-lock.json'
               - 'turbo.json'
+            admin:
+              - 'apps/admin/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
+            scraper:
+              - 'apps/scraper/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'turbo.json'
 
-      - name: Skip Web Deployment Notice
-        if: steps.filter.outputs.src == 'false' && github.event_name != 'workflow_dispatch'
-        run: echo "ℹ️ No changes in apps/web detected. Skipping Coolify webhook trigger."
-
+  # ----------------------------------------------------
+  # 1. WEB APP DEPLOYMENT (apps/web)
+  # ----------------------------------------------------
+  deploy-web:
+    name: Deploy Web App
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
       - name: Trigger Web Deployment
-        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_WEB }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
@@ -65,29 +92,11 @@ jobs:
   # ----------------------------------------------------
   deploy-admin:
     name: Deploy Admin App
+    needs: changes
+    if: needs.changes.outputs.admin == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Check for Admin changes
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            src:
-              - 'apps/admin/**'
-              - 'packages/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'turbo.json'
-
-      - name: Skip Admin Deployment Notice
-        if: steps.filter.outputs.src == 'false' && github.event_name != 'workflow_dispatch'
-        run: echo "ℹ️ No changes in apps/admin detected. Skipping Coolify webhook trigger."
-
       - name: Trigger Admin Deployment
-        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_ADMIN }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
@@ -118,29 +127,11 @@ jobs:
   # ----------------------------------------------------
   deploy-api:
     name: Deploy API App
+    needs: changes
+    if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Check for API changes
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            src:
-              - 'apps/api/**'
-              - 'packages/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'turbo.json'
-
-      - name: Skip API Deployment Notice
-        if: steps.filter.outputs.src == 'false' && github.event_name != 'workflow_dispatch'
-        run: echo "ℹ️ No changes in apps/api detected. Skipping Coolify webhook trigger."
-
       - name: Trigger API Deployment
-        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_API }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
@@ -171,29 +162,11 @@ jobs:
   # ----------------------------------------------------
   deploy-scraper:
     name: Deploy Scraper App
+    needs: changes
+    if: needs.changes.outputs.scraper == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Check for Scraper changes
-        uses: dorny/paths-filter@v3
-        id: filter
-        with:
-          filters: |
-            src:
-              - 'apps/scraper/**'
-              - 'packages/**'
-              - 'package.json'
-              - 'package-lock.json'
-              - 'turbo.json'
-
-      - name: Skip Scraper Deployment Notice
-        if: steps.filter.outputs.src == 'false' && github.event_name != 'workflow_dispatch'
-        run: echo "ℹ️ No changes in apps/scraper detected. Skipping Coolify webhook trigger."
-
       - name: Trigger Scraper Deployment
-        if: steps.filter.outputs.src == 'true' || github.event_name == 'workflow_dispatch'
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_SCRAPER }}
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
