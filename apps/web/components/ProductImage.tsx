@@ -102,9 +102,11 @@ export default function ProductImage({
       className={`${position} overflow-hidden ${bg} ${isFill ? "w-full h-full" : "inline-block"} ${wrapperClassName}`}
       style={!isFill ? { width, height } : undefined}
     >
-      {/* 1. Show subtle animated pulse skeleton background while image is downloading */}
+      {/* 1. Show subtle animated pulse skeleton background with centered Package icon while image is downloading */}
       {showSkeleton && (
-        <div className="absolute inset-0 z-0 bg-gradient-to-r from-zinc-200/50 via-zinc-100 to-zinc-200/50 dark:from-zinc-800/40 dark:via-zinc-700/40 dark:to-zinc-800/40 animate-pulse" />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-zinc-200/60 via-zinc-100 to-zinc-200/60 dark:from-zinc-800/40 dark:via-zinc-700/40 dark:to-zinc-800/40 animate-pulse flex items-center justify-center">
+          <Package className={`${iconClassName} text-zinc-300/80 dark:text-zinc-600/60`} strokeWidth={1.5} />
+        </div>
       )}
 
       {/* 2. Show fallback Package icon if image genuinely fails or has no src */}
