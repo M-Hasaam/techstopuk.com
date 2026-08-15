@@ -1,15 +1,5 @@
-try {
-    require('dotenv/config');
-} catch {
-    // Optional in bare CI runners
-}
-
-let defineConfig: any = (config: any) => config;
-try {
-    defineConfig = require('prisma/config').defineConfig;
-} catch {
-    // Optional in bare CI runners
-}
+import 'dotenv/config';
+import { defineConfig } from 'prisma/config';
 
 const databaseUrl =
     process.env.DATABASE_URL ??
