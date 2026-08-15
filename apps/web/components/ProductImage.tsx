@@ -3,10 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { Package } from "lucide-react";
+import { getSubcategoryIcon } from "../lib/brand-logos";
 
 interface ProductImageProps {
   src: string | null | undefined;
   alt: string;
+  category?: string;
+  fallbackIcon?: React.ComponentType<{ className?: string }>;
   hover?: boolean;
   mode?: "product" | "cover";
   sizes?: string;
@@ -44,6 +47,8 @@ interface ProductImageProps {
 export default function ProductImage({
   src,
   alt,
+  category,
+  fallbackIcon,
   hover = true,
   mode = "product",
   sizes = "(max-width: 640px) 90vw, (max-width: 1024px) 45vw, 30vw",
@@ -60,6 +65,8 @@ export default function ProductImage({
   const [failed, setFailed] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const isFill = width === undefined || height === undefined;
+
+  const FallbackIcon = fallbackIcon ?? getSubcategoryIcon(category ?? alt);
 
   // Reset on src change
   useEffect(() => {
@@ -102,17 +109,17 @@ export default function ProductImage({
       className={`${position} overflow-hidden ${bg} ${isFill ? "w-full h-full" : "inline-block"} ${wrapperClassName}`}
       style={!isFill ? { width, height } : undefined}
     >
-      {/* 1. Show subtle animated pulse skeleton background with centered Package icon while image is downloading */}
+      {/* 1. Show subtle animated pulse skeleton background with centered category icon while image is downloading */}
       {showSkeleton && (
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-zinc-200/60 via-zinc-100 to-zinc-200/60 dark:from-zinc-800/40 dark:via-zinc-700/40 dark:to-zinc-800/40 animate-pulse flex items-center justify-center">
-          <Package className={`${iconClassName} text-zinc-300/80 dark:text-zinc-600/60`} strokeWidth={1.5} />
+          <FallbackIcon className={`${iconClassName} text-zinc-300/80 dark:text-zinc-600/60`} strokeWidth={1.5} />
         </div>
       )}
 
-      {/* 2. Show fallback Package icon if image genuinely fails or has no src */}
+      {/* 2. Show fallback category icon if image genuinely fails or has no src */}
       {showPlaceholder && (
         <div className="absolute inset-0 flex items-center justify-center z-0">
-          <Package className={`${iconClassName} text-zinc-300 dark:text-zinc-600`} strokeWidth={1.5} />
+          <FallbackIcon className={`${iconClassName} text-zinc-300 dark:text-zinc-600`} strokeWidth={1.5} />
         </div>
       )}
 

@@ -1540,24 +1540,25 @@ function BestDealsSplit() {
                 <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 text-center leading-tight">All Deals</span>
               </button>
 
-              {categoryPills.map((pill) => (
-                <button
-                  key={pill.category}
-                  onClick={() => setSelectedCategory(pill.category)}
-                  className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[64px] group"
-                >
-                  <div className={`h-12 w-[64px] rounded-xl border overflow-hidden flex items-center justify-center transition-colors ${selectedCategory === pill.category
-                    ? "border-zinc-950 dark:border-white bg-image-light shadow-sm"
-                    : "bg-image-light border-transparent hover:border-zinc-200 dark:hover:border-zinc-700"
-                    }`}>
-                    {pill.img
-                      ? <NextImage src={pill.img} alt={pill.name} width={36} height={36} className="object-contain mix-blend-multiply" />
-                      : <span className="text-[9px] font-bold text-zinc-500 uppercase">{pill.name.slice(0, 3)}</span>
-                    }
-                  </div>
-                  <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 text-center leading-tight truncate w-full">{pill.name}</span>
-                </button>
-              ))}
+              {categoryPills.map((pill) => {
+                const Icon = getSubcategoryIcon(pill.name);
+                const isSelected = selectedCategory === pill.category;
+                return (
+                  <button
+                    key={pill.category}
+                    onClick={() => setSelectedCategory(pill.category)}
+                    className="flex flex-col items-center gap-1.5 flex-shrink-0 w-[68px] group"
+                  >
+                    <div className={`h-12 w-[64px] rounded-xl border flex items-center justify-center transition-all ${isSelected
+                      ? "bg-zinc-950 border-zinc-950 text-white dark:bg-white dark:border-white dark:text-zinc-950 shadow-sm"
+                      : "bg-image-light border-transparent hover:border-zinc-200 dark:hover:border-zinc-700 text-zinc-700 dark:text-zinc-300"
+                      }`}>
+                      <Icon className={`h-5 w-5 ${isSelected ? "text-white dark:text-zinc-950" : "text-zinc-700 dark:text-zinc-300"}`} />
+                    </div>
+                    <span className="text-[10px] font-medium text-zinc-600 dark:text-zinc-400 text-center leading-tight truncate w-full px-0.5">{pill.name}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Products */}
@@ -1575,7 +1576,7 @@ function BestDealsSplit() {
                         <div className="absolute top-2 left-2 z-20 flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-500 text-white text-[8px] font-bold uppercase tracking-wider shadow-sm">
                           <Zap className="h-2 w-2 fill-white" /> Flash
                         </div>
-                        <ProductImage src={p.images?.[0]} alt={p.name} />
+                        <ProductImage src={p.images?.[0]} alt={p.name} category={p.category} />
                       </div>
                       <p className="font-semibold text-zinc-950 text-[12.5px] leading-snug mb-1 line-clamp-2 hover:underline min-h-[36px]">{p.name}</p>
                     </Link>
