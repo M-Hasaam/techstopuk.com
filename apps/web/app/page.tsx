@@ -90,6 +90,7 @@ import { useCart } from "../context/cart-context";
 import ProductImage from "../components/ProductImage";
 import { isOtherProduct } from "../lib/other-categories";
 import LogoLoop from "../components/LogoLoop";
+import { BRAND_SVGS, getSubcategoryIcon } from "../lib/brand-logos";
 const Footer = dynamic(() => import("../components/Footer"));
 
 // ─── Promo Carousel Banner ───────────────────────────────────────────────────
@@ -2142,30 +2143,26 @@ function TopBrandsSplit() {
                 All
               </button>
 
-              {brands.map((brand) => (
-                <button
-                  key={brand.id}
-                  onClick={() => setActiveBrand(brand.name)}
-                  className={`flex-shrink-0 h-10 px-4 rounded-full font-bold text-sm transition-all duration-200 border flex items-center gap-2 ${activeBrand === brand.name
-                    ? "bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white"
-                    : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:bg-zinc-900/40 dark:text-zinc-400 dark:border-zinc-800 dark:hover:text-white dark:hover:border-zinc-400"
-                    }`}
-                >
-                  {brand.logo && (
-                    <NextImage
-                      src={brand.logo}
-                      alt={brand.name}
-                      width={20}
-                      height={20}
-                      className={`object-contain flex-shrink-0 ${activeBrand === brand.name
-                        ? "brightness-0 invert dark:brightness-100 dark:invert-0"
-                        : "dark:brightness-0 dark:invert"
-                        }`}
-                    />
-                  )}
-                  {brand.name}
-                </button>
-              ))}
+              {brands.map((brand) => {
+                const SvgLogo = BRAND_SVGS[brand.name];
+                return (
+                  <button
+                    key={brand.id}
+                    onClick={() => setActiveBrand(brand.name)}
+                    className={`flex-shrink-0 h-10 px-4 rounded-full font-bold text-sm transition-all duration-200 border flex items-center gap-2 ${activeBrand === brand.name
+                      ? "bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white"
+                      : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:bg-zinc-900/40 dark:text-zinc-400 dark:border-zinc-800 dark:hover:text-white dark:hover:border-zinc-400"
+                      }`}
+                  >
+                    {SvgLogo && (
+                      <span className={`shrink-0 ${activeBrand === brand.name ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
+                        {SvgLogo}
+                      </span>
+                    )}
+                    <span>{brand.name}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Products horizontal scroll */}

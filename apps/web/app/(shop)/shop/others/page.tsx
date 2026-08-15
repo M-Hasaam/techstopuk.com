@@ -9,6 +9,7 @@ import { productsApi } from "@/lib/api";
 import { GradeBadge } from "@/components/GradeBadge";
 import { useCart } from "@/context/cart-context";
 import ProductImage from "@/components/ProductImage";
+import { getSubcategoryIcon } from "@/lib/brand-logos";
 
 
 interface Product {
@@ -101,7 +102,30 @@ export default function OthersPage() {
               <p className="font-bold">No products found</p>
             </div>
           ) : (
-            <div className="space-y-16">
+            <div className="space-y-12">
+              {/* SUBCATEGORY PILLS QUICK NAV */}
+              {categories.length > 0 && (
+                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 sm:p-6 rounded-[28px] border border-zinc-200/80 dark:border-zinc-800">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-3 sm:mb-4">Browse by type</p>
+                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
+                    {categories.map(cat => {
+                      const Icon = getSubcategoryIcon(cat);
+                      return (
+                        <a
+                          key={cat}
+                          href={`#${cat.toLowerCase()}`}
+                          className="flex items-center gap-2.5 px-4 h-12 rounded-2xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-900 dark:hover:border-white transition-all shrink-0 shadow-sm group cursor-pointer"
+                        >
+                          <div className="h-7 w-7 rounded-xl bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center shrink-0 group-hover:bg-zinc-900 group-hover:text-white transition-colors">
+                            <Icon className="h-3.5 w-3.5" />
+                          </div>
+                          <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{cat}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
               {/* ALL SECTION */}
               {allFiltered.length > 0 && (
                 <div>
