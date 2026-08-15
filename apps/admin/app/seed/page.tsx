@@ -37,6 +37,7 @@ interface SeedResult {
   pricingConfigs: number;
   deviceCatalog: number;
   tradeInQuestions?: number;
+  stores?: number;
   banners: number;
   promoSlides: number;
   others: { created: number; updated: number; errors: string[] };
@@ -69,6 +70,7 @@ interface PurgeResult {
     deviceCatalog: number;
     tradeInDevices?: number;
     tradeInQuestions?: number;
+    stores?: number;
     brandCategories: number;
     categories: number;
     brands: number;
@@ -226,6 +228,10 @@ export default function SeedPage() {
               <div className="flex items-center justify-between px-5 py-2.5">
                 <span className="text-sm text-zinc-500">Trade-in questions seeded</span>
                 <span className="font-bold text-sm">{result.tradeInQuestions ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-sm text-zinc-500">Store locations seeded</span>
+                <span className="font-bold text-sm">{result.stores ?? 0}</span>
               </div>
               <div className="flex items-center justify-between px-5 py-2.5">
                 <span className="text-sm text-zinc-500">Promo slides seeded</span>
@@ -411,6 +417,10 @@ export default function SeedPage() {
                 <div className="flex items-center justify-between px-5 py-2.5">
                   <span className="text-sm text-zinc-500">Trade-In Questions</span>
                   <span className="font-bold text-sm text-red-600">{purgeResult.counts.tradeInQuestions ?? 0}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2.5">
+                  <span className="text-sm text-zinc-500">Store Locations</span>
+                  <span className="font-bold text-sm text-red-600">{purgeResult.counts.stores ?? 0}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-2.5">
                   <span className="text-sm text-zinc-500">Brand-Category Links</span>

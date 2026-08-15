@@ -455,6 +455,7 @@ export interface SeedResult {
     deviceCatalog: number;
     tradeInDevices: number;
     tradeInQuestions?: number;
+    stores?: number;
     others: { created: number; updated: number; errors: string[] };
     categories: number;
     brands: number;
@@ -541,6 +542,7 @@ export class SeedService {
         const deviceCount    = await this.seedCatalogFromFolder();
         const tradeInDevicesCount = await this.seedTradeInDevices();
         const tradeInQuestionsResult = await this.tradeInQuestionsService.seedDefaults();
+        const storesCount    = await this.seedStores();
         const productsResult = await this.seedProducts(productsData);
         const othersResult   = await this.seedOthers();
         const helplineSeeded    = await this.seedHelplines();
@@ -558,6 +560,7 @@ export class SeedService {
             deviceCatalog: deviceCount,
             tradeInDevices: tradeInDevicesCount,
             tradeInQuestions: tradeInQuestionsResult.seeded,
+            stores: storesCount,
             others: othersResult,
             products: productsResult,
             categories: categoryCount,
@@ -566,6 +569,35 @@ export class SeedService {
             helplineSeeded,
             supportEmailSeeded,
         };
+    }
+
+    private async seedStores(): Promise<number> {
+        let seeded = 0;
+        const DEFAULT_STORES = [
+            {
+                name: 'TechStop Leicester',
+                address: '148B Melton Rd',
+                city: 'Leicester',
+                postcode: 'LE4 5EE',
+                phone: '+447343055398',
+                openingHours: 'Mon–Sat, 9:00 AM – 6:00 PM',
+                mapsEmbedUrl: 'https://maps.google.com/maps?q=148B+Melton+Rd,+Leicester+LE4+5EE&t=&z=15&ie=UTF8&iwloc=&output=embed',
+                isActive: true,
+            },
+        ];
+        for (const store of DEFAULT_STORES) {
+            const existing = await this.prisma.store.findFirst({
+                where: { postcode: store.postcode, name: store.name },
+            });
+            if (!existing) {
+                await this.prisma.store.create({ data: store });
+                seeded++;
+            }
+        }
+        if (seeded > 0) {
+            this.logger.log(`Seeded ${seeded} default store location(s)`);
+        }
+        return seeded;
     }
 
     // ─── Support contact info (helpline + email) ─────────────────────────────
@@ -618,6 +650,7 @@ export class SeedService {
             helplines: number;
             notifications: number;
             supportChats: number;
+            stores: number;
             supportEmailCleared: boolean;
         }
     }> {
@@ -703,6 +736,7 @@ export class SeedService {
                 helplines:          helplinesDeleted.count,
                 notifications:      notifications.count,
                 supportChats:       supportChats.count,
+                stores:             storesDeleted.count,
                 supportEmailCleared: hadSupportEmail,
             },
         };
