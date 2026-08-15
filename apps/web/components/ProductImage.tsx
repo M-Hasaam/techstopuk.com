@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { Package } from "lucide-react";
 
@@ -67,24 +67,34 @@ export default function ProductImage({
     setFailed(false);
   }, [src]);
 
-  // Backup for cached images: poll once after a short delay so the <img> is in the DOM
+  // Instant ref check callback: if the browser already has the image cached on mount/update,
+  // setLoaded(true) fires on frame 1 (0ms delay) without waiting for React synthetic onLoad
+  const handleRef = useCallback((imgNode: HTMLImageElement | null) => {
+    if (imgNode && imgNode.complete && imgNode.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, []);
+
+  // Poll for complete state during hydration or fast loads
   useEffect(() => {
     if (!src || failed || loaded) return;
-    const t = setTimeout(() => {
+    const interval = setInterval(() => {
       const img = wrapperRef.current?.querySelector("img");
-      if (img?.complete && img.naturalWidth > 0) setLoaded(true);
-    }, 50);
-    return () => clearTimeout(t);
+      if (img?.complete && img.naturalWidth > 0) {
+        setLoaded(true);
+        clearInterval(interval);
+      }
+    }, 100);
+
+    return () => clearInterval(interval);
   }, [src, failed, loaded]);
 
-  // Only show the placeholder when there is genuinely no image to display.
-  // While the image is loading we keep it invisible (opacity-0) so the placeholder
-  // never bleeds through via mix-blend-multiply on white product backgrounds.
   const showPlaceholder = !src || failed;
+  const showSkeleton = src && !failed && !loaded;
 
   const baseClass = mode === "cover"
-    ? `object-cover transition-all duration-500 z-10 ${hover ? "group-hover:scale-105" : ""} ${className}`
-    : `object-contain pt-5 pb-2 px-3 sm:pt-6 sm:pb-3 sm:px-4 mix-blend-multiply dark:mix-blend-normal transition-all duration-500 z-10 ${hover ? "group-hover:scale-105" : ""} ${className}`;
+    ? `object-cover transition-opacity duration-200 z-10 ${hover ? "group-hover:scale-105 transition-transform duration-500" : ""} ${className}`
+    : `object-contain pt-5 pb-2 px-3 sm:pt-6 sm:pb-3 sm:px-4 mix-blend-multiply dark:mix-blend-normal transition-opacity duration-200 z-10 ${hover ? "group-hover:scale-105 transition-transform duration-500" : ""} ${className}`;
 
   return (
     <div
@@ -92,31 +102,42 @@ export default function ProductImage({
       className={`${position} overflow-hidden ${bg} ${isFill ? "w-full h-full" : "inline-block"} ${wrapperClassName}`}
       style={!isFill ? { width, height } : undefined}
     >
+      {/* 1. Show subtle animated pulse skeleton background while image is downloading */}
+      {showSkeleton && (
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-zinc-200/50 via-zinc-100 to-zinc-200/50 dark:from-zinc-800/40 dark:via-zinc-700/40 dark:to-zinc-800/40 animate-pulse" />
+      )}
+
+      {/* 2. Show fallback Package icon if image genuinely fails or has no src */}
       {showPlaceholder && (
         <div className="absolute inset-0 flex items-center justify-center z-0">
-          <Package className={`${iconClassName} text-zinc-200`} strokeWidth={1.5} />
+          <Package className={`${iconClassName} text-zinc-300 dark:text-zinc-600`} strokeWidth={1.5} />
         </div>
       )}
 
+      {/* 3. Render image with immediate ref check & smooth opacity fade-in */}
       {src && !failed && (
         isFill ? (
           <Image
+            ref={handleRef}
             src={src}
             alt={alt}
             fill
             sizes={sizes}
             priority={priority}
+            decoding="async"
             className={`${baseClass} ${loaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
           />
         ) : (
           <Image
+            ref={handleRef}
             src={src}
             alt={alt}
             width={width}
             height={height}
             priority={priority}
+            decoding="async"
             className={`${baseClass} ${loaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setLoaded(true)}
             onError={() => setFailed(true)}
