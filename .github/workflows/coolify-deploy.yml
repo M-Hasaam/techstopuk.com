@@ -53,7 +53,7 @@ jobs:
               - 'turbo.json'
 
   # ----------------------------------------------------
-  # 0.5. FAST PRISMA DB MIGRATION CHECK (~5-8s cached)
+  # 0.5. PRISMA DB MIGRATION CHECK (apps/api)
   # ----------------------------------------------------
   check-migrations:
     name: DB Migration Check
@@ -63,6 +63,21 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout Code
@@ -79,6 +94,9 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Check schema is in sync with migrations
+        env:
+          DATABASE_URL: postgresql://prisma:prisma@localhost:5432/shadow
+          SHADOW_DATABASE_URL: postgresql://prisma:prisma@localhost:5432/shadow
         run: |
           npx prisma migrate diff \
             --from-migrations ./prisma/migrations \
