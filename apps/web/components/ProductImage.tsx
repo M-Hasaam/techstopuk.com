@@ -66,7 +66,7 @@ export default function ProductImage({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const isFill = width === undefined || height === undefined;
 
-  const FallbackIcon = fallbackIcon ?? getSubcategoryIcon(category ?? alt);
+  const FallbackIcon = fallbackIcon ?? getSubcategoryIcon(category);
 
   // Reset on src change
   useEffect(() => {

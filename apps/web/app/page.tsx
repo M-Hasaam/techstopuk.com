@@ -81,7 +81,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import NextImage from "next/image";
-import { productsApi, reviewsApi, bannersApi, catalogApi, storesApi, type Store } from "../lib/api";
+import { productsApi, reviewsApi, bannersApi, catalogApi, storesApi, otherSubcategoriesApi, type Store } from "../lib/api";
 import type { CatalogBrand } from "../lib/api";
 import { getGradeConfig } from "../lib/grades";
 import { GradeBadge } from "../components/GradeBadge";
@@ -1460,6 +1460,25 @@ function BestDealsSplit() {
     }).catch(() => { });
   }, [trigger]);
 
+  const [dbSubcats, setDbSubcats] = useState<Record<string, string | null>>({});
+
+  useEffect(() => {
+    if (trigger === 0) return;
+    Promise.all([
+      otherSubcategoriesApi.list().catch(() => []),
+      catalogApi.listCategories().catch(() => []),
+    ]).then(([others, cats]) => {
+      const map: Record<string, string | null> = {};
+      for (const item of others) {
+        if (item.name) map[item.name.toLowerCase().trim()] = item.icon ?? null;
+      }
+      for (const item of cats) {
+        if (item.name) map[item.name.toLowerCase().trim()] = item.icon ?? null;
+      }
+      setDbSubcats(map);
+    });
+  }, [trigger]);
+
   // Category pills sorted by product count descending
   const categoryPills = (() => {
     const countMap = new Map<string, { count: number; img: string }>();
@@ -1474,7 +1493,7 @@ function BestDealsSplit() {
     return Array.from(countMap.entries())
       .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 6)
-      .map(([cat, { img }]) => ({ name: cat, img, category: cat }));
+      .map(([cat, { img }]) => ({ name: cat, img, category: cat, icon: dbSubcats[cat.toLowerCase().trim()] }));
   })();
 
   const filtered = selectedCategory === "all"
@@ -1542,7 +1561,7 @@ function BestDealsSplit() {
               </button>
 
               {categoryPills.map((pill) => {
-                const Icon = getSubcategoryIcon(pill.name);
+                const Icon = getSubcategoryIcon(pill.name, pill.icon);
                 const isSelected = selectedCategory === pill.category;
                 return (
                   <button
@@ -2246,7 +2265,7 @@ function TopBrandsSplit() {
                       className="w-[220px] flex-shrink-0 bg-white rounded-xl p-4 border border-zinc-200/60 shadow-sm hover:shadow-md transition-shadow flex flex-col group cursor-pointer"
                     >
                       <div className="relative h-40 w-full rounded-xl mb-3 overflow-hidden bg-image-light">
-                        <ProductImage src={p.images?.[0]} alt={p.name} />
+                        <ProductImage src={p.images?.[0]} alt={p.name} fallbackIcon={getSubcategoryIcon(p.categoryIcon)} />
                         <GradeBadge condition={p.condition ?? ''} className="absolute top-2 left-2 z-20" />
                       </div>
                       <p className="font-semibold text-zinc-950 text-[13px] leading-snug mb-2 line-clamp-2">{p.name}</p>

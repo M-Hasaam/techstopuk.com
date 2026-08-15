@@ -35,11 +35,19 @@ export class OtherCatalogService {
     }
 
     createSubcategory(dto: CreateOtherSubcategoryDto) {
-        return this.prisma.otherSubcategory.create({ data: { name: dto.name.trim() } });
+        return this.prisma.otherSubcategory.create({
+            data: { name: dto.name.trim(), icon: dto.icon?.trim() || null },
+        });
     }
 
     updateSubcategory(id: string, dto: Partial<CreateOtherSubcategoryDto>) {
-        return this.prisma.otherSubcategory.update({ where: { id }, data: { name: dto.name?.trim() } });
+        return this.prisma.otherSubcategory.update({
+            where: { id },
+            data: {
+                ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+                ...(dto.icon !== undefined ? { icon: dto.icon ? dto.icon.trim() : null } : {}),
+            },
+        });
     }
 
     async deleteSubcategory(id: string) {

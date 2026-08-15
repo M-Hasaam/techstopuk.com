@@ -9,7 +9,15 @@ export class CreateCategoryDto {
 
     @IsString()
     @IsOptional()
+    displayName?: string;
+
+    @IsString()
+    @IsOptional()
     description?: string;
+
+    @IsString()
+    @IsOptional()
+    icon?: string;
 
     @IsBoolean()
     @IsOptional()

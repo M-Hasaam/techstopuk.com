@@ -12,7 +12,7 @@ import {
   Battery, Camera, Monitor, Wifi, Cpu, BadgeCheck
 } from "lucide-react";
 import Footer from "@/components/Footer";
-import { catalogApi } from "@/lib/api";
+import { catalogApi, otherSubcategoriesApi } from "@/lib/api";
 import { GradeKey, GRADE_CONFIG, getGradeConfig } from "@/lib/grades";
 import { GradeBadge } from "@/components/GradeBadge";
 import ProductImage from "@/components/ProductImage";
@@ -119,20 +119,34 @@ export default function CategoryPage() {
   const categorySlug = (params?.category as string)?.toLowerCase();
 
   // All category content comes from the API — admin panel is the single source of truth
-  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string } | null>(null);
+  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string; icon?: string } | null>(null);
   const [catNotFound, setCatNotFound] = useState(false);
   useEffect(() => {
-    catalogApi.listCategories({ includeInactive: false } as any)
-      .then(cats => {
-        const found = cats.find(c => c.slug === categorySlug);
-        if (found) setDynamicCat({
-          name: found.name,
-          displayName: found.displayName ?? undefined,
-          description: found.description ?? undefined,
+    Promise.all([
+      catalogApi.listCategories({ includeInactive: false } as any).catch(() => []),
+      otherSubcategoriesApi.list().catch(() => []),
+    ]).then(([mainCats, subCats]) => {
+      const foundMain = mainCats.find(c => c.slug === categorySlug || c.name.toLowerCase() === categorySlug);
+      if (foundMain) {
+        setDynamicCat({
+          name: foundMain.name,
+          displayName: foundMain.displayName ?? foundMain.name,
+          description: foundMain.description ?? undefined,
+          icon: foundMain.icon ?? undefined,
         });
-        else setCatNotFound(true);
-      })
-      .catch(() => setCatNotFound(true));
+        return;
+      }
+      const foundSub = subCats.find(s => s.name.toLowerCase() === categorySlug || s.id === categorySlug);
+      if (foundSub) {
+        setDynamicCat({
+          name: foundSub.name,
+          displayName: foundSub.name,
+          icon: foundSub.icon ?? undefined,
+        });
+        return;
+      }
+      setCatNotFound(true);
+    }).catch(() => setCatNotFound(true));
   }, [categorySlug]);
 
   // meta — name = short nav label, plural = full display heading
@@ -610,7 +624,7 @@ export default function CategoryPage() {
                             )}
                           </div>
 
-                          <ProductImage src={product.image} alt={product.title} hover={product.stock > 0} priority={index < 4} />
+                          <ProductImage src={product.image} alt={product.title} fallbackIcon={getSubcategoryIcon(dynamicCat?.icon)} hover={product.stock > 0} priority={index < 4} />
 
                           {product.stock > 0 && product.price > 0 && (
                             <button

@@ -110,7 +110,7 @@ export const deviceCatalogApi = {
 // ── Catalog management (categories, brands, brand-categories) ─────────────────
 export interface CatalogCategoryItem {
   id: string; name: string; slug: string; displayName?: string; description?: string; // slug is computed: name.toLowerCase()
-  image?: string; images: string[]; isActive: boolean;
+  image?: string; images: string[]; icon?: string | null; isActive: boolean;
   isSellable: boolean; isRepairable: boolean;
   createdAt: string; updatedAt: string;
 }
@@ -122,9 +122,9 @@ export interface CatalogBrandItem {
 export const catalogCategoriesApi = {
   list: (includeInactive?: boolean) =>
     apiFetch<CatalogCategoryItem[]>(`/catalog/categories${includeInactive ? '?includeInactive=true' : ''}`),
-  create: (data: { name: string; slug: string; displayName?: string; description?: string; isActive?: boolean }) =>
+  create: (data: { name: string; slug: string; displayName?: string; description?: string; icon?: string; isActive?: boolean }) =>
     apiFetch<CatalogCategoryItem>('/catalog/categories', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: Partial<{ name: string; slug: string; displayName: string; description: string; isActive: boolean; isSellable: boolean; isRepairable: boolean }>) =>
+  update: (id: string, data: Partial<{ name: string; slug: string; displayName: string; description: string; icon: string; isActive: boolean; isSellable: boolean; isRepairable: boolean }>) =>
     apiFetch<CatalogCategoryItem>(`/catalog/categories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   delete: (id: string) => apiFetch<void>(`/catalog/categories/${id}`, { method: 'DELETE' }),
   uploadImage: async (id: string, file: File) => {
@@ -206,6 +206,7 @@ export interface OtherBrand {
 export interface OtherSubcategory {
   id: string;
   name: string;
+  icon?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -221,10 +222,13 @@ export const otherBrandsApi = {
 
 export const otherSubcategoriesApi = {
   list: () => apiFetch<OtherSubcategory[]>('/other-subcategories'),
-  create: (name: string) =>
-    apiFetch<OtherSubcategory>('/other-subcategories', { method: 'POST', body: JSON.stringify({ name }) }),
-  update: (id: string, name: string) =>
-    apiFetch<OtherSubcategory>(`/other-subcategories/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) }),
+  create: (data: string | { name: string; icon?: string }) =>
+    apiFetch<OtherSubcategory>('/other-subcategories', {
+      method: 'POST',
+      body: JSON.stringify(typeof data === 'string' ? { name: data } : data),
+    }),
+  update: (id: string, data: { name?: string; icon?: string }) =>
+    apiFetch<OtherSubcategory>(`/other-subcategories/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   remove: (id: string) => apiFetch<void>(`/other-subcategories/${id}`, { method: 'DELETE' }),
 };
 

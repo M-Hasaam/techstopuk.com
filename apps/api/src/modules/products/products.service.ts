@@ -56,9 +56,10 @@ export class ProductsService {
             ...rest,
             tradeInPrice,
             images: images.filter(Boolean) as string[],
-            brand:    catalog?.brandCategory?.brand?.name    ?? otherBrand?.name       ?? '',
-            model:    catalog?.model                          ?? '',
-            category: catalog?.brandCategory?.category?.name ?? otherSubcategory?.name ?? '',
+            brand:        catalog?.brandCategory?.brand?.name    ?? otherBrand?.name       ?? '',
+            model:        catalog?.model                          ?? '',
+            category:     catalog?.brandCategory?.category?.name ?? otherSubcategory?.name ?? '',
+            categoryIcon: catalog?.brandCategory?.category?.icon ?? otherSubcategory?.icon ?? null,
         };
     }
 

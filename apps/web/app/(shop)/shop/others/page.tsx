@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ShoppingCart, Package } from "lucide-react";
 import Footer from "@/components/Footer";
-import { productsApi } from "@/lib/api";
+import { productsApi, otherSubcategoriesApi, type OtherSubcategory } from "@/lib/api";
 import { GradeBadge } from "@/components/GradeBadge";
 import { useCart } from "@/context/cart-context";
 import ProductImage from "@/components/ProductImage";
@@ -14,7 +14,7 @@ import { getSubcategoryIcon } from "@/lib/brand-logos";
 
 interface Product {
   id: string; name: string; slug: string; brand: string;
-  category: string; price: number; comparePrice?: number;
+  category: string; categoryIcon?: string | null; price: number; comparePrice?: number;
   images: string[]; condition: string; stock: number;
   otherBrandId?: string;
 }
@@ -23,16 +23,21 @@ export default function OthersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [shuffledAll, setShuffledAll] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [subcategories, setSubcategories] = useState<OtherSubcategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const { addItem } = useCart();
 
   useEffect(() => {
     setLoading(true);
-    productsApi.list({ limit: 500 })
-      .then(res => {
+    Promise.all([
+      productsApi.list({ limit: 500 }),
+      otherSubcategoriesApi.list().catch(() => []),
+    ])
+      .then(([res, subcatList]) => {
         const others = res.items.filter(p => !!p.otherBrandId) as Product[];
         setProducts(others);
+        setSubcategories(subcatList);
         
         // Count products per category
         const categoryCounts = others.reduce((acc, p) => {
@@ -103,29 +108,6 @@ export default function OthersPage() {
             </div>
           ) : (
             <div className="space-y-12">
-              {/* SUBCATEGORY PILLS QUICK NAV */}
-              {categories.length > 0 && (
-                <div className="bg-zinc-50 dark:bg-zinc-900/50 p-4 sm:p-6 rounded-[28px] border border-zinc-200/80 dark:border-zinc-800">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-zinc-400 mb-3 sm:mb-4">Browse by type</p>
-                  <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide pb-1">
-                    {categories.map(cat => {
-                      const Icon = getSubcategoryIcon(cat);
-                      return (
-                        <a
-                          key={cat}
-                          href={`#${cat.toLowerCase()}`}
-                          className="flex items-center gap-2.5 px-4 h-12 rounded-2xl bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:border-zinc-900 dark:hover:border-white transition-all shrink-0 shadow-sm group cursor-pointer"
-                        >
-                          <div className="h-7 w-7 rounded-xl bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center shrink-0 group-hover:bg-zinc-900 group-hover:text-white transition-colors">
-                            <Icon className="h-3.5 w-3.5" />
-                          </div>
-                          <span className="text-xs font-extrabold text-zinc-900 dark:text-zinc-100 whitespace-nowrap">{cat}</span>
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
               {/* ALL SECTION */}
               {allFiltered.length > 0 && (
                 <div>
@@ -186,7 +168,7 @@ function ProductGridCard({ p, i, handleAddToCart, addedIds }: { p: Product; i: n
     >
       <Link href={`/shop/${p.category.toLowerCase()}/${p.slug}`} className="block">
         <div className="aspect-square bg-image-light relative overflow-hidden">
-          <ProductImage src={p.images?.[0]} alt={p.name} />
+          <ProductImage src={p.images?.[0]} alt={p.name} fallbackIcon={getSubcategoryIcon(p.categoryIcon)} />
           <GradeBadge condition={p.condition ?? ''} className="absolute top-2 left-2 z-20" />
           {saving > 0 && (
             <span className="absolute top-2 right-2 bg-accent text-white text-[9px] font-black px-2 py-0.5 rounded-full">

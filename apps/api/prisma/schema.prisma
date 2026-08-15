@@ -279,6 +279,7 @@ model Category {
   displayName     String?   // full plural heading e.g. "Audio & Headphones", "Gaming Consoles"
   image           String?
   images          String[]        @default([])
+  icon            String?
   isActive        Boolean         @default(true)
   isSellable      Boolean         @default(false)
   isRepairable    Boolean         @default(false)
@@ -507,6 +508,7 @@ model OtherBrand {
 model OtherSubcategory {
   id        String    @id @default(uuid())
   name      String    @unique
+  icon      String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   products  Product[]

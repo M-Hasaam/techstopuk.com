@@ -425,11 +425,13 @@ export interface Product {
   reviewCount: number;
   otherBrandId?: string;
   otherSubcategoryId?: string;
+  categoryIcon?: string | null;
 }
 
 export interface OtherSubcategory {
   id: string;
   name: string;
+  icon?: string | null;
 }
 
 export const otherSubcategoriesApi = {
@@ -561,6 +563,7 @@ export interface CatalogCategory {
   description?: string;
   image?: string;
   images: string[];
+  icon?: string | null;
   isActive: boolean;
   productCount: number;
   minPrice: number | null;

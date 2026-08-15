@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { catalogCategoriesApi, type CatalogCategoryItem } from "../../../lib/api";
-import { Plus, Pencil, Trash2, Upload, Check, X, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Upload, Check, X, ArrowLeft, Package } from "lucide-react";
 import Link from "next/link";
+import { IconPicker, ADMIN_ICON_MAP, getAdminCategoryIcon } from "../../../components/IconPicker";
 
-type Form = { name: string; slug: string; displayName: string; description: string; isActive: boolean };
-const empty: Form = { name: "", slug: "", displayName: "", description: "", isActive: true };
+type Form = { name: string; slug: string; displayName: string; description: string; icon: string; isActive: boolean };
+const empty: Form = { name: "", slug: "", displayName: "", description: "", icon: "package", isActive: true };
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 
 // Slugs that belong to the "Others" group — mirrors the Navbar grouping
@@ -36,7 +37,14 @@ export default function CategoriesPage() {
 
   function startEdit(c: CatalogCategoryItem) {
     setEditing(c.id); setError("");
-    setForm({ name: c.name, slug: c.slug, displayName: c.displayName ?? "", description: c.description ?? "", isActive: c.isActive });
+    setForm({
+      name: c.name,
+      slug: c.slug,
+      displayName: c.displayName ?? "",
+      description: c.description ?? "",
+      icon: c.icon ?? "package",
+      isActive: c.isActive
+    });
   }
   function startCreate() { setEditing("new"); setForm(empty); setError(""); }
   function cancel() { setEditing(null); setError(""); }
@@ -45,9 +53,23 @@ export default function CategoriesPage() {
     setSaving(true); setError("");
     try {
       if (editing === "new") {
-        await catalogCategoriesApi.create({ name: form.name, slug: form.slug, displayName: form.displayName || undefined, description: form.description || undefined, isActive: form.isActive });
+        await catalogCategoriesApi.create({
+          name: form.name,
+          slug: form.slug,
+          displayName: form.displayName || undefined,
+          description: form.description || undefined,
+          icon: form.icon,
+          isActive: form.isActive
+        });
       } else if (editing) {
-        await catalogCategoriesApi.update(editing, { name: form.name, slug: form.slug, displayName: form.displayName || undefined, description: form.description || undefined, isActive: form.isActive });
+        await catalogCategoriesApi.update(editing, {
+          name: form.name,
+          slug: form.slug,
+          displayName: form.displayName || undefined,
+          description: form.description || undefined,
+          icon: form.icon,
+          isActive: form.isActive
+        });
       }
       cancel(); load();
     } catch (e: any) { setError(e.message); }
@@ -84,39 +106,51 @@ export default function CategoriesPage() {
       </div>
 
       {editing && (
-        <div className="bg-white border border-zinc-200 rounded-2xl p-5 mb-6">
-          <h2 className="font-bold mb-4 text-sm">{editing === "new" ? "New category" : "Edit category"}</h2>
-          <div className="grid grid-cols-2 gap-3 mb-3">
-            <div className="col-span-2 sm:col-span-1">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Name <span className="text-zinc-300 font-normal normal-case tracking-normal">(short nav label)</span></label>
-              <input className="w-full h-9 border border-zinc-200 rounded-xl px-3 text-sm"
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value, slug: editing === "new" ? slugify(e.target.value) : f.slug }))} />
+        <div className="bg-white border border-zinc-200 rounded-3xl p-6 mb-8 shadow-sm">
+          <h2 className="font-extrabold mb-5 text-base text-zinc-900">{editing === "new" ? "New Category" : `Edit Category (${form.name})`}</h2>
+          <div className="space-y-4 mb-5">
+            {/* Row 1: Name & Display Name */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1.5">
+                  Name <span className="text-zinc-300 font-normal normal-case tracking-normal">(short nav label)</span>
+                </label>
+                <input className="w-full h-[52px] border border-zinc-200 rounded-2xl px-4 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-400 bg-white"
+                  value={form.name}
+                  onChange={e => setForm(f => ({ ...f, name: e.target.value, slug: editing === "new" ? slugify(e.target.value) : f.slug }))} />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1.5">
+                  Display Name <span className="text-zinc-300 font-normal normal-case tracking-normal">(page heading e.g. "Audio & Headphones")</span>
+                </label>
+                <input className="w-full h-[52px] border border-zinc-200 rounded-2xl px-4 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-400 bg-white"
+                  placeholder="e.g. Audio & Headphones"
+                  value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} />
+              </div>
             </div>
-            <div className="col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">
-                Display Name <span className="text-zinc-300 font-normal normal-case tracking-normal">(shown as page heading, e.g. "Audio & Headphones")</span>
-              </label>
-              <input className="w-full h-9 border border-zinc-200 rounded-xl px-3 text-sm"
-                placeholder="e.g. Audio & Headphones"
-                value={form.displayName} onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} />
-            </div>
-            <div className="col-span-2">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1">Description</label>
-              <input className="w-full h-9 border border-zinc-200 rounded-xl px-3 text-sm"
+
+            {/* Row 2: Description */}
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-1.5">Description</label>
+              <input className="w-full h-[52px] border border-zinc-200 rounded-2xl px-4 text-sm font-semibold text-zinc-900 focus:outline-none focus:border-zinc-400 bg-white"
                 value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
             </div>
+
+            {/* Row 3: Icon Picker */}
+            <div>
+              <IconPicker value={form.icon} onChange={iconId => setForm(f => ({ ...f, icon: iconId }))} label="Category Icon" />
+            </div>
           </div>
-          <label className="flex items-center gap-2 text-xs font-semibold mb-3 cursor-pointer">
-            <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} /> Active
+          <label className="flex items-center gap-2 text-xs font-semibold mb-4 cursor-pointer">
+            <input type="checkbox" checked={form.isActive} onChange={e => setForm(f => ({ ...f, isActive: e.target.checked }))} className="h-4 w-4 rounded border-zinc-300 text-zinc-950 focus:ring-zinc-950" /> Active Category
           </label>
-          {error && <p className="text-red-500 text-xs mb-2">{error}</p>}
+          {error && <p className="text-red-500 text-xs mb-3 font-medium">{error}</p>}
           <div className="flex gap-2">
             <button onClick={save} disabled={saving}
-              className="h-8 px-4 rounded-xl bg-zinc-950 text-white text-xs font-bold disabled:opacity-50">
-              {saving ? "Saving…" : "Save"}
+              className="h-9 px-5 rounded-xl bg-zinc-950 text-white text-xs font-bold disabled:opacity-50 hover:bg-zinc-800 transition-colors">
+              {saving ? "Saving…" : "Save Category"}
             </button>
-            <button onClick={cancel} className="h-8 px-4 rounded-xl border border-zinc-200 text-xs font-bold">Cancel</button>
+            <button onClick={cancel} className="h-9 px-5 rounded-xl border border-zinc-200 text-xs font-bold text-zinc-600 hover:bg-zinc-50 transition-colors">Cancel</button>
           </div>
         </div>
       )}
@@ -133,12 +167,12 @@ export default function CategoriesPage() {
         const othersCats = cats.filter(c =>  OTHERS_SLUGS.has(c.slug));
 
         const renderTable = (rows: CatalogCategoryItem[]) => (
-          <div className="bg-white border border-zinc-100 rounded-2xl overflow-hidden">
+          <div className="bg-white border border-zinc-100 rounded-2xl overflow-hidden shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[700px]">
               <thead className="border-b border-zinc-100 bg-zinc-50">
                 <tr className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                  <th className="text-left px-5 py-3">Name</th>
+                  <th className="text-left px-5 py-3">Name & Icon</th>
                   <th className="text-left px-5 py-3">Images</th>
                   <th className="text-left px-5 py-3">Status</th>
                   <th className="text-center px-3 py-3">Sellable</th>
@@ -147,81 +181,91 @@ export default function CategoriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-50">
-                {rows.map(cat => (
-                  <tr key={cat.id} className="hover:bg-zinc-50/50">
-                    <td className="px-5 py-3 font-semibold text-zinc-900">{cat.name}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {(cat.images ?? []).map((img, i) => (
-                          <div key={i} className="relative group">
-                            <img src={img} alt="" className="h-8 w-8 rounded-lg object-cover border border-zinc-100" />
-                            <button
-                              onClick={async () => {
-                                setUploadingId(cat.id);
-                                try { await catalogCategoriesApi.deleteImage(cat.id, img); load(); }
-                                catch (e: any) { setError(e.message); }
-                                finally { setUploadingId(null); }
-                              }}
-                              className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-white text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                            >×</button>
+                {rows.map(cat => {
+                  const RowIcon = getAdminCategoryIcon(cat.icon);
+                  return (
+                    <tr key={cat.id} className="hover:bg-zinc-50/50">
+                      <td className="px-5 py-3 font-semibold text-zinc-900">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-7 w-7 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-600 shrink-0">
+                            <RowIcon className="h-3.5 w-3.5" />
                           </div>
-                        ))}
-                        {(cat.images ?? []).length < 10 && (
-                          <button onClick={() => { pendingUploadId.current = cat.id; fileRef.current?.click(); }}
-                            disabled={uploadingId === cat.id}
-                            className="h-8 w-8 rounded-lg border-2 border-dashed border-zinc-200 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-zinc-500 transition-colors">
-                            {uploadingId === cat.id ? <div className="h-3 w-3 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" /> : <Upload className="h-3 w-3" />}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cat.isActive ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}>
-                        {cat.isActive ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
-                        {cat.isActive ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    {/* Sellable toggle */}
-                    <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => {
-                          const next = !cat.isSellable;
-                          setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isSellable: next } : c));
-                          catalogCategoriesApi.update(cat.id, { isSellable: next }).catch(() =>
-                            setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isSellable: !next } : c))
-                          );
-                        }}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${cat.isSellable ? "bg-emerald-500" : "bg-zinc-300"}`}
-                      >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${cat.isSellable ? "translate-x-4.5" : "translate-x-0.5"}`} />
-                      </button>
-                    </td>
-                    {/* Repairable toggle */}
-                    <td className="px-3 py-3 text-center">
-                      <button
-                        onClick={() => {
-                          const next = !cat.isRepairable;
-                          setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isRepairable: next } : c));
-                          catalogCategoriesApi.update(cat.id, { isRepairable: next }).catch(() =>
-                            setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isRepairable: !next } : c))
-                          );
-                        }}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${cat.isRepairable ? "bg-blue-500" : "bg-zinc-300"}`}
-                      >
-                        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${cat.isRepairable ? "translate-x-4.5" : "translate-x-0.5"}`} />
-                      </button>
-                    </td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2 justify-end">
-                        {cat.image && <button onClick={() => { pendingUploadId.current = cat.id; fileRef.current?.click(); }} className="text-zinc-300 hover:text-zinc-600"><Upload className="h-3.5 w-3.5" /></button>}
-                        <button onClick={() => startEdit(cat)} className="text-zinc-300 hover:text-zinc-700"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => remove(cat.id)} className="text-zinc-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          <span>{cat.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {(cat.images ?? []).map((img, i) => (
+                            <div key={i} className="relative group">
+                              <img src={img} alt="" className="h-8 w-8 rounded-lg object-cover border border-zinc-100" />
+                              <button
+                                onClick={async () => {
+                                  setUploadingId(cat.id);
+                                  try { await catalogCategoriesApi.deleteImage(cat.id, img); load(); }
+                                  catch (e: any) { setError(e.message); }
+                                  finally { setUploadingId(null); }
+                                }}
+                                className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-white text-[8px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              >×</button>
+                            </div>
+                          ))}
+                          {(cat.images ?? []).length < 10 && (
+                            <button onClick={() => { pendingUploadId.current = cat.id; fileRef.current?.click(); }}
+                              disabled={uploadingId === cat.id}
+                              className="h-8 w-8 rounded-lg border-2 border-dashed border-zinc-200 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-zinc-500 transition-colors">
+                              {uploadingId === cat.id ? <div className="h-3 w-3 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" /> : <Upload className="h-3 w-3" />}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${cat.isActive ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}>
+                          {cat.isActive ? <Check className="h-2.5 w-2.5" /> : <X className="h-2.5 w-2.5" />}
+                          {cat.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      {/* Sellable toggle */}
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          onClick={() => {
+                            const next = !cat.isSellable;
+                            setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isSellable: next } : c));
+                            catalogCategoriesApi.update(cat.id, { isSellable: next }).catch(() =>
+                              setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isSellable: !next } : c))
+                            );
+                          }}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${cat.isSellable ? "bg-emerald-500" : "bg-zinc-300"}`}
+                        >
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${cat.isSellable ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                        </button>
+                      </td>
+                      {/* Repairable toggle */}
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          onClick={() => {
+                            const next = !cat.isRepairable;
+                            setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isRepairable: next } : c));
+                            catalogCategoriesApi.update(cat.id, { isRepairable: next }).catch(() =>
+                              setCats(prev => prev.map(c => c.id === cat.id ? { ...c, isRepairable: !next } : c))
+                            );
+                          }}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none ${cat.isRepairable ? "bg-emerald-500" : "bg-zinc-300"}`}
+                        >
+                          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${cat.isRepairable ? "translate-x-4.5" : "translate-x-0.5"}`} />
+                        </button>
+                      </td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-2 justify-end">
+                          {cat.image && <button onClick={() => { pendingUploadId.current = cat.id; fileRef.current?.click(); }} className="text-zinc-300 hover:text-zinc-600"><Upload className="h-3.5 w-3.5" /></button>}
+                          <button onClick={() => startEdit(cat)} className="text-zinc-300 hover:text-zinc-700"><Pencil className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => remove(cat.id)} className="text-zinc-300 hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {rows.length === 0 && (
-                  <tr><td colSpan={5} className="px-5 py-10 text-center text-sm text-zinc-400">None.</td></tr>
+                  <tr><td colSpan={6} className="px-5 py-10 text-center text-sm text-zinc-400">None.</td></tr>
                 )}
               </tbody>
             </table>

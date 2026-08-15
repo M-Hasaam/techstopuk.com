@@ -43,16 +43,25 @@ function categoryFlags(slug: string) {
 
 // Per-slug display copy — never had a source anywhere, so categories only ever
 // got a bare capitalized `name` from the seed script (no displayName/description).
-const CATEGORY_META: Record<string, { displayName: string; description: string }> = {
-    phones:      { displayName: 'Smartphones',        description: 'Certified refurbished phones from Apple, Samsung, Google and more.' },
-    tablets:     { displayName: 'Tablets & iPads',     description: 'Refurbished tablets for work, study and entertainment.' },
-    gaming:      { displayName: 'Gaming',              description: 'PlayStation, Xbox and Switch consoles, tested and graded.' },
-    laptops:     { displayName: 'Laptops & MacBooks',  description: 'Refurbished laptops and MacBooks for every budget.' },
-    audio:       { displayName: 'Audio & Headphones',  description: 'Headphones, earbuds and speakers from top audio brands.' },
-    smartwatches:{ displayName: 'Smartwatches',        description: 'Refurbished smartwatches and fitness trackers.' },
+const CATEGORY_META: Record<string, { displayName: string; description: string; icon: string }> = {
+    phones:       { displayName: 'Smartphones',        description: 'Certified refurbished phones from Apple, Samsung, Google and more.', icon: 'smartphone' },
+    tablets:      { displayName: 'Tablets & iPads',     description: 'Refurbished tablets for work, study and entertainment.',            icon: 'tablet' },
+    gaming:       { displayName: 'Gaming',              description: 'PlayStation, Xbox and Switch consoles, tested and graded.',         icon: 'gamepad-2' },
+    laptops:      { displayName: 'Laptops & MacBooks',  description: 'Refurbished laptops and MacBooks for every budget.',                 icon: 'laptop' },
+    audio:        { displayName: 'Audio & Headphones',  description: 'Headphones, earbuds and speakers from top audio brands.',            icon: 'headphones' },
+    smartwatches: { displayName: 'Smartwatches',        description: 'Refurbished smartwatches and fitness trackers.',                    icon: 'watch' },
+    cables:       { displayName: 'Cables & Adapters',   description: 'Charging and data cables.',                                         icon: 'zap' },
+    chargers:     { displayName: 'Chargers & Power',    description: 'Fast chargers and power banks.',                                     icon: 'zap' },
+    storage:      { displayName: 'Storage & SSDs',      description: 'External drives and memory cards.',                                  icon: 'hard-drive' },
+    memory:       { displayName: 'Memory & RAM',        description: 'Computer memory upgrades.',                                          icon: 'cpu' },
+    mouse:        { displayName: 'Mouse & Keyboards',   description: 'Mice, keyboards and input devices.',                                 icon: 'mouse' },
+    graphics:     { displayName: 'Graphics Cards',      description: 'GPUs and display adapters.',                                         icon: 'monitor' },
+    lens:         { displayName: 'Camera Lenses',       description: 'Camera lenses and accessories.',                                     icon: 'camera' },
+    films:        { displayName: 'Films & Media',       description: 'Movies, physical media and films.',                                  icon: 'film' },
+    games:        { displayName: 'Games & Discs',       description: 'Video games and media discs.',                                       icon: 'disc' },
 };
 function categoryMeta(slug: string) {
-    return CATEGORY_META[slug] ?? {};
+    return CATEGORY_META[slug] ?? { icon: 'package' };
 }
 
 const PRICING_DEFAULTS = [
@@ -1088,9 +1097,32 @@ export class SeedService {
                     const otherBrandId = brandCache.get(brandName)!;
 
                     if (!subcatCache.has(subcatName)) {
+                        const defaultIcon = (name: string) => {
+                            const k = name.toLowerCase();
+                            if (k.includes('storage') || k.includes('ssd') || k.includes('hdd') || k.includes('nvme')) return 'hard-drive';
+                            if (k.includes('memory') || k.includes('ram') || k.includes('cpu')) return 'cpu';
+                            if (k.includes('charger') || k.includes('cable') || k.includes('power')) return 'zap';
+                            if (k.includes('watch') || k.includes('smartwatch')) return 'watch';
+                            if (k.includes('graphic') || k.includes('gpu') || k.includes('monitor')) return 'monitor';
+                            if (k.includes('pen') || k.includes('stylus')) return 'pen-tool';
+                            if (k.includes('mouse') || k.includes('keyboard')) return 'mouse';
+                            if (k.includes('audio') || k.includes('headphone') || k.includes('earbud')) return 'headphones';
+                            if (k.includes('phone') || k.includes('mobile')) return 'smartphone';
+                            if (k.includes('laptop') || k.includes('macbook')) return 'laptop';
+                            if (k.includes('tablet') || k.includes('ipad')) return 'tablet';
+                            if (k.includes('game') || k.includes('console')) return 'gamepad-2';
+                            if (k.includes('camera') || k.includes('lens')) return 'camera';
+                            if (k.includes('film') || k.includes('movie')) return 'film';
+                            if (k.includes('disc')) return 'disc';
+                            return 'package';
+                        };
                         const existing = await this.prisma.otherSubcategory.findFirst({ where: { name: subcatName } });
-                        const os = existing
-                            ?? await this.prisma.otherSubcategory.create({ data: { name: subcatName } });
+                        let os: any = existing;
+                        if (!existing) {
+                            os = await this.prisma.otherSubcategory.create({ data: { name: subcatName, icon: defaultIcon(subcatName) } });
+                        } else if (!existing.icon) {
+                            os = await this.prisma.otherSubcategory.update({ where: { id: existing.id }, data: { icon: defaultIcon(subcatName) } });
+                        }
                         subcatCache.set(subcatName, os.id);
                     }
                     const otherSubcategoryId = subcatCache.get(subcatName)!;
