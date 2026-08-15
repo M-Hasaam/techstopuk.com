@@ -265,3 +265,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+// CI Trigger test
