@@ -2828,5 +2828,3 @@ export default function HomePage() {
     </main>
   );
 }
-
-// CI Trigger test
