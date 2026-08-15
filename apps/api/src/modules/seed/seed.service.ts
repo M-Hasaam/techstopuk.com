@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { SettingsService } from '../settings/settings.service';
+import { TradeInQuestionsService } from '../trade-in-questions/trade-in-questions.service';
 import { S3Client, PutObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -453,6 +454,7 @@ export interface SeedResult {
     promoSlides: number;
     deviceCatalog: number;
     tradeInDevices: number;
+    tradeInQuestions?: number;
     others: { created: number; updated: number; errors: string[] };
     categories: number;
     brands: number;
@@ -478,6 +480,7 @@ export class SeedService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly settingsService: SettingsService,
+        private readonly tradeInQuestionsService: TradeInQuestionsService,
     ) {
         this.bucketName = process.env.GARAGE_BUCKET || 'ai-ecommerce';
         this.s3Client = new S3Client({
@@ -537,6 +540,7 @@ export class SeedService {
         const slideCount     = await this.seedPromoSlides();
         const deviceCount    = await this.seedCatalogFromFolder();
         const tradeInDevicesCount = await this.seedTradeInDevices();
+        const tradeInQuestionsResult = await this.tradeInQuestionsService.seedDefaults();
         const productsResult = await this.seedProducts(productsData);
         const othersResult   = await this.seedOthers();
         const helplineSeeded    = await this.seedHelplines();
@@ -553,6 +557,7 @@ export class SeedService {
             promoSlides: slideCount,
             deviceCatalog: deviceCount,
             tradeInDevices: tradeInDevicesCount,
+            tradeInQuestions: tradeInQuestionsResult.seeded,
             others: othersResult,
             products: productsResult,
             categories: categoryCount,
@@ -602,13 +607,17 @@ export class SeedService {
             otherSubcategories: number;
             deviceCatalog: number;
             tradeInDevices: number;
+            tradeInQuestions: number;
             brandCategories: number;
             categories: number;
             brands: number;
             banners: number;
+            gradeBanners: number;
             promoSlides: number;
             pricingConfigs: number;
             helplines: number;
+            notifications: number;
+            supportChats: number;
             supportEmailCleared: boolean;
         }
     }> {
@@ -639,26 +648,32 @@ export class SeedService {
         this.logger.log(`Garage purged — deleted ${s3Deleted} objects from bucket "${this.bucketName}"`);
 
         // 2. Wipe DB in FK-safe order and track counts
-        const orderItems           = await this.prisma.orderItem.deleteMany({});
-        const orders               = await this.prisma.order.deleteMany({});
-        const tradeIns             = await this.prisma.tradeIn.deleteMany({});
-        const repairs              = await this.prisma.repair.deleteMany({});
-        const reviews              = await this.prisma.review.deleteMany({});
-        const scraperRuns          = await this.prisma.scraperRun.deleteMany({});
-        const scrapedPrices        = await this.prisma.scrapedPrice.deleteMany({});
-        const productsDeleted      = await this.prisma.product.deleteMany({});
-        const otherBrandsDeleted   = await this.prisma.otherBrand.deleteMany({});
-        const otherSubsDeleted     = await this.prisma.otherSubcategory.deleteMany({});
-        const tradeInDevicesDeleted = await this.prisma.tradeInDevice.deleteMany({});
-        const deviceCatalogDeleted = await this.prisma.deviceCatalog.deleteMany({});
-        const brandCatsDeleted     = await this.prisma.brandCategory.deleteMany({});
-        const categoriesDeleted    = await this.prisma.category.deleteMany({});
-        const brandsDeleted        = await this.prisma.brand.deleteMany({});
-        const bannersDeleted       = await this.prisma.banner.deleteMany({});
-        const promoSlidesDeleted   = await this.prisma.promoSlide.deleteMany({});
-        const pricingDeleted       = await this.prisma.pricingConfig.deleteMany({});
-        const helplinesDeleted     = await this.prisma.helplineNumber.deleteMany({});
-        const hadSupportEmail      = (await this.settingsService.get('SUPPORT_EMAIL')) !== null;
+        const orderItems            = await this.prisma.orderItem.deleteMany({});
+        const orders                = await this.prisma.order.deleteMany({});
+        const tradeIns              = await this.prisma.tradeIn.deleteMany({});
+        const repairs               = await this.prisma.repair.deleteMany({});
+        const reviews               = await this.prisma.review.deleteMany({});
+        const chatMessages          = await this.prisma.chatMessage.deleteMany({});
+        const supportChats          = await this.prisma.supportChat.deleteMany({});
+        const notifications         = await this.prisma.notification.deleteMany({});
+        const scraperRuns           = await this.prisma.scraperRun.deleteMany({});
+        const scrapedPrices         = await this.prisma.scrapedPrice.deleteMany({});
+        const productsDeleted       = await this.prisma.product.deleteMany({});
+        const otherBrandsDeleted    = await this.prisma.otherBrand.deleteMany({});
+        const otherSubsDeleted      = await this.prisma.otherSubcategory.deleteMany({});
+        const tradeInDevicesDeleted  = await this.prisma.tradeInDevice.deleteMany({});
+        const tradeInQuestionsDel   = await this.prisma.tradeInQuestion.deleteMany({});
+        const deviceCatalogDeleted  = await this.prisma.deviceCatalog.deleteMany({});
+        const brandCatsDeleted      = await this.prisma.brandCategory.deleteMany({});
+        const categoriesDeleted     = await this.prisma.category.deleteMany({});
+        const brandsDeleted         = await this.prisma.brand.deleteMany({});
+        const bannersDeleted        = await this.prisma.banner.deleteMany({});
+        const gradeBannersDeleted   = await this.prisma.gradeBanner.deleteMany({});
+        const promoSlidesDeleted    = await this.prisma.promoSlide.deleteMany({});
+        const pricingDeleted        = await this.prisma.pricingConfig.deleteMany({});
+        const helplinesDeleted      = await this.prisma.helplineNumber.deleteMany({});
+        const storesDeleted         = await this.prisma.store.deleteMany({});
+        const hadSupportEmail       = (await this.settingsService.get('SUPPORT_EMAIL')) !== null;
         await this.settingsService.remove('SUPPORT_EMAIL');
 
         this.logger.log('Database purged — all tables cleared');
@@ -677,13 +692,17 @@ export class SeedService {
                 otherSubcategories: otherSubsDeleted.count,
                 deviceCatalog:      deviceCatalogDeleted.count,
                 tradeInDevices:     tradeInDevicesDeleted.count,
+                tradeInQuestions:   tradeInQuestionsDel.count,
                 brandCategories:    brandCatsDeleted.count,
                 categories:         categoriesDeleted.count,
                 brands:             brandsDeleted.count,
                 banners:            bannersDeleted.count,
+                gradeBanners:       gradeBannersDeleted.count,
                 promoSlides:        promoSlidesDeleted.count,
                 pricingConfigs:     pricingDeleted.count,
                 helplines:          helplinesDeleted.count,
+                notifications:      notifications.count,
+                supportChats:       supportChats.count,
                 supportEmailCleared: hadSupportEmail,
             },
         };

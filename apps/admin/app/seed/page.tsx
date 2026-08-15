@@ -16,13 +16,27 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       ...init?.headers,
     },
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new Error("401 Unauthorized — Admin session expired or role lacks ADMIN permissions. Please log out and log back into your admin account.");
+    }
+    let msg = res.statusText;
+    try {
+      const data = await res.json();
+      msg = data.message || msg;
+    } catch {
+      const text = await res.text();
+      msg = text || msg;
+    }
+    throw new Error(msg);
+  }
   return res.json();
 }
 
 interface SeedResult {
   pricingConfigs: number;
   deviceCatalog: number;
+  tradeInQuestions?: number;
   banners: number;
   promoSlides: number;
   others: { created: number; updated: number; errors: string[] };
@@ -53,6 +67,8 @@ interface PurgeResult {
     otherBrands: number;
     otherSubcategories: number;
     deviceCatalog: number;
+    tradeInDevices?: number;
+    tradeInQuestions?: number;
     brandCategories: number;
     categories: number;
     brands: number;
@@ -208,6 +224,10 @@ export default function SeedPage() {
                 <span className="font-bold text-sm">{result.deviceCatalog}</span>
               </div>
               <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-sm text-zinc-500">Trade-in questions seeded</span>
+                <span className="font-bold text-sm">{result.tradeInQuestions ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
                 <span className="text-sm text-zinc-500">Promo slides seeded</span>
                 <span className="font-bold text-sm">{result.promoSlides}</span>
               </div>
@@ -292,23 +312,23 @@ export default function SeedPage() {
         </div>
 
         <div className="bg-white rounded-3xl border border-red-200 shadow-sm p-8 space-y-6">
-          <div className="p-4 rounded-2xl bg-red-50 border border-red-100 space-y-2">
-            <div className="flex items-center gap-2">
-              <TriangleAlert className="h-4 w-4 text-red-600 shrink-0" />
-              <p className="text-sm font-bold text-red-800">This is irreversible</p>
-            </div>
-            <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
-              <li>Wipes <strong>every file</strong> in Garage (S3) — products, banners, trade-in images, repair images, everything.</li>
-              <li>Deletes all products, categories, brands, brand-categories, device catalog entries.</li>
-              <li>Deletes all orders, order items, trade-ins, repairs, and reviews.</li>
-              <li>Removes all pricing configs and scraper history.</li>
-              <li>Clears helpline numbers and the support contact email too.</li>
-              <li>Use this before a full re-seed to start from a clean slate.</li>
-            </ul>
-          </div>
+          {!purgeResult ? (
+            <div className="space-y-6">
+              <div className="p-4 rounded-2xl bg-red-50 border border-red-100 space-y-2">
+                <div className="flex items-center gap-2">
+                  <TriangleAlert className="h-4 w-4 text-red-600 shrink-0" />
+                  <p className="text-sm font-bold text-red-800">This is irreversible</p>
+                </div>
+                <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
+                  <li>Wipes <strong>every file</strong> in Garage (S3) — products, banners, trade-in images, repair images, everything.</li>
+                  <li>Deletes all products, categories, brands, brand-categories, device catalog entries.</li>
+                  <li>Deletes all orders, order items, trade-ins, repairs, and reviews.</li>
+                  <li>Removes all pricing configs and scraper history.</li>
+                  <li>Clears helpline numbers and the support contact email too.</li>
+                  <li>Use this before a full re-seed to start from a clean slate.</li>
+                </ul>
+              </div>
 
-          {!purgeResult && (
-            <>
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"
@@ -353,17 +373,15 @@ export default function SeedPage() {
                   </>
                 )}
               </button>
-            </>
-          )}
 
-          {purgeError && (
-            <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-100">
-              <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700 font-medium">{purgeError}</p>
+              {purgeError && (
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-red-50 border border-red-100">
+                  <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-700 font-medium">{purgeError}</p>
+                </div>
+              )}
             </div>
-          )}
-
-          {purgeResult && (
+          ) : (
             <div className="space-y-4">
               <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
                 <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
@@ -389,6 +407,10 @@ export default function SeedPage() {
                 <div className="flex items-center justify-between px-5 py-2.5">
                   <span className="text-sm text-zinc-500">Device Catalog Entries</span>
                   <span className="font-bold text-sm text-red-600">{purgeResult.counts.deviceCatalog}</span>
+                </div>
+                <div className="flex items-center justify-between px-5 py-2.5">
+                  <span className="text-sm text-zinc-500">Trade-In Questions</span>
+                  <span className="font-bold text-sm text-red-600">{purgeResult.counts.tradeInQuestions ?? 0}</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-2.5">
                   <span className="text-sm text-zinc-500">Brand-Category Links</span>
@@ -455,12 +477,21 @@ export default function SeedPage() {
                   <span className="font-black text-sm text-zinc-900">{purgeResult.deleted}</span>
                 </div>
               </div>
-              <button
-                onClick={() => setPurgeResult(null)}
-                className="w-full h-10 rounded-2xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
-              >
-                Dismiss
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => { setPurgeResult(null); handleSeed(); }}
+                  className="flex-1 h-11 rounded-2xl bg-zinc-950 text-white font-bold text-sm hover:bg-zinc-800 transition-colors flex items-center justify-center gap-2"
+                >
+                  <DatabaseZap className="h-4 w-4" />
+                  Run Full Re-Seed Now
+                </button>
+                <button
+                  onClick={() => setPurgeResult(null)}
+                  className="h-11 px-5 rounded-2xl border border-zinc-200 text-sm font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           )}
         </div>
