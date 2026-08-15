@@ -16,7 +16,8 @@ import { catalogApi } from "@/lib/api";
 import { GradeKey, GRADE_CONFIG, getGradeConfig } from "@/lib/grades";
 import { GradeBadge } from "@/components/GradeBadge";
 import ProductImage from "@/components/ProductImage";
-import { BRAND_SVGS, getSubcategoryIcon } from "@/lib/brand-logos";
+import { getSubcategoryIcon } from "@/lib/brand-logos";
+import { BrandPill } from "@/components/BrandPill";
 
 // ─── Scroll Buttons ───────────────────────────────────────────────────────────
 function ScrollButtons({ scrollRef }: { scrollRef: React.RefObject<HTMLElement | null> }) {
@@ -347,29 +348,16 @@ export default function CategoryPage() {
                   >
                     All Brands
                   </button>
-                  {subBrands.map((b) => {
-                    const SvgLogo = BRAND_SVGS[b.brand];
-                    return (
-                      <button
-                        key={b.brand}
-                        onClick={() => setActiveTabBrand(b.brand)}
-                        className={`h-14 px-5 min-w-[72px] rounded-2xl transition-all border flex items-center justify-center gap-2 bg-white ${
-                          activeTabBrand === b.brand
-                            ? "border-black dark:border-white shadow-sm text-zinc-950 dark:text-white"
-                            : "border-zinc-200 dark:border-zinc-800 text-zinc-600 hover:border-zinc-400 dark:hover:border-zinc-500"
-                        }`}
-                      >
-                        {SvgLogo && (
-                          <span className={`shrink-0 ${activeTabBrand === b.brand ? "text-zinc-950 dark:text-white" : "text-zinc-700 dark:text-zinc-300"}`}>
-                            {SvgLogo}
-                          </span>
-                        )}
-                        <span className={`font-extrabold text-xs tracking-tight ${
-                          activeTabBrand === b.brand ? "text-zinc-950 dark:text-white" : "text-zinc-700 dark:text-zinc-300"
-                        }`}>{b.brand}</span>
-                      </button>
-                    );
-                  })}
+                  {subBrands.map((b) => (
+                    <BrandPill
+                      key={b.brand}
+                      brand={b.brand}
+                      logo={b.logo}
+                      isActive={activeTabBrand === b.brand}
+                      onClick={() => setActiveTabBrand(b.brand)}
+                      variant="card"
+                    />
+                  ))}
                 </div>
 
                 {/* Horizontal Product Carousel */}

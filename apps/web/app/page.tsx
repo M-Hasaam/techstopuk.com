@@ -90,7 +90,8 @@ import { useCart } from "../context/cart-context";
 import ProductImage from "../components/ProductImage";
 import { isOtherProduct } from "../lib/other-categories";
 import LogoLoop from "../components/LogoLoop";
-import { BRAND_SVGS, getSubcategoryIcon } from "../lib/brand-logos";
+import { getSubcategoryIcon } from "../lib/brand-logos";
+import { BrandPill } from "../components/BrandPill";
 const Footer = dynamic(() => import("../components/Footer"));
 
 // ─── Promo Carousel Banner ───────────────────────────────────────────────────
@@ -2121,7 +2122,7 @@ function TopBrandsSplit() {
   useEffect(() => {
     bannersApi.random(1).then(b => setDeskImg(b[0]?.url ?? null)).catch(() => { });
     catalogApi.listBrands()
-      .then(res => setBrands(res.filter(b => b.isActive && b.logo).sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0))))
+      .then(res => setBrands(res.filter(b => b.isActive).sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0))))
       .catch(() => { });
     // Fetch "all" — larger limit so filtering out "others" still leaves ~20 main products
     setLoading(true);
@@ -2196,7 +2197,7 @@ function TopBrandsSplit() {
               {/* All tab */}
               <button
                 onClick={() => setActiveBrand("all")}
-                className={`flex-shrink-0 h-10 px-5 rounded-full font-bold text-sm transition-all duration-200 border ${activeBrand === "all"
+                className={`flex-shrink-0 h-9.5 sm:h-10 px-4 sm:px-5 rounded-full font-bold text-xs sm:text-sm transition-all duration-200 border flex items-center justify-center ${activeBrand === "all"
                   ? "bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white"
                   : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:bg-zinc-900/40 dark:text-zinc-400 dark:border-zinc-800 dark:hover:text-white dark:hover:border-zinc-400"
                   }`}
@@ -2204,26 +2205,15 @@ function TopBrandsSplit() {
                 All
               </button>
 
-              {brands.map((brand) => {
-                const SvgLogo = BRAND_SVGS[brand.name];
-                return (
-                  <button
-                    key={brand.id}
-                    onClick={() => setActiveBrand(brand.name)}
-                    className={`flex-shrink-0 h-10 px-4 rounded-full font-bold text-sm transition-all duration-200 border flex items-center gap-2 ${activeBrand === brand.name
-                      ? "bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-zinc-950 dark:border-white"
-                      : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-950 hover:text-zinc-950 dark:bg-zinc-900/40 dark:text-zinc-400 dark:border-zinc-800 dark:hover:text-white dark:hover:border-zinc-400"
-                      }`}
-                  >
-                    {SvgLogo && (
-                      <span className={`shrink-0 ${activeBrand === brand.name ? "text-white dark:text-zinc-950" : "text-zinc-800 dark:text-zinc-200"}`}>
-                        {SvgLogo}
-                      </span>
-                    )}
-                    <span>{brand.name}</span>
-                  </button>
-                );
-              })}
+              {brands.map((brand) => (
+                <BrandPill
+                  key={brand.id}
+                  brand={brand.name}
+                  logo={brand.logo}
+                  isActive={activeBrand === brand.name}
+                  onClick={() => setActiveBrand(brand.name)}
+                />
+              ))}
             </div>
 
             {/* Products horizontal scroll */}
