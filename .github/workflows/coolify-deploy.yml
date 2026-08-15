@@ -42,10 +42,10 @@ jobs:
           echo "Triggering Web App deployment on Coolify..."
           if [ -n "$COOLIFY_TOKEN" ]; then
             echo "Using COOLIFY_TOKEN Bearer authorization..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
           else
             echo "Warning: COOLIFY_TOKEN is not set. Requesting without auth header..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
           fi
           echo "$response"
           http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -91,10 +91,10 @@ jobs:
           echo "Triggering Admin App deployment on Coolify..."
           if [ -n "$COOLIFY_TOKEN" ]; then
             echo "Using COOLIFY_TOKEN Bearer authorization..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
           else
             echo "Warning: COOLIFY_TOKEN is not set. Requesting without auth header..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
           fi
           echo "$response"
           http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -140,10 +140,10 @@ jobs:
           echo "Triggering API App deployment on Coolify..."
           if [ -n "$COOLIFY_TOKEN" ]; then
             echo "Using COOLIFY_TOKEN Bearer authorization..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
           else
             echo "Warning: COOLIFY_TOKEN is not set. Requesting without auth header..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
           fi
           echo "$response"
           http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
@@ -189,10 +189,10 @@ jobs:
           echo "Triggering Scraper deployment on Coolify..."
           if [ -n "$COOLIFY_TOKEN" ]; then
             echo "Using COOLIFY_TOKEN Bearer authorization..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK")
           else
             echo "Warning: COOLIFY_TOKEN is not set. Requesting without auth header..."
-            response=$(curl -s -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
+            response=$(curl --connect-timeout 15 --max-time 45 -s -S -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK")
           fi
           echo "$response"
           http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d':' -f2)
