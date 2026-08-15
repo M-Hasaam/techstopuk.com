@@ -5,7 +5,9 @@ const databaseUrl =
     process.env.DATABASE_URL ??
     'postgresql://ai_ecommerce:ai_ecommerce@localhost:5432/ai_ecommerce?schema=public';
 
-const shadowDatabaseUrl = process.env.SHADOW_DATABASE_URL ?? undefined;
+const shadowDatabaseUrl =
+    process.env.SHADOW_DATABASE_URL ??
+    'postgresql://prisma:prisma@localhost:5432/shadow';
 
 export default defineConfig({
     schema: 'prisma/schema.prisma',
@@ -14,6 +16,6 @@ export default defineConfig({
     },
     datasource: {
         url: databaseUrl,
-        ...(shadowDatabaseUrl ? { shadowDatabaseUrl } : {}),
+        shadowDatabaseUrl: shadowDatabaseUrl,
     },
 });
