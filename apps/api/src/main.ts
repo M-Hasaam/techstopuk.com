@@ -102,3 +102,5 @@ async function bootstrap() {
   throw new Error(`No free port found in range ${startPort}-${startPort + maxPortAttempts - 1}`);
 }
 bootstrap();
+
+// Test API CI trigger
