@@ -93,23 +93,48 @@ import LogoLoop from "../components/LogoLoop";
 const Footer = dynamic(() => import("../components/Footer"));
 
 // ─── Promo Carousel Banner ───────────────────────────────────────────────────
+const DEFAULT_PROMO_SLIDES: import('../lib/api').PromoSlide[] = [
+  {
+    id: "default-1",
+    order: 0,
+    isActive: true,
+    imgUrl: "/hero/image.jpg",
+    tabTitle: "Refurbished Tech",
+    tag: "FEATURED",
+    titleLine1: "Certified Refurbished",
+    titleLine2: "Save up to 40% on",
+    titleItalic: "Flagship Tech",
+    title: "Certified Refurbished Flagship Tech",
+    subtitle: "12-month warranty & 30-day free returns on every single device.",
+    badgeA: "12-Month Warranty",
+    badgeB: "Free Returns",
+    specs: ["100% Tested", "Unlocked"],
+    themeColor: "#ef4444",
+    bgGlow: "rgba(239,68,68,0.15)",
+    btnText: "Shop Refurbished",
+    btnLink: "/shop/phones",
+  },
+];
+
 function PromoCarouselBanner() {
   const [idx, setIdx] = useState(0);
-  const [slides, setSlides] = useState<import('../lib/api').PromoSlide[]>([]);
-  const [loadingSlides, setLoadingSlides] = useState(true);
+  const [slides, setSlides] = useState<import('../lib/api').PromoSlide[]>(DEFAULT_PROMO_SLIDES);
   const tabContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bannersApi.promoSlides()
-      .then(setSlides)
-      .catch(() => { })
-      .finally(() => setLoadingSlides(false));
+      .then((data) => {
+        if (data && data.length > 0) {
+          setSlides(data);
+        }
+      })
+      .catch(() => { });
   }, []);
 
   const safeIdx = slides.length > 0 ? idx % slides.length : 0;
 
   useEffect(() => {
-    if (slides.length === 0) return;
+    if (slides.length <= 1) return;
     const timer = setInterval(() => {
       setIdx((prev) => (prev + 1) % slides.length);
     }, 5000);
@@ -134,14 +159,6 @@ function PromoCarouselBanner() {
     }
   }, [safeIdx]);
 
-  if (loadingSlides) {
-    // Must match the loaded <section> below exactly (height + background) —
-    // any mismatch here is a guaranteed layout jump the instant slides arrive.
-    return (
-      <div className="w-full h-[80svh] lg:min-h-[75vh] bg-zinc-950 border-b border-zinc-200/60 dark:border-zinc-900 animate-pulse" />
-    );
-  }
-
   if (slides.length === 0) return null;
 
   const slide = slides[safeIdx];
@@ -155,23 +172,26 @@ function PromoCarouselBanner() {
       <div className="absolute inset-0 z-0">
         {slides.map((s, i) => {
           const isActive = safeIdx === i;
+          // Only render active or immediately adjacent slide on DOM to keep mobile memory/network payload near 0
+          const isAdjacent = Math.abs(safeIdx - i) <= 1 || (safeIdx === 0 && i === slides.length - 1);
+          if (!isActive && !isAdjacent) return null;
+
           return s.imgUrl ? (
             <motion.div
               key={s.id}
               aria-hidden={!isActive}
               className="absolute inset-0 h-full w-full"
               initial={false}
-              animate={isActive ? { opacity: 1, scale: 1.08 } : { opacity: 0, scale: 1.02 }}
-              transition={isActive ? { opacity: { duration: 0.7 }, scale: { duration: 5, ease: "linear" } } : { opacity: { duration: 0.5 }, scale: { duration: 0 } }}
+              animate={isActive ? { opacity: 1, scale: 1.05 } : { opacity: 0, scale: 1 }}
+              transition={isActive ? { opacity: { duration: 0.6 }, scale: { duration: 5, ease: "linear" } } : { opacity: { duration: 0.4 }, scale: { duration: 0 } }}
             >
-              {/* priority on slide 0 only — that's the one visible on first paint,
-                  everything else can lazy-load since it's hidden behind it */}
               <NextImage
                 src={s.imgUrl}
                 alt={s.tabTitle}
                 fill
                 priority={i === 0}
-                sizes="100vw"
+                quality={80}
+                sizes="(max-width: 768px) 100vw, 100vw"
                 className="object-cover"
               />
             </motion.div>
@@ -203,7 +223,7 @@ function PromoCarouselBanner() {
               transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col gap-8 sm:gap-8 items-start relative z-10 w-full"
             >
-              <h1 className="font-sans text-[2.5rem] leading-[1.05] sm:text-5xl lg:text-[clamp(3.5rem,4.2vw,5.5rem)] font-black sm:leading-[0.95] lg:leading-[0.88] tracking-tight text-white uppercase drop-shadow-[0_2px_24px_rgba(0,0,0,0.5)]">
+              <h1 className="font-sans text-[2.25rem] sm:text-5xl lg:text-[clamp(3.5rem,4.2vw,5.5rem)] font-black leading-[1.05] sm:leading-[0.95] lg:leading-[0.88] tracking-tight text-white uppercase drop-shadow-[0_2px_24px_rgba(0,0,0,0.5)]">
                 {slide.titleLine1} <br className="hidden sm:block" />
                 {slide.titleLine2}{" "}
                 <span className="font-sans font-black text-red-500">
@@ -212,26 +232,26 @@ function PromoCarouselBanner() {
               </h1>
 
               {slide.subtitle && (
-                <p className="max-w-[310px] sm:max-w-md lg:max-w-xl text-[15px] sm:text-lg lg:text-xl font-medium text-white/80 leading-relaxed sm:leading-snug">
+                <p className="max-w-[310px] sm:max-w-md lg:max-w-xl text-[14px] sm:text-lg lg:text-xl font-medium text-white/80 leading-relaxed sm:leading-snug">
                   {slide.subtitle}
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-6 sm:mt-4 w-full">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-4 sm:mt-4 w-full">
                 <Link
                   href={slide.btnLink === "/sell" ? "/trade-in" : slide.btnLink}
-                  className="group relative inline-flex h-10 sm:h-12 px-6 sm:px-8 items-center justify-center bg-white text-zinc-950 rounded-xl sm:rounded-2xl font-bold text-[11px] sm:text-xs overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_10px_20px_rgba(0,0,0,0.3)] cursor-pointer"
+                  className="group relative inline-flex h-11 sm:h-12 px-6 sm:px-8 items-center justify-center bg-white text-zinc-950 rounded-xl sm:rounded-2xl font-bold text-xs overflow-hidden transition-all hover:scale-105 active:scale-95 shadow-[0_10px_20px_rgba(0,0,0,0.3)] cursor-pointer"
                 >
                   <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-red-600 to-red-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   <span className="relative z-10 flex items-center gap-2 group-hover:text-white transition-colors duration-300">
                     {slide.btnText}
-                    <ArrowRight className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </span>
                 </Link>
 
                 <Link
                   href="/trade-in"
-                  className="inline-flex h-10 sm:h-12 px-5 sm:px-6 items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all font-bold text-[11px] sm:text-xs shadow-sm active:scale-95"
+                  className="inline-flex h-11 sm:h-12 px-5 sm:px-6 items-center justify-center rounded-xl sm:rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white/20 transition-all font-bold text-xs shadow-sm active:scale-95"
                 >
                   How it Works
                 </Link>
@@ -243,11 +263,11 @@ function PromoCarouselBanner() {
       </div>
 
       {/* Bottom Floating Navigation Dock */}
-      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-12 mt-8 relative z-20">
+      <div className="mx-auto w-full max-w-[1500px] px-4 sm:px-6 lg:px-12 mt-6 lg:mt-8 relative z-20">
         <div className="flex justify-center">
 
           {/* Mobile Dots Pagination */}
-          <div className="lg:hidden flex items-center gap-2.5 p-2 rounded-full bg-black/20 backdrop-blur-md">
+          <div className="lg:hidden flex items-center gap-2.5 p-2 rounded-full bg-black/30 backdrop-blur-md">
             {slides.map((s, i) => {
               const isActive = safeIdx === i;
               return (
@@ -343,22 +363,26 @@ const CATEGORY_ICONS: Record<string, typeof Smartphone> = {
   audio: Headphones,
 };
 
+const DEFAULT_CATEGORIES: import('../lib/api').CatalogCategory[] = [
+  { id: 'cat-phones', name: 'Phones', displayName: 'Phones', slug: 'phones', isActive: true, isSellable: true, isRepairable: true, productCount: 1250, minPrice: 99, modelCount: 50, images: [], createdAt: '', updatedAt: '' },
+  { id: 'cat-laptops', name: 'Laptops', displayName: 'Laptops', slug: 'laptops', isActive: true, isSellable: true, isRepairable: true, productCount: 450, minPrice: 249, modelCount: 30, images: [], createdAt: '', updatedAt: '' },
+  { id: 'cat-gaming', name: 'Gaming', displayName: 'Gaming', slug: 'gaming', isActive: true, isSellable: true, isRepairable: true, productCount: 680, minPrice: 120, modelCount: 20, images: [], createdAt: '', updatedAt: '' },
+  { id: 'cat-tablets', name: 'Tablets', displayName: 'Tablets', slug: 'tablets', isActive: true, isSellable: true, isRepairable: true, productCount: 320, minPrice: 140, modelCount: 15, images: [], createdAt: '', updatedAt: '' },
+];
+
 function CategoryQuickNav() {
-  const [categories, setCategories] = useState<import('../lib/api').CatalogCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<import('../lib/api').CatalogCategory[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     catalogApi.listCategories()
       .then(res => {
-        setCategories(res.filter(c => c.isActive && c.isSellable).sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0)));
+        if (res && res.length > 0) {
+          setCategories(res.filter(c => c.isActive && c.isSellable).sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0)));
+        }
       })
-      .catch(() => { })
-      .finally(() => setLoading(false));
+      .catch(() => { });
   }, []);
 
-  if (loading) {
-    return <div className="border-y border-zinc-100 py-6 bg-white h-[76px] animate-pulse" />;
-  }
   if (categories.length === 0) return null;
 
   const formatCount = (n: number) => {
@@ -418,10 +442,15 @@ function TradeInCTASection() {
   const router = useRouter();
 
   return (
-    <section className="relative min-h-[60vh] lg:min-h-[auto] flex items-center py-16 lg:py-14 font-sans w-full">
+    <section className="relative min-h-[60vh] lg:min-h-[auto] flex items-center py-12 lg:py-14 font-sans w-full">
       {/* Background photo — shown in full, no wash */}
       <div className="absolute inset-0 z-0 overflow-hidden">
         <style>{`
+          @media (min-width: 1024px) {
+            .cinematic-pan {
+              animation: cinematicPan 20s ease-in-out infinite;
+            }
+          }
           @keyframes cinematicPan {
             0% { transform: scale(1) translate(0, 0); }
             50% { transform: scale(1.05) translate(-1%, -1%); }
@@ -429,13 +458,13 @@ function TradeInCTASection() {
           }
         `}</style>
         <NextImage
-          src="/hero/trade_in_user_gen.png"
-          alt=""
+          src="/hero/trade_in_user_gen.jpg"
+          alt="TechStop Trade-In"
           fill
           priority
-          sizes="100vw"
-          className="object-cover object-right lg:object-center brightness-75"
-          style={{ animation: 'cinematicPan 20s ease-in-out infinite' }}
+          quality={82}
+          sizes="(max-width: 768px) 100vw, 100vw"
+          className="object-cover object-right lg:object-center brightness-75 cinematic-pan"
         />
         <div className="absolute inset-0 bg-zinc-950/60 lg:bg-zinc-950/30" />
       </div>
@@ -447,12 +476,12 @@ function TradeInCTASection() {
             TechStop Trade-In
           </span>
 
-          <h2 className="text-3xl md:text-4xl font-black tracking-tight text-white leading-tight mb-3 drop-shadow-lg">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white leading-tight mb-3 drop-shadow-lg">
             Sell your old tech. <br />
             <span className="text-accent drop-shadow-lg">Get cash in 48 hours.</span>
           </h2>
 
-          <p className="text-white/90 text-sm md:text-base font-semibold leading-relaxed mb-6 drop-shadow-md">
+          <p className="text-white/90 text-xs sm:text-sm md:text-base font-semibold leading-relaxed mb-5 sm:mb-6 drop-shadow-md">
             We pay premium market rates for used smartphones, laptops, tablets, and gaming consoles. Trade in online with free insured Royal Mail shipping or drop off in-store.
           </p>
 
@@ -473,30 +502,29 @@ function TradeInCTASection() {
   );
 }
 
+const DEFAULT_BENTO_CATEGORIES: import('../lib/api').CatalogCategory[] = [
+  { id: 'bento-1', name: 'Smartphones', displayName: 'Smartphones', slug: 'phones', isActive: true, isSellable: true, isRepairable: true, productCount: 1250, minPrice: 99, modelCount: 50, images: [], createdAt: '', updatedAt: '' },
+  { id: 'bento-2', name: 'Laptops & MacBooks', displayName: 'Laptops', slug: 'laptops', isActive: true, isSellable: true, isRepairable: true, productCount: 450, minPrice: 249, modelCount: 30, images: [], createdAt: '', updatedAt: '' },
+  { id: 'bento-3', name: 'Gaming Consoles', displayName: 'Gaming', slug: 'gaming', isActive: true, isSellable: true, isRepairable: true, productCount: 680, minPrice: 120, modelCount: 20, images: [], createdAt: '', updatedAt: '' },
+  { id: 'bento-4', name: 'Tablets & iPads', displayName: 'Tablets', slug: 'tablets', isActive: true, isSellable: true, isRepairable: true, productCount: 320, minPrice: 140, modelCount: 15, images: [], createdAt: '', updatedAt: '' },
+];
+
 function CategoryBento() {
-  const [categories, setCategories] = useState<import('../lib/api').CatalogCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<import('../lib/api').CatalogCategory[]>(DEFAULT_BENTO_CATEGORIES);
 
   useEffect(() => {
     catalogApi.listCategories()
       .then(cats => {
-        // Show sellable main categories, capped at 6 for the bento grid
-        const mainCats = cats.filter(c => c.isSellable).slice(0, 6);
-        setCategories(mainCats);
+        if (cats && cats.length > 0) {
+          const mainCats = cats.filter(c => c.isSellable).slice(0, 6);
+          if (mainCats.length > 0) {
+            setCategories(mainCats);
+          }
+        }
       })
-      .catch(() => { })
-      .finally(() => setLoading(false));
+      .catch(() => { });
   }, []);
 
-  if (loading) {
-    return (
-      <section className="bg-white border-y border-zinc-100 py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="h-[350px] lg:h-[450px] bg-zinc-100 rounded-[2rem] animate-pulse" />
-        </div>
-      </section>
-    );
-  }
   if (categories.length === 0) return null;
 
   const formatCount = (n: number) => {
