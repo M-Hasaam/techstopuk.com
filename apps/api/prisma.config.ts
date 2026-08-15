@@ -3,7 +3,7 @@ import { defineConfig } from 'prisma/config';
 
 const databaseUrl =
     process.env.DATABASE_URL ??
-    'postgresql://ai_ecommerce:ai_ecommerce@localhost:5432/ai_ecommerce?schema=public';
+    'postgresql://prisma:prisma@localhost:5432/shadow';
 
 const shadowDatabaseUrl =
     process.env.SHADOW_DATABASE_URL ??

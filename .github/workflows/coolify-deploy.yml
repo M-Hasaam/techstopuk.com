@@ -53,7 +53,7 @@ jobs:
               - 'turbo.json'
 
   # ----------------------------------------------------
-  # 0.5. FAST PRISMA DB MIGRATION CHECK (~15s)
+  # 0.5. PRISMA DB MIGRATION CHECK (~18s)
   # ----------------------------------------------------
   check-migrations:
     name: DB Migration Check
@@ -63,6 +63,21 @@ jobs:
     defaults:
       run:
         working-directory: apps/api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+          POSTGRES_DB: shadow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout Code
