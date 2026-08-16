@@ -572,3 +572,7 @@ model TradeInQuestionOption {
   @@index([questionId])
   @@map("trade_in_question_options")
 }
+
+model TestMigrationFailure {
+  id String @id @default(cuid())
+}
