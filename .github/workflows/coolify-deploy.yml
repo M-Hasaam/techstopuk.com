@@ -96,8 +96,8 @@ jobs:
           echo "flag_active=$FLAG" >> $GITHUB_OUTPUT
 
   # ----------------------------------------------------
-  # 0.5. PRISMA DB MIGRATION CHECK (~18s)
-  # Only executes if Check Migration Needed? node outputs needed=true
+  # 0.5A. PRISMA DB MIGRATION CHECK (~18s - YES Branch)
+  # Executed when Check Migration Needed? outputs needed=true
   # ----------------------------------------------------
   check-migrations:
     name: DB Migration Check
@@ -161,6 +161,21 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh variable set RUN_MIGRATION_ALWAYS --body "true" || echo "Variable update skipped or not created yet"
+
+  # ----------------------------------------------------
+  # 0.5B. SKIP DB MIGRATION CHECK (~1s - NO / Bypass Branch)
+  # Executed when Check Migration Needed? outputs needed=false
+  # Creates explicit visual bypass arrow in GitHub Actions GUI Graph
+  # ----------------------------------------------------
+  skip-migrations:
+    name: Skip DB Check (Fast Bypass)
+    needs: [changes, eval-migration]
+    if: needs.eval-migration.outputs.needed == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log Fast Bypass Route
+        run: |
+          echo "⚡ Migration check bypassed! Routing straight to API deployment (~18s saved)."
 
   # ----------------------------------------------------
   # 1. WEB APP DEPLOYMENT (apps/web)
@@ -239,7 +254,7 @@ jobs:
   # ----------------------------------------------------
   deploy-api:
     name: Deploy API App
-    needs: [changes, eval-migration, check-migrations]
+    needs: [changes, eval-migration, check-migrations, skip-migrations]
     if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && always() && needs.check-migrations.result != 'failure'
     runs-on: ubuntu-latest
     steps:
