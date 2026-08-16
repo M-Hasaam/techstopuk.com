@@ -190,13 +190,27 @@ export default function Navbar() {
   // Smart search: fetch the (small) catalog once, then score/rank matches
   // entirely client-side — instant per keystroke, and tolerant of reordered
   // words, extra words, and typos (see lib/search.ts for the algorithm).
+  // Uses sessionStorage cache to eliminate redundant network fetches on page switching.
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_product_index");
+      if (cached) {
+        setProductIndex(JSON.parse(cached));
+        setIndexLoading(false);
+        return;
+      }
+    } catch {}
+
     productsApi.list({ limit: 300 })
-      .then(r => setProductIndex(r.items.map(p => ({
-        id: p.id, slug: p.slug, name: p.name, brand: p.brand,
-        category: p.category, price: p.price ?? null, image: p.images?.[0] ?? null,
-        stock: p.stock, rating: p.rating, reviewCount: p.reviewCount,
-      }))))
+      .then(r => {
+        const items = r.items.map(p => ({
+          id: p.id, slug: p.slug, name: p.name, brand: p.brand,
+          category: p.category, price: p.price ?? null, image: p.images?.[0] ?? null,
+          stock: p.stock, rating: p.rating, reviewCount: p.reviewCount,
+        }));
+        setProductIndex(items);
+        try { sessionStorage.setItem("ts_product_index", JSON.stringify(items)); } catch {}
+      })
       .catch(() => {})
       .finally(() => setIndexLoading(false));
   }, []);
@@ -245,15 +259,29 @@ export default function Navbar() {
   // mobile drawer can be positioned as a fixed overlay flush underneath it,
   // instead of expanding the header's box (which used to push page content
   // down when opened) or leaving a gap that peeks through to the header.
+  // Throttled using requestAnimationFrame + passive listeners to prevent layout thrashing on scroll.
   useEffect(() => {
     const el = headerRef.current;
     if (!el) return;
-    const update = () => setHeaderHeight(el.getBoundingClientRect().bottom);
+
+    let ticking = false;
+    const update = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          if (headerRef.current) {
+            setHeaderHeight(headerRef.current.getBoundingClientRect().bottom);
+          }
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
     update();
     const observer = new ResizeObserver(update);
     observer.observe(el);
-    window.addEventListener("scroll", update);
-    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update, { passive: true });
     return () => {
       observer.disconnect();
       window.removeEventListener("scroll", update);

@@ -21,8 +21,9 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "**" },
     ],
   },
+  reactStrictMode: true,
   experimental: {
-    optimizePackageImports: ["lucide-react", "framer-motion"],
+    optimizePackageImports: ["lucide-react", "framer-motion", "date-fns", "uuid"],
   },
   // Content-Security-Policy is set per-request in middleware.ts (needs a nonce).
   // Setting it here too would make browsers enforce the intersection of two
