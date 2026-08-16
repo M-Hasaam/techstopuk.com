@@ -673,15 +673,15 @@ export default function Navbar() {
                         <Link
                           href={href}
                           prefetch={true}
-                          className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-250 flex items-center whitespace-nowrap ${
-                            isActive ? "text-white z-10 font-extrabold" : "text-zinc-400 hover:text-white font-semibold"
+                          className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-200 flex items-center whitespace-nowrap font-bold ${
+                            isActive ? "text-white z-10" : "text-zinc-400 hover:text-white"
                           }`}
                         >
                           {isActive && (
                             <motion.div
                               layoutId="activeCategoryTab"
                               className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
-                              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+                              transition={{ type: "spring", stiffness: 220, damping: 24, mass: 0.8 }}
                             />
                           )}
                           {label}
