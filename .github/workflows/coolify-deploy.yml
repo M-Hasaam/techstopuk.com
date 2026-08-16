@@ -63,7 +63,7 @@ jobs:
   # Decision Node in GUI Graph: Checks if Prisma folder changed or RUN_MIGRATION_ALWAYS flag is true
   # ----------------------------------------------------
   eval-migration:
-    name: Check Migration Needed? (flag=${{ vars.RUN_MIGRATION_ALWAYS || 'false' }})
+    name: Check Migration Needed?
     needs: changes
     if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
