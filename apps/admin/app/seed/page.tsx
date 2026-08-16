@@ -38,6 +38,8 @@ interface SeedResult {
   deviceCatalog: number;
   tradeInQuestions?: number;
   stores?: number;
+  scrapedPrices?: number;
+  autoPricedProducts?: number;
   banners: number;
   promoSlides: number;
   others: { created: number; updated: number; errors: string[] };
@@ -248,6 +250,14 @@ export default function SeedPage() {
               <div className="flex items-center justify-between px-5 py-2.5">
                 <span className="text-sm text-zinc-500">Support contact email</span>
                 <span className="font-bold text-sm">{result.supportEmailSeeded ? "Added" : "Already set"}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-sm text-zinc-500">Scraped market prices seeded</span>
+                <span className="font-bold text-sm text-indigo-600">{result.scrapedPrices ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-sm text-zinc-500">Auto-priced products calculated</span>
+                <span className="font-bold text-sm text-emerald-600">{result.autoPricedProducts ?? 0}</span>
               </div>
               <div className="flex items-center justify-between px-5 py-2.5">
                 <span className="text-sm text-zinc-500">Products created</span>

@@ -447,6 +447,8 @@ const TRADE_IN_DEVICES_SEED = [
     { name: "QuietComfort Earbuds II", brand: "Bose",            category: "Audio" },
 ];
 
+import { ProductPricingService } from '../product-pricing/product-pricing.service';
+
 export interface SeedResult {
     pricingConfigs: number;
     banners: number;
@@ -456,6 +458,8 @@ export interface SeedResult {
     tradeInDevices: number;
     tradeInQuestions?: number;
     stores?: number;
+    scrapedPrices?: number;
+    autoPricedProducts?: number;
     others: { created: number; updated: number; errors: string[] };
     categories: number;
     brands: number;
@@ -482,6 +486,7 @@ export class SeedService {
         private readonly prisma: PrismaService,
         private readonly settingsService: SettingsService,
         private readonly tradeInQuestionsService: TradeInQuestionsService,
+        private readonly productPricingService: ProductPricingService,
     ) {
         this.bucketName = process.env.GARAGE_BUCKET || 'ai-ecommerce';
         this.s3Client = new S3Client({
@@ -547,6 +552,15 @@ export class SeedService {
         const othersResult   = await this.seedOthers();
         const helplineSeeded    = await this.seedHelplines();
         const supportEmailSeeded = await this.seedSupportEmail();
+        const scrapedPricesCount = await this.seedScrapedPrices();
+
+        // Run auto-pricing calculation so all catalog products get calculated prices, comparePrice retail values, and auto_priced status
+        try {
+            await this.productPricingService.runPriceCatalog();
+        } catch (err) {
+            this.logger.warn(`Failed to auto-price catalog during seed: ${err instanceof Error ? err.message : err}`);
+        }
+        const autoPricedCount = await this.prisma.product.count({ where: { pricingStatus: 'auto_priced' } });
 
         const categoryCount      = await this.prisma.category.count();
         const brandCount         = await this.prisma.brand.count();
@@ -561,6 +575,8 @@ export class SeedService {
             tradeInDevices: tradeInDevicesCount,
             tradeInQuestions: tradeInQuestionsResult.seeded,
             stores: storesCount,
+            scrapedPrices: scrapedPricesCount,
+            autoPricedProducts: autoPricedCount,
             others: othersResult,
             products: productsResult,
             categories: categoryCount,
@@ -569,6 +585,89 @@ export class SeedService {
             helplineSeeded,
             supportEmailSeeded,
         };
+    }
+
+    private async seedScrapedPrices(): Promise<number> {
+        const DEFAULT_BENCHMARKS: Array<{
+            brand: string;
+            model: string;
+            storage: string;
+            ram?: string;
+            marketPrice: number;
+            cexSellPrice?: number;
+            envirofonePrice?: number;
+            backMarketPrice?: number;
+        }> = [
+            // Apple iPhones
+            { brand: 'Apple', model: 'iPhone 11', storage: '64GB', marketPrice: 199, cexSellPrice: 199, envirofonePrice: 185, backMarketPrice: 195 },
+            { brand: 'Apple', model: 'iPhone 11', storage: '128GB', marketPrice: 229, cexSellPrice: 229, envirofonePrice: 215, backMarketPrice: 225 },
+            { brand: 'Apple', model: 'iPhone 11 Pro', storage: '64GB', marketPrice: 249, cexSellPrice: 249, envirofonePrice: 235, backMarketPrice: 245 },
+            { brand: 'Apple', model: 'iPhone 11 Pro Max', storage: '64GB', marketPrice: 289, cexSellPrice: 289, envirofonePrice: 275, backMarketPrice: 285 },
+            { brand: 'Apple', model: 'iPhone 12', storage: '64GB', marketPrice: 269, cexSellPrice: 269, envirofonePrice: 255, backMarketPrice: 265 },
+            { brand: 'Apple', model: 'iPhone 12', storage: '128GB', marketPrice: 299, cexSellPrice: 299, envirofonePrice: 285, backMarketPrice: 295 },
+            { brand: 'Apple', model: 'iPhone 12 Mini', storage: '64GB', marketPrice: 239, cexSellPrice: 239, envirofonePrice: 225, backMarketPrice: 235 },
+            { brand: 'Apple', model: 'iPhone 12 Pro', storage: '128GB', marketPrice: 349, cexSellPrice: 349, envirofonePrice: 335, backMarketPrice: 345 },
+            { brand: 'Apple', model: 'iPhone 12 Pro Max', storage: '128GB', marketPrice: 399, cexSellPrice: 399, envirofonePrice: 385, backMarketPrice: 395 },
+            { brand: 'Apple', model: 'iPhone 13', storage: '128GB', marketPrice: 399, cexSellPrice: 399, envirofonePrice: 385, backMarketPrice: 395 },
+            { brand: 'Apple', model: 'iPhone 13', storage: '256GB', marketPrice: 449, cexSellPrice: 449, envirofonePrice: 435, backMarketPrice: 445 },
+            { brand: 'Apple', model: 'iPhone 13 Mini', storage: '128GB', marketPrice: 329, cexSellPrice: 329, envirofonePrice: 315, backMarketPrice: 325 },
+            { brand: 'Apple', model: 'iPhone 13 Pro', storage: '128GB', marketPrice: 489, cexSellPrice: 489, envirofonePrice: 475, backMarketPrice: 485 },
+            { brand: 'Apple', model: 'iPhone 13 Pro Max', storage: '128GB', marketPrice: 549, cexSellPrice: 549, envirofonePrice: 535, backMarketPrice: 545 },
+            { brand: 'Apple', model: 'iPhone 14', storage: '128GB', marketPrice: 479, cexSellPrice: 479, envirofonePrice: 465, backMarketPrice: 475 },
+            { brand: 'Apple', model: 'iPhone 14 Plus', storage: '128GB', marketPrice: 529, cexSellPrice: 529, envirofonePrice: 515, backMarketPrice: 525 },
+            { brand: 'Apple', model: 'iPhone 14 Pro', storage: '128GB', marketPrice: 599, cexSellPrice: 599, envirofonePrice: 585, backMarketPrice: 595 },
+            { brand: 'Apple', model: 'iPhone 14 Pro Max', storage: '128GB', marketPrice: 669, cexSellPrice: 669, envirofonePrice: 655, backMarketPrice: 665 },
+            { brand: 'Apple', model: 'iPhone 15', storage: '128GB', marketPrice: 599, cexSellPrice: 599, envirofonePrice: 585, backMarketPrice: 595 },
+            { brand: 'Apple', model: 'iPhone 15 Plus', storage: '128GB', marketPrice: 669, cexSellPrice: 669, envirofonePrice: 655, backMarketPrice: 665 },
+            { brand: 'Apple', model: 'iPhone 15 Pro', storage: '128GB', marketPrice: 749, cexSellPrice: 749, envirofonePrice: 735, backMarketPrice: 745 },
+            { brand: 'Apple', model: 'iPhone 15 Pro Max', storage: '256GB', marketPrice: 879, cexSellPrice: 879, envirofonePrice: 865, backMarketPrice: 875 },
+            // iPads
+            { brand: 'Apple', model: 'iPad Mini 6th Gen', storage: '64GB', marketPrice: 349, cexSellPrice: 349, envirofonePrice: 335, backMarketPrice: 345 },
+            { brand: 'Apple', model: 'iPad Pro 11-inch M1', storage: '128GB', marketPrice: 499, cexSellPrice: 499, envirofonePrice: 485, backMarketPrice: 495 },
+            // Gaming
+            { brand: 'Sony', model: 'PlayStation 5', storage: '825GB', marketPrice: 379, cexSellPrice: 379, envirofonePrice: 365, backMarketPrice: 375 },
+            { brand: 'Microsoft', model: 'Xbox One X', storage: '1TB', marketPrice: 159, cexSellPrice: 159, envirofonePrice: 145, backMarketPrice: 155 },
+            { brand: 'Microsoft', model: 'Xbox One S', storage: '500GB', marketPrice: 119, cexSellPrice: 119, envirofonePrice: 110, backMarketPrice: 115 },
+            { brand: 'Microsoft', model: 'Xbox One S', storage: '1TB', marketPrice: 139, cexSellPrice: 139, envirofonePrice: 130, backMarketPrice: 135 },
+            { brand: 'Microsoft', model: 'Xbox One S', storage: '2TB', marketPrice: 169, cexSellPrice: 169, envirofonePrice: 160, backMarketPrice: 165 },
+            // Samsung
+            { brand: 'Samsung', model: 'Galaxy S21', storage: '128GB', marketPrice: 229, cexSellPrice: 229, envirofonePrice: 215, backMarketPrice: 225 },
+            { brand: 'Samsung', model: 'Galaxy S22', storage: '128GB', marketPrice: 319, cexSellPrice: 319, envirofonePrice: 305, backMarketPrice: 315 },
+            { brand: 'Samsung', model: 'Galaxy S23', storage: '128GB', marketPrice: 439, cexSellPrice: 439, envirofonePrice: 425, backMarketPrice: 435 },
+            { brand: 'Samsung', model: 'Galaxy S24', storage: '128GB', marketPrice: 579, cexSellPrice: 579, envirofonePrice: 565, backMarketPrice: 575 },
+        ];
+
+        let count = 0;
+        for (const item of DEFAULT_BENCHMARKS) {
+            const deviceKey = `${item.brand} ${item.model} ${item.storage}`.trim();
+            await this.prisma.scrapedPrice.upsert({
+                where: { deviceKey },
+                update: {
+                    brand: item.brand,
+                    model: item.model,
+                    storage: item.storage,
+                    ram: item.ram ?? '',
+                    marketPrice: item.marketPrice,
+                    cexSellPrice: item.cexSellPrice ?? item.marketPrice,
+                    envirofonePrice: item.envirofonePrice ?? item.marketPrice * 0.95,
+                    backMarketPrice: item.backMarketPrice ?? item.marketPrice,
+                },
+                create: {
+                    deviceKey,
+                    brand: item.brand,
+                    model: item.model,
+                    storage: item.storage,
+                    ram: item.ram ?? '',
+                    marketPrice: item.marketPrice,
+                    cexSellPrice: item.cexSellPrice ?? item.marketPrice,
+                    envirofonePrice: item.envirofonePrice ?? item.marketPrice * 0.95,
+                    backMarketPrice: item.backMarketPrice ?? item.marketPrice,
+                },
+            });
+            count++;
+        }
+        this.logger.log(`Seeded ${count} default scraped market prices`);
+        return count;
     }
 
     private async seedStores(): Promise<number> {
