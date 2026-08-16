@@ -233,13 +233,17 @@ jobs:
             echo "Warning: COOLIFY_WEBHOOK_WEB secret is not set. Skipping deployment."
             exit 0
           fi
+          if [[ "$COOLIFY_WEBHOOK" == *":8000"* ]]; then
+            echo "⚠️ WARNING: COOLIFY_WEBHOOK_WEB secret contains port :8000 which may be blocked by VPS firewall!"
+            echo "💡 Tip: Replace :8000 with your Coolify HTTPS domain (e.g., https://coolify.techstopuk.com/api/v1/deploy?...) or allow port 8000 in your VPS firewall."
+          fi
           echo "Triggering Web App deployment on Coolify..."
           if [ -n "$COOLIFY_TOKEN" ]; then
             echo "Using COOLIFY_TOKEN Bearer authorization..."
-            response=$(curl -s -S -m 120 --connect-timeout 15 -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK") || true
+            response=$(curl -s -S --retry 2 --retry-delay 3 -m 120 --connect-timeout 15 -w "\nHTTP_CODE:%{http_code}" -H "Authorization: Bearer $COOLIFY_TOKEN" "$COOLIFY_WEBHOOK") || true
           else
             echo "Warning: COOLIFY_TOKEN is not set. Requesting without auth header..."
-            response=$(curl -s -S -m 120 --connect-timeout 15 -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK") || true
+            response=$(curl -s -S --retry 2 --retry-delay 3 -m 120 --connect-timeout 15 -w "\nHTTP_CODE:%{http_code}" "$COOLIFY_WEBHOOK") || true
           fi
           echo "Response from Coolify:"
           echo "$response"
