@@ -681,7 +681,7 @@ export default function Navbar() {
                             <motion.div
                               layoutId="activeCategoryTab"
                               className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
-                              transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
                             />
                           )}
                           {label}
