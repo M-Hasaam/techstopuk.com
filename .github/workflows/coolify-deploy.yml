@@ -67,7 +67,7 @@ jobs:
   # - If it passes, resets RUN_MIGRATION_ALWAYS=false
   # ----------------------------------------------------
   check-migrations:
-    name: DB Migration Check
+    name: DB Migration Check (prisma:${{ needs.changes.outputs.prisma || 'false' }}, flag:${{ vars.RUN_MIGRATION_ALWAYS || 'false' }})
     needs: changes
     if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && (needs.changes.outputs.prisma == 'true' || vars.RUN_MIGRATION_ALWAYS == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
@@ -93,6 +93,11 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Log Migration Check Parameters
+        run: |
+          echo "Prisma Folder Changed : ${{ needs.changes.outputs.prisma }}"
+          echo "RUN_MIGRATION_ALWAYS  : ${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
