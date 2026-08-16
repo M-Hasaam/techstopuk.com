@@ -206,11 +206,15 @@ export class TradeInQuestionsService {
     async seedDefaults() {
         const imagesUploaded = await this.ensureDiagnosticImages();
         let seeded = 0;
+        let alreadyExisted = 0;
         for (const q of DEFAULT_TRADE_IN_QUESTIONS) {
             const existing = await this.prisma.tradeInQuestion.findUnique({
                 where: { category_key: { category: q.category, key: q.key } },
             });
-            if (existing) continue;
+            if (existing) {
+                alreadyExisted++;
+                continue;
+            }
             await this.prisma.tradeInQuestion.create({
                 data: {
                     category: q.category,
@@ -230,6 +234,6 @@ export class TradeInQuestionsService {
             });
             seeded++;
         }
-        return { seeded, imagesUploaded };
+        return { seeded, alreadyExisted, total: DEFAULT_TRADE_IN_QUESTIONS.length, imagesUploaded };
     }
 }

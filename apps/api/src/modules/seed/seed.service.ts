@@ -449,29 +449,30 @@ const TRADE_IN_DEVICES_SEED = [
 
 import { ProductPricingService } from '../product-pricing/product-pricing.service';
 
+export interface SeedEntityStats {
+    created: number;
+    alreadyExisted: number;
+    total: number;
+}
+
 export interface SeedResult {
-    pricingConfigs: number;
-    banners: number;
-    gradeBanners: number;
-    promoSlides: number;
-    deviceCatalog: number;
-    tradeInDevices: number;
-    tradeInQuestions?: number;
-    stores?: number;
-    scrapedPrices?: number;
-    autoPricedProducts?: number;
-    others: { created: number; updated: number; errors: string[] };
-    categories: number;
-    brands: number;
-    brandCategories: number;
+    pricingConfigs: SeedEntityStats;
+    banners: SeedEntityStats;
+    gradeBanners: SeedEntityStats;
+    promoSlides: SeedEntityStats;
+    deviceCatalog: SeedEntityStats;
+    tradeInDevices: SeedEntityStats;
+    tradeInQuestions: SeedEntityStats;
+    stores: SeedEntityStats;
+    scrapedPrices: SeedEntityStats;
+    autoPricedProducts: number;
+    others: { created: number; updated: number; alreadyExisted: number; total: number; errors: string[] };
+    products: { created: number; updated: number; alreadyExisted: number; total: number; errors: string[] };
+    categories: SeedEntityStats;
+    brands: SeedEntityStats;
+    brandCategories: SeedEntityStats;
     helplineSeeded: boolean;
     supportEmailSeeded: boolean;
-    products: {
-        created: number;
-        updated: number;
-        errors: string[];
-        total: number;
-    };
 }
 
 @Injectable()
@@ -540,19 +541,23 @@ export class SeedService {
         const productsData: any[] = JSON.parse(fs.readFileSync(productsJsonPath, 'utf8'));
         this.logger.log(`Loaded ${productsData.length} products from products.json`);
 
-        const pricingCount   = await this.seedPricingConfigs();
-        const bannerCount    = await this.seedBanners();
-        const gradeBannerCount = await this.seedGradeBanners();
-        const slideCount     = await this.seedPromoSlides();
-        const deviceCount    = await this.seedCatalogFromFolder();
-        const tradeInDevicesCount = await this.seedTradeInDevices();
+        const initialCategoryCount      = await this.prisma.category.count();
+        const initialBrandCount         = await this.prisma.brand.count();
+        const initialBrandCategoryCount = await this.prisma.brandCategory.count();
+
+        const pricingStats        = await this.seedPricingConfigs();
+        const bannerStats         = await this.seedBanners();
+        const gradeBannerStats    = await this.seedGradeBanners();
+        const slideStats          = await this.seedPromoSlides();
+        const deviceStats         = await this.seedCatalogFromFolder();
+        const tradeInDevicesStats = await this.seedTradeInDevices();
         const tradeInQuestionsResult = await this.tradeInQuestionsService.seedDefaults();
-        const storesCount    = await this.seedStores();
-        const productsResult = await this.seedProducts(productsData);
-        const othersResult   = await this.seedOthers();
-        const helplineSeeded    = await this.seedHelplines();
-        const supportEmailSeeded = await this.seedSupportEmail();
-        const scrapedPricesCount = await this.seedScrapedPrices();
+        const storesStats         = await this.seedStores();
+        const productsResult      = await this.seedProducts(productsData);
+        const othersResult        = await this.seedOthers();
+        const helplineSeeded      = await this.seedHelplines();
+        const supportEmailSeeded  = await this.seedSupportEmail();
+        const scrapedPricesStats  = await this.seedScrapedPrices();
 
         // Run auto-pricing calculation so all catalog products get calculated prices, comparePrice retail values, and auto_priced status
         try {
@@ -562,32 +567,52 @@ export class SeedService {
         }
         const autoPricedCount = await this.prisma.product.count({ where: { pricingStatus: 'auto_priced' } });
 
-        const categoryCount      = await this.prisma.category.count();
-        const brandCount         = await this.prisma.brand.count();
-        const brandCategoryCount = await this.prisma.brandCategory.count();
+        const finalCategoryCount      = await this.prisma.category.count();
+        const finalBrandCount         = await this.prisma.brand.count();
+        const finalBrandCategoryCount = await this.prisma.brandCategory.count();
+
+        const categoryStats: SeedEntityStats = {
+            created: Math.max(0, finalCategoryCount - initialCategoryCount),
+            alreadyExisted: initialCategoryCount,
+            total: finalCategoryCount,
+        };
+        const brandStats: SeedEntityStats = {
+            created: Math.max(0, finalBrandCount - initialBrandCount),
+            alreadyExisted: initialBrandCount,
+            total: finalBrandCount,
+        };
+        const brandCategoryStats: SeedEntityStats = {
+            created: Math.max(0, finalBrandCategoryCount - initialBrandCategoryCount),
+            alreadyExisted: initialBrandCategoryCount,
+            total: finalBrandCategoryCount,
+        };
 
         return {
-            pricingConfigs: pricingCount,
-            banners: bannerCount,
-            gradeBanners: gradeBannerCount,
-            promoSlides: slideCount,
-            deviceCatalog: deviceCount,
-            tradeInDevices: tradeInDevicesCount,
-            tradeInQuestions: tradeInQuestionsResult.seeded,
-            stores: storesCount,
-            scrapedPrices: scrapedPricesCount,
+            pricingConfigs: pricingStats,
+            banners: bannerStats,
+            gradeBanners: gradeBannerStats,
+            promoSlides: slideStats,
+            deviceCatalog: deviceStats,
+            tradeInDevices: tradeInDevicesStats,
+            tradeInQuestions: {
+                created: tradeInQuestionsResult.seeded,
+                alreadyExisted: tradeInQuestionsResult.alreadyExisted,
+                total: tradeInQuestionsResult.total,
+            },
+            stores: storesStats,
+            scrapedPrices: scrapedPricesStats,
             autoPricedProducts: autoPricedCount,
             others: othersResult,
             products: productsResult,
-            categories: categoryCount,
-            brands: brandCount,
-            brandCategories: brandCategoryCount,
+            categories: categoryStats,
+            brands: brandStats,
+            brandCategories: brandCategoryStats,
             helplineSeeded,
             supportEmailSeeded,
         };
     }
 
-    private async seedScrapedPrices(): Promise<number> {
+    private async seedScrapedPrices(): Promise<SeedEntityStats> {
         const DEFAULT_BENCHMARKS: Array<{
             brand: string;
             model: string;
@@ -637,67 +662,35 @@ export class SeedService {
             { brand: 'Samsung', model: 'Galaxy S24', storage: '128GB', marketPrice: 579, cexSellPrice: 579, envirofonePrice: 565, backMarketPrice: 575 },
         ];
 
-        let count = 0;
+        let created = 0;
+        let alreadyExisted = 0;
         for (const item of DEFAULT_BENCHMARKS) {
             const deviceKey = `${item.brand} ${item.model} ${item.storage}`.trim();
-            await this.prisma.scrapedPrice.upsert({
-                where: { deviceKey },
-                update: {
-                    brand: item.brand,
-                    model: item.model,
-                    storage: item.storage,
-                    ram: item.ram ?? '',
-                    marketPrice: item.marketPrice,
-                    cexSellPrice: item.cexSellPrice ?? item.marketPrice,
-                    envirofonePrice: item.envirofonePrice ?? item.marketPrice * 0.95,
-                    backMarketPrice: item.backMarketPrice ?? item.marketPrice,
-                },
-                create: {
-                    deviceKey,
-                    brand: item.brand,
-                    model: item.model,
-                    storage: item.storage,
-                    ram: item.ram ?? '',
-                    marketPrice: item.marketPrice,
-                    cexSellPrice: item.cexSellPrice ?? item.marketPrice,
-                    envirofonePrice: item.envirofonePrice ?? item.marketPrice * 0.95,
-                    backMarketPrice: item.backMarketPrice ?? item.marketPrice,
-                },
-            });
-            count++;
-        }
-        this.logger.log(`Seeded ${count} default scraped market prices`);
-        return count;
-    }
-
-    private async seedStores(): Promise<number> {
-        let seeded = 0;
-        const DEFAULT_STORES = [
-            {
-                name: 'TechStop Leicester',
-                address: '148B Melton Rd',
-                city: 'Leicester',
-                postcode: 'LE4 5EE',
-                phone: '+447343055398',
-                openingHours: 'Mon–Sat, 9:00 AM – 6:00 PM',
-                mapsEmbedUrl: 'https://maps.google.com/maps?q=148B+Melton+Rd,+Leicester+LE4+5EE&t=&z=15&ie=UTF8&iwloc=&output=embed',
-                isActive: true,
-            },
-        ];
-        for (const store of DEFAULT_STORES) {
-            const existing = await this.prisma.store.findFirst({
-                where: { postcode: store.postcode, name: store.name },
-            });
-            if (!existing) {
-                await this.prisma.store.create({ data: store });
-                seeded++;
+            const existing = await this.prisma.scrapedPrice.findUnique({ where: { deviceKey } });
+            if (existing) {
+                alreadyExisted++;
+            } else {
+                await this.prisma.scrapedPrice.create({
+                    data: {
+                        deviceKey,
+                        brand: item.brand,
+                        model: item.model,
+                        storage: item.storage,
+                        ram: item.ram ?? '',
+                        marketPrice: item.marketPrice,
+                        cexSellPrice: item.cexSellPrice ?? item.marketPrice,
+                        envirofonePrice: item.envirofonePrice ?? item.marketPrice * 0.95,
+                        backMarketPrice: item.backMarketPrice ?? item.marketPrice,
+                    },
+                });
+                created++;
             }
         }
-        if (seeded > 0) {
-            this.logger.log(`Seeded ${seeded} default store location(s)`);
-        }
-        return seeded;
+        this.logger.log(`Seeded ${DEFAULT_BENCHMARKS.length} scraped market prices (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: DEFAULT_BENCHMARKS.length };
     }
+
+
 
     // ─── Support contact info (helpline + email) ─────────────────────────────
     // Only fill these in when completely unset — unlike the rest of this seed,
@@ -841,38 +834,77 @@ export class SeedService {
         };
     }
 
-    private async seedTradeInDevices(): Promise<number> {
-        let count = 0;
+    private async seedTradeInDevices(): Promise<SeedEntityStats> {
+        let created = 0;
+        let alreadyExisted = 0;
         for (const device of TRADE_IN_DEVICES_SEED) {
-            await this.prisma.tradeInDevice.upsert({
-                where:  { brand_name: { brand: device.brand, name: device.name } },
-                update: { category: device.category, isActive: true },
-                create: { name: device.name, brand: device.brand, category: device.category, isActive: true },
+            const existing = await this.prisma.tradeInDevice.findUnique({
+                where: { brand_name: { brand: device.brand, name: device.name } },
             });
-            count++;
+            if (existing) {
+                await this.prisma.tradeInDevice.update({
+                    where: { id: existing.id },
+                    data: { category: device.category, isActive: true },
+                });
+                alreadyExisted++;
+            } else {
+                await this.prisma.tradeInDevice.create({
+                    data: { name: device.name, brand: device.brand, category: device.category, isActive: true },
+                });
+                created++;
+            }
         }
-        this.logger.log(`Seeded ${count} Trade-In search devices (Other Search Devices)`);
-        return count;
+        this.logger.log(`Seeded ${TRADE_IN_DEVICES_SEED.length} Trade-In search devices (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: TRADE_IN_DEVICES_SEED.length };
     }
 
-    private async seedPricingConfigs(): Promise<number> {
+    private async seedPricingConfigs(): Promise<SeedEntityStats> {
+        let created = 0;
+        let alreadyExisted = 0;
         for (const config of PRICING_DEFAULTS) {
-            await this.prisma.pricingConfig.upsert({
-                where: { key: config.key },
-                update: { value: config.value, label: config.label },
-                create: config,
-            });
+            const existing = await this.prisma.pricingConfig.findUnique({ where: { key: config.key } });
+            if (existing) {
+                alreadyExisted++;
+            } else {
+                await this.prisma.pricingConfig.create({ data: config });
+                created++;
+            }
         }
-        return PRICING_DEFAULTS.length;
+        return { created, alreadyExisted, total: PRICING_DEFAULTS.length };
+    }
+
+    private async seedStores(): Promise<SeedEntityStats> {
+        let created = 0;
+        let alreadyExisted = 0;
+        const DEFAULT_STORES = [
+            {
+                name: 'TechStop Leicester',
+                address: '148B Melton Rd',
+                city: 'Leicester',
+                postcode: 'LE4 5EE',
+                phone: '+447343055398',
+                openingHours: 'Mon–Sat, 9:00 AM – 6:00 PM',
+                mapsEmbedUrl: 'https://maps.google.com/maps?q=148B+Melton+Rd,+Leicester+LE4+5EE&t=&z=15&ie=UTF8&iwloc=&output=embed',
+                isActive: true,
+            },
+        ];
+        for (const store of DEFAULT_STORES) {
+            const existing = await this.prisma.store.findFirst({
+                where: { postcode: store.postcode, name: store.name },
+            });
+            if (existing) {
+                alreadyExisted++;
+            } else {
+                await this.prisma.store.create({ data: store });
+                created++;
+            }
+        }
+        return { created, alreadyExisted, total: DEFAULT_STORES.length };
     }
 
     // ─── Dynamic catalog seed from seed/categories/ folder ────────────────────
 
-    private async seedCatalogFromFolder(): Promise<number> {
-        await this.prisma.orderItem.deleteMany({});
-        await this.prisma.product.deleteMany({});
-        await this.prisma.deviceCatalog.deleteMany({});
-
+    private async seedCatalogFromFolder(): Promise<SeedEntityStats> {
         const categoriesDir = path.join(this.seedDir, 'categories');
         if (!fs.existsSync(categoriesDir)) {
             this.logger.warn('seed/categories/ not found — skipping catalog image seed');
@@ -885,6 +917,8 @@ export class SeedService {
 
         // Seed the device catalog (models + storage)
         const bcCache = new Map<string, string>();
+        let created = 0;
+        let alreadyExisted = 0;
 
         for (const dev of DEVICE_CATALOG) {
             const brandSlug    = dev.brand.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -912,18 +946,35 @@ export class SeedService {
                 bcCache.set(bcKey, bc.id);
             }
 
-            await this.prisma.deviceCatalog.create({
-                data: {
-                    brandCategoryId: bcCache.get(bcKey)!,
-                    model: dev.model,
-                    storageOptions: dev.storageOptions,
-                    attributeOptions: (dev as { attributeOptions?: unknown }).attributeOptions ?? [],
-                    isActive: true,
-                },
+            const brandCategoryId = bcCache.get(bcKey)!;
+            const existing = await this.prisma.deviceCatalog.findUnique({
+                where: { brandCategoryId_model: { brandCategoryId, model: dev.model } },
             });
+
+            if (existing) {
+                await this.prisma.deviceCatalog.update({
+                    where: { id: existing.id },
+                    data: {
+                        storageOptions: dev.storageOptions,
+                        attributeOptions: (dev as { attributeOptions?: unknown }).attributeOptions ?? [],
+                    },
+                });
+                alreadyExisted++;
+            } else {
+                await this.prisma.deviceCatalog.create({
+                    data: {
+                        brandCategoryId,
+                        model: dev.model,
+                        storageOptions: dev.storageOptions,
+                        attributeOptions: (dev as { attributeOptions?: unknown }).attributeOptions ?? [],
+                        isActive: true,
+                    },
+                });
+                created++;
+            }
         }
-        this.logger.log(`Seeded ${DEVICE_CATALOG.length} device catalog entries`);
-        return DEVICE_CATALOG.length;
+        this.logger.log(`Seeded ${DEVICE_CATALOG.length} device catalog entries (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: DEVICE_CATALOG.length };
     }
 
     // Scan seed/categories/{slug}/ — root images → category hero, subfolders → brand-category images
@@ -1040,46 +1091,48 @@ export class SeedService {
 
     // ─── Banners ──────────────────────────────────────────────────────────────
 
-    private async seedBanners(): Promise<number> {
+    private async seedBanners(): Promise<SeedEntityStats> {
         const bannersDir = path.join(this.seedDir, 'banners');
-        if (!fs.existsSync(bannersDir)) return 0;
+        if (!fs.existsSync(bannersDir)) return { created: 0, alreadyExisted: 0, total: 0 };
 
-        // Only root-level images (skip promo_banners/ subfolder)
         const files = fs.readdirSync(bannersDir)
             .filter(f => isImageFile(f) && fs.statSync(path.join(bannersDir, f)).isFile());
-        let count = 0;
+        let created = 0;
+        let alreadyExisted = 0;
 
         for (let i = 0; i < files.length; i++) {
             const filename = files[i]!;
             const s3Key = `banners/${filename}`;
             const existing = await this.prisma.banner.findUnique({ where: { key: s3Key } });
-            if (!existing) {
+            if (existing) {
+                alreadyExisted++;
+            } else {
                 const uploaded = await this.uploadLocalFile(path.join(bannersDir, filename), s3Key);
                 if (uploaded) {
                     await this.prisma.banner.create({
                         data: { key: uploaded, label: filename.replace(/\.[^.]+$/, ''), order: i },
                     });
-                    count++;
+                    created++;
                     this.logger.log(`  Banner: ${filename}`);
                 }
             }
         }
-        this.logger.log(`Seeded ${count} background banners`);
-        return count;
+        this.logger.log(`Seeded background banners (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: files.length };
     }
 
     // ─── Grade guide banners ────────────────────────────────────────────────────
 
-    private async seedGradeBanners(): Promise<number> {
+    private async seedGradeBanners(): Promise<SeedEntityStats> {
         const gradeDir = path.join(this.seedDir, 'banners', 'Grade');
-        if (!fs.existsSync(gradeDir)) return 0;
+        if (!fs.existsSync(gradeDir)) return { created: 0, alreadyExisted: 0, total: 0 };
 
         const files = fs.readdirSync(gradeDir)
             .filter(f => isImageFile(f) && fs.statSync(path.join(gradeDir, f)).isFile());
-        let count = 0;
+        let created = 0;
+        let alreadyExisted = 0;
 
         for (const filename of files) {
-            // Filenames are "<grade>_<n>.png" — e.g. a_1.png, new_2.png.
             const gradePrefix = filename.split('_')[0]?.toLowerCase() ?? '';
             const grade = gradePrefix === 'new' ? 'NEW' : gradePrefix.toUpperCase();
             if (!['NEW', 'A', 'B', 'C', 'F'].includes(grade)) continue;
@@ -1087,16 +1140,13 @@ export class SeedService {
             const s3Key = `banners/grade/${gradePrefix}/${filename}`;
             const existing = await this.prisma.gradeBanner.findUnique({ where: { key: s3Key } });
 
-            // A DB row alone doesn't guarantee the object is still in storage — local
-            // Garage/MinIO volumes aren't persistent across restarts, so a row can
-            // outlive its object. Verify before trusting it, otherwise re-seeding can
-            // never repair a banner that lost its underlying file.
             if (existing) {
                 try {
                     await this.s3Client.send(new HeadObjectCommand({ Bucket: this.bucketName, Key: s3Key }));
+                    alreadyExisted++;
                     continue;
                 } catch {
-                    // object missing despite the DB row — fall through and re-upload
+                    // re-upload missing image
                 }
             }
 
@@ -1106,30 +1156,32 @@ export class SeedService {
                     await this.prisma.gradeBanner.create({
                         data: { grade, key: uploaded, label: filename.replace(/\.[^.]+$/, ''), isActive: true, order: 0 },
                     });
+                    created++;
+                } else {
+                    alreadyExisted++;
                 }
-                count++;
                 this.logger.log(`  Grade banner: ${filename}`);
             }
         }
-        this.logger.log(`Seeded ${count} grade guide banners`);
-        return count;
+        this.logger.log(`Seeded grade guide banners (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: files.length };
     }
 
     // ─── Promo slides ─────────────────────────────────────────────────────────
 
-    private async seedPromoSlides(): Promise<number> {
+    private async seedPromoSlides(): Promise<SeedEntityStats> {
         const slidesJsonPath = path.join(this.seedDir, 'banners', 'promo_banners', 'slides.json');
-        if (!fs.existsSync(slidesJsonPath)) return 0;
+        if (!fs.existsSync(slidesJsonPath)) return { created: 0, alreadyExisted: 0, total: 0 };
 
         const promoDir = path.join(this.seedDir, 'banners', 'promo_banners');
         const raw: any[] = JSON.parse(fs.readFileSync(slidesJsonPath, 'utf8'));
-        let count = 0;
+        let created = 0;
+        let alreadyExisted = 0;
 
         for (let i = 0; i < raw.length; i++) {
             const slide = raw[i]!;
             const imgFilename: string = slide.img ?? '';
 
-            // Upload image if present
             let imgKey: string | null = null;
             if (imgFilename) {
                 const localPath = path.join(promoDir, imgFilename);
@@ -1138,7 +1190,6 @@ export class SeedService {
                 if (imgKey) this.logger.log(`  Promo image: ${imgFilename}`);
             }
 
-            // Map all fields from slides.json to the DB model
             const slideData = {
                 imgKey:      imgKey ?? null,
                 tabTitle:    slide.tabTitle    ?? '',
@@ -1158,22 +1209,22 @@ export class SeedService {
                 isActive:    true,
             };
 
-            // Upsert by order so re-seeding is idempotent
             const existing = await this.prisma.promoSlide.findFirst({ where: { order: i } });
             if (existing) {
                 await this.prisma.promoSlide.update({
                     where: { id: existing.id },
                     data: { ...slideData, imgKey: imgKey ?? existing.imgKey },
                 });
+                alreadyExisted++;
             } else {
                 await this.prisma.promoSlide.create({
                     data: { ...slideData, order: i },
                 });
-                count++;
+                created++;
             }
         }
-        this.logger.log(`Seeded ${count} promo slides`);
-        return raw.length;
+        this.logger.log(`Seeded promo slides (${created} created, ${alreadyExisted} already existed)`);
+        return { created, alreadyExisted, total: raw.length };
     }
 
     private async uploadImage(
@@ -1202,11 +1253,11 @@ export class SeedService {
     // Uses OtherBrand + OtherSubcategory so these products appear on /products/others
     // and NOT in the main catalog.
 
-    private async seedOthers(): Promise<{ created: number; updated: number; errors: string[] }> {
+    private async seedOthers(): Promise<SeedResult['others']> {
         const othersJsonPath = path.join(this.seedDir, 'others', 'products.json');
         if (!fs.existsSync(othersJsonPath)) {
             this.logger.warn('others/products.json not found — skipping');
-            return { created: 0, updated: 0, errors: ['others/products.json not found'] };
+            return { created: 0, updated: 0, alreadyExisted: 0, total: 0, errors: ['others/products.json not found'] };
         }
 
         const data: Record<string, any[]> = JSON.parse(fs.readFileSync(othersJsonPath, 'utf8'));
@@ -1231,9 +1282,12 @@ export class SeedService {
 
         let created = 0;
         let updated = 0;
+        let alreadyExisted = 0;
+        let totalItems = 0;
         const errors: string[] = [];
 
         for (const [subcatKey, items] of Object.entries(data)) {
+            totalItems += items.length;
             const subcatName = CAT_NAME[subcatKey] ?? capitalize(subcatKey.replace(/_/g, ' '));
 
             for (const item of items) {
@@ -1309,9 +1363,34 @@ export class SeedService {
 
                     const existing = await this.prisma.product.findUnique({ where: { slug: item.id } });
                     if (existing) {
-                        await this.prisma.product.update({ where: { slug: item.id }, data: productData as never });
+                        const updateData = {
+                            otherBrandId,
+                            otherSubcategoryId,
+                            name: item.name,
+                            images: (existing.images as string[])?.length > 0 ? existing.images : (s3ImageKey ? [s3ImageKey] : []),
+                        };
+                        await this.prisma.product.update({ where: { slug: item.id }, data: updateData as never });
                         updated++;
+                        alreadyExisted++;
                     } else {
+                        const productData = {
+                            otherBrandId,
+                            otherSubcategoryId,
+                            name:          item.name,
+                            slug:          item.id,
+                            condition:     'A',
+                            storage:       '',
+                            price:         typeof item.price === 'number' ? item.price : null,
+                            comparePrice:  typeof item.comparePrice === 'number' ? item.comparePrice : null,
+                            stock:         10,
+                            images:        s3ImageKey ? [s3ImageKey] : [],
+                            specs:         {},
+                            description:   '',
+                            rating:        0,
+                            reviewCount:   0,
+                            pricingStatus: 'manual',
+                            isActive:      true,
+                        };
                         await this.prisma.product.create({ data: productData as never });
                         created++;
                     }
@@ -1324,8 +1403,8 @@ export class SeedService {
             this.logger.log(`  Others seeded: ${subcatKey} (${items.length} items)`);
         }
 
-        this.logger.log(`Seeded ${created} others products (${updated} updated, ${errors.length} errors)`);
-        return { created, updated, errors };
+        this.logger.log(`Seeded others products (${created} created, ${alreadyExisted} already existed, ${errors.length} errors)`);
+        return { created, updated, alreadyExisted, total: totalItems, errors };
     }
 
     private normalizeCategory(raw: string): string {
@@ -1342,6 +1421,7 @@ export class SeedService {
     private async seedProducts(productsData: any[]): Promise<SeedResult['products']> {
         let created = 0;
         let updated = 0;
+        let alreadyExisted = 0;
         const errors: string[] = [];
 
         // Build brand::model → catalogId lookup from what was just seeded
@@ -1414,29 +1494,36 @@ export class SeedService {
                     }
                 }
 
-                const data = {
-                    catalogId,
-                    name: prod.name,
-                    slug,
-                    condition: prod.condition,
-                    storage,
-                    price: null,
-                    comparePrice: null,
-                    stock: Number(prod.stock ?? 10),
-                    images: s3Keys.length > 0 ? s3Keys : (Array.isArray(prod.images) ? prod.images : []),
-                    specs: remainingSpecs ?? {},
-                    description: prod.description ?? '',
-                    rating: Number(prod.rating ?? 0),
-                    reviewCount: Number(prod.reviewCount ?? 0),
-                    pricingStatus: 'no_data',
-                    isActive: false,
-                };
-
                 const existing = await this.prisma.product.findUnique({ where: { slug } });
                 if (existing) {
-                    await this.prisma.product.update({ where: { slug }, data: data as never });
+                    const updateData = {
+                        catalogId,
+                        name: prod.name,
+                        images: (existing.images as string[])?.length > 0 ? existing.images : (s3Keys.length > 0 ? s3Keys : (Array.isArray(prod.images) ? prod.images : [])),
+                        specs: remainingSpecs ?? {},
+                        description: existing.description || prod.description || '',
+                    };
+                    await this.prisma.product.update({ where: { slug }, data: updateData as never });
                     updated++;
+                    alreadyExisted++;
                 } else {
+                    const data = {
+                        catalogId,
+                        name: prod.name,
+                        slug,
+                        condition: prod.condition,
+                        storage,
+                        price: null,
+                        comparePrice: null,
+                        stock: Number(prod.stock ?? 10),
+                        images: s3Keys.length > 0 ? s3Keys : (Array.isArray(prod.images) ? prod.images : []),
+                        specs: remainingSpecs ?? {},
+                        description: prod.description ?? '',
+                        rating: Number(prod.rating ?? 0),
+                        reviewCount: Number(prod.reviewCount ?? 0),
+                        pricingStatus: 'no_data',
+                        isActive: false,
+                    };
                     await this.prisma.product.create({ data: data as never });
                     created++;
                 }
@@ -1450,7 +1537,7 @@ export class SeedService {
             }
         }
 
-        this.logger.log(`Products seeded — created: ${created}, updated: ${updated}, errors: ${errors.length}`);
-        return { created, updated, errors, total: productsData.length };
+        this.logger.log(`Products seeded — created: ${created}, alreadyExisted: ${alreadyExisted}, errors: ${errors.length}`);
+        return { created, updated, alreadyExisted, errors, total: productsData.length };
     }
 }
