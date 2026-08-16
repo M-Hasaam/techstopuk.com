@@ -254,11 +254,18 @@ export default function Navbar() {
       .slice(0, 10);
   }, [productIndex]);
 
+  // Automatically close mobile menu, search popups, and dropdowns on route changes
+  useEffect(() => {
+    setIsOpen(false);
+    setHoveredCat(null);
+    setIsSearchFocused(false);
+    setMobileSearchOpen(false);
+    setProfileOpen(false);
+  }, [pathname]);
+
   // Measure where the sticky header's bottom edge actually sits on screen
   // (its own height alone misses the promo bar stacked above it) so the
-  // mobile drawer can be positioned as a fixed overlay flush underneath it,
-  // instead of expanding the header's box (which used to push page content
-  // down when opened) or leaving a gap that peeks through to the header.
+  // mobile drawer can be positioned as a fixed overlay flush underneath it.
   // Throttled using requestAnimationFrame + passive listeners to prevent layout thrashing on scroll.
   useEffect(() => {
     const el = headerRef.current;
@@ -290,8 +297,7 @@ export default function Navbar() {
   }, []);
 
   // Toggling the mobile menu: measure the header's current bottom edge and
-  // reset the drawer's own scroll position synchronously, in the same
-  // event, so there's no stale-measurement or leftover-scroll flash on open.
+  // reset the drawer's own scroll position.
   function toggleMobileMenu() {
     const opening = !isOpen;
     if (opening && headerRef.current) {
@@ -301,27 +307,15 @@ export default function Navbar() {
     setIsOpen(opening);
   }
 
-  // Lock background scroll while the mobile drawer overlay is open. Plain
-  // `overflow: hidden` on body doesn't reliably block touch-scrolling on
-  // mobile browsers, so pin the body in place with position: fixed and
-  // restore the exact scroll position on close.
+  // Lock background scroll smoothly without body layout collapse (overflow hidden)
   useEffect(() => {
-    if (!isOpen) return;
-    const scrollY = window.scrollY;
-    const body = document.body.style;
-    const prev = { position: body.position, top: body.top, left: body.left, right: body.right, width: body.width };
-    body.position = "fixed";
-    body.top = `-${scrollY}px`;
-    body.left = "0";
-    body.right = "0";
-    body.width = "100%";
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
     return () => {
-      body.position = prev.position;
-      body.top = prev.top;
-      body.left = prev.left;
-      body.right = prev.right;
-      body.width = prev.width;
-      window.scrollTo(0, scrollY);
+      document.body.style.overflow = "";
     };
   }, [isOpen]);
 
@@ -865,6 +859,7 @@ export default function Navbar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="lg:hidden fixed inset-x-0 z-40 bg-black/40"
               style={{ top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }}
               onClick={() => setIsOpen(false)}
@@ -874,8 +869,8 @@ export default function Navbar() {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", bounce: 0, duration: 0.4 }}
-              className="lg:hidden fixed left-0 z-50 w-[82%] max-w-xs border-r border-b border-white/10 bg-[#0a0a0a] overflow-y-auto text-white shadow-2xl"
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="lg:hidden fixed left-0 z-50 w-[82%] max-w-xs border-r border-b border-white/10 bg-[#0a0a0a] overflow-y-auto text-white shadow-2xl will-change-transform"
               style={{ top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }}
             >
             <div className="px-4 py-6 space-y-1 flex flex-col min-h-full">
