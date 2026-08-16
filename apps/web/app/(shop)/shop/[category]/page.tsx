@@ -190,7 +190,13 @@ export default function CategoryPage() {
     return [];
   });
   const [loading, setLoading] = useState(() => displayProducts.length === 0);
-  const [subBrands, setSubBrands] = useState<{ brand: string; slug: string; logo: string | null; image: string | null }[]>([]);
+  const [subBrands, setSubBrands] = useState<{ brand: string; slug: string; logo: string | null; image: string | null }[]>(() => {
+    try {
+      const cached = sessionStorage.getItem(`ts_cat_brands_${categorySlug}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
 
   const { addItem } = useCart();
   const topPicksScrollRef = useRef<HTMLDivElement | null>(null);
@@ -206,28 +212,37 @@ export default function CategoryPage() {
           setLoading(false);
         }
       }
+      const cachedBrands = sessionStorage.getItem(`ts_cat_brands_${categorySlug}`);
+      if (cachedBrands) {
+        setSubBrands(JSON.parse(cachedBrands));
+      }
     } catch {}
 
-    catalogApi.listCategories()
-      .then(cats => cats.find(c => c.name.toLowerCase() === categorySlug.toLowerCase())?.name ?? null)
-      .catch(() => null)
-      .then(async (apiCategory) => {
-        if (!apiCategory) { setLoading(false); return; }
-        productsApi.brands(apiCategory).then(setSubBrands).catch(() => {});
-        try {
-          const res = await productsApi.list({ category: apiCategory, limit: 100 });
-          const mapped = res.items.map(p => ({
-            id: p.slug, title: p.name, brand: p.brand, grade: p.condition,
-            storage: String((p.specs as Record<string, unknown>)?.storage ?? "—"),
-            price: p.price, originalPrice: p.comparePrice ?? p.price,
-            rating: p.rating, reviews: p.reviewCount, image: p.images[0] ?? "", stock: p.stock,
-          }));
-          const shuffled = mapped.sort(() => Math.random() - 0.5);
-          setDisplayProducts(shuffled);
-          try { sessionStorage.setItem(`ts_cat_prods_${categorySlug}`, JSON.stringify(shuffled)); } catch {}
-        } catch { /* ignore */ } finally { setLoading(false); }
-      });
-  }, [categorySlug]);
+    const targetCategory = dynamicCat?.name ?? (categorySlug ? categorySlug.charAt(0).toUpperCase() + categorySlug.slice(1) : "");
+    if (!targetCategory) return;
+
+    productsApi.brands(targetCategory)
+      .then(brands => {
+        setSubBrands(brands);
+        try { sessionStorage.setItem(`ts_cat_brands_${categorySlug}`, JSON.stringify(brands)); } catch {}
+      })
+      .catch(() => {});
+
+    productsApi.list({ category: targetCategory, limit: 100 })
+      .then(res => {
+        const mapped = res.items.map(p => ({
+          id: p.slug, title: p.name, brand: p.brand, grade: p.condition,
+          storage: String((p.specs as Record<string, unknown>)?.storage ?? "—"),
+          price: p.price, originalPrice: p.comparePrice ?? p.price,
+          rating: p.rating, reviews: p.reviewCount, image: p.images[0] ?? "", stock: p.stock,
+        }));
+        const shuffled = mapped.sort(() => Math.random() - 0.5);
+        setDisplayProducts(shuffled);
+        try { sessionStorage.setItem(`ts_cat_prods_${categorySlug}`, JSON.stringify(shuffled)); } catch {}
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [categorySlug, dynamicCat?.name]);
 
   if (catNotFound) { notFound(); return null; }
   
