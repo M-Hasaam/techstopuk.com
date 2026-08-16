@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
+// CI workflow test: Prisma folder change trigger
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 enum Role {
