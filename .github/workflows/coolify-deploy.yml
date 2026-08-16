@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # ----------------------------------------------------
@@ -60,7 +60,7 @@ jobs:
 
   # ----------------------------------------------------
   # 0.4. EVALUATE MIGRATION CHECK NECESSITY (~1s)
-  # Decision Node in GUI Graph: Checks if Prisma folder changed or RUN_MIGRATION_ALWAYS flag is true
+  # Decision Node in GUI Graph: Reads .github/ci-state.json and Prisma folder changes
   # ----------------------------------------------------
   eval-migration:
     name: Check Migration Needed?
@@ -72,11 +72,18 @@ jobs:
       prisma_changed: ${{ steps.eval.outputs.prisma_changed }}
       flag_active: ${{ steps.eval.outputs.flag_active }}
     steps:
-      - name: Evaluate Decision & Print Environment Variables
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Evaluate Decision & Read State File
         id: eval
         run: |
           PRISMA="${{ needs.changes.outputs.prisma }}"
-          FLAG="${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
+          STATE_FILE=".github/ci-state.json"
+          FLAG="false"
+          if [ -f "$STATE_FILE" ]; then
+            FLAG=$(jq -r '.run_migration_always // false' "$STATE_FILE")
+          fi
           EVENT="${{ github.event_name }}"
 
           echo "===================================================="
@@ -103,7 +110,7 @@ jobs:
           echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
           echo "| **Prisma Folder Edited** | \`${{ needs.changes.outputs.prisma }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **RUN_MIGRATION_ALWAYS** | \`${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`${{ steps.eval.outputs.flag_active }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| **Routing Decision** | \`${{ steps.eval.outputs.needed == 'true' && 'YES (Run DB Check)' || 'NO (Fast Bypass)' }}\` |" >> $GITHUB_STEP_SUMMARY
 
   # ----------------------------------------------------
@@ -159,33 +166,39 @@ jobs:
             --to-schema ./prisma/schema.prisma \
             --exit-code
 
-      - name: Clear RUN_MIGRATION_ALWAYS flag on success
+      - name: Reset RUN_MIGRATION_ALWAYS flag to false on success
         if: success()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh variable set RUN_MIGRATION_ALWAYS --body "false" || echo "Variable update skipped or not created yet"
+          cd ../..
+          jq '.run_migration_always = false' .github/ci-state.json > tmp.json && mv tmp.json .github/ci-state.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "ci: reset run_migration_always to false [skip ci]" || echo "No state change to commit"
+          git push || echo "Push skipped"
           echo "===================================================="
           echo " ✅ Migration Check PASSED -> RUN_MIGRATION_ALWAYS reset to 'false'"
           echo "===================================================="
           echo "### 🟢 DB Migration Check Passed" >> $GITHUB_STEP_SUMMARY
           echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **RUN_MIGRATION_ALWAYS** | \`false\` (Reset on Success) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`false\` (Reset in .github/ci-state.json) |" >> $GITHUB_STEP_SUMMARY
 
       - name: Set RUN_MIGRATION_ALWAYS flag on failure
         if: failure()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh variable set RUN_MIGRATION_ALWAYS --body "true" || echo "Variable update skipped or not created yet"
+          cd ../..
+          jq '.run_migration_always = true' .github/ci-state.json > tmp.json && mv tmp.json .github/ci-state.json
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "ci: set run_migration_always to true on failure [skip ci]" || echo "No state change to commit"
+          git push || echo "Push skipped"
           echo "===================================================="
           echo " ❌ Migration Check FAILED -> RUN_MIGRATION_ALWAYS set to 'true'"
           echo "===================================================="
           echo "### 🔴 DB Migration Check Failed" >> $GITHUB_STEP_SUMMARY
           echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **RUN_MIGRATION_ALWAYS** | \`true\` (Set on Failure) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`true\` (Set in .github/ci-state.json) |" >> $GITHUB_STEP_SUMMARY
 
   # ----------------------------------------------------
   # 0.5B. SKIP DB MIGRATION CHECK (~1s - NO / Bypass Branch)
@@ -283,18 +296,29 @@ jobs:
     if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && always() && needs.check-migrations.result != 'failure'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Log Post-Migration Flag Status
         run: |
+          FLAG="false"
+          if [ -f ".github/ci-state.json" ]; then
+            FLAG=$(jq -r '.run_migration_always // false' .github/ci-state.json)
+          fi
           echo "===================================================="
-          echo " RUN_MIGRATION_ALWAYS (Post-Migration Check) : ${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
+          echo " RUN_MIGRATION_ALWAYS (Post-Migration Check) : $FLAG"
           echo "===================================================="
 
       - name: Render API Deploy Summary Card
         run: |
+          FLAG="false"
+          if [ -f ".github/ci-state.json" ]; then
+            FLAG=$(jq -r '.run_migration_always // false' .github/ci-state.json)
+          fi
           echo "### 🚀 API Deployment" >> $GITHUB_STEP_SUMMARY
           echo "| Parameter | Status / Value |" >> $GITHUB_STEP_SUMMARY
           echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          echo "| **RUN_MIGRATION_ALWAYS (Post-Check)** | \`${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS (Post-Check)** | \`$FLAG\` |" >> $GITHUB_STEP_SUMMARY
 
       - name: Trigger API Deployment
         env:
