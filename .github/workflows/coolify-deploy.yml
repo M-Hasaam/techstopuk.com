@@ -269,6 +269,19 @@ jobs:
     if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && always() && needs.check-migrations.result != 'failure'
     runs-on: ubuntu-latest
     steps:
+      - name: Log Post-Migration Flag Status
+        run: |
+          echo "===================================================="
+          echo " RUN_MIGRATION_ALWAYS (Post-Migration Check) : ${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
+          echo "===================================================="
+
+      - name: Render API Deploy Summary Card
+        run: |
+          echo "### 🚀 API Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Status / Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS (Post-Check)** | \`${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}\` |" >> $GITHUB_STEP_SUMMARY
+
       - name: Trigger API Deployment
         env:
           COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_API }}
