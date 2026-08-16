@@ -119,30 +119,46 @@ export default function CategoryPage() {
   const categorySlug = (params?.category as string)?.toLowerCase();
 
   // All category content comes from the API — admin panel is the single source of truth
-  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string; icon?: string } | null>(null);
+  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string; icon?: string } | null>(() => {
+    try {
+      const cached = sessionStorage.getItem(`ts_cat_meta_${categorySlug}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
   const [catNotFound, setCatNotFound] = useState(false);
+
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(`ts_cat_meta_${categorySlug}`);
+      if (cached) { setDynamicCat(JSON.parse(cached)); }
+    } catch {}
+
     Promise.all([
       catalogApi.listCategories({ includeInactive: false } as any).catch(() => []),
       otherSubcategoriesApi.list().catch(() => []),
     ]).then(([mainCats, subCats]) => {
       const foundMain = mainCats.find(c => c.slug === categorySlug || c.name.toLowerCase() === categorySlug);
       if (foundMain) {
-        setDynamicCat({
+        const metaObj = {
           name: foundMain.name,
           displayName: foundMain.displayName ?? foundMain.name,
           description: foundMain.description ?? undefined,
           icon: foundMain.icon ?? undefined,
-        });
+        };
+        setDynamicCat(metaObj);
+        try { sessionStorage.setItem(`ts_cat_meta_${categorySlug}`, JSON.stringify(metaObj)); } catch {}
         return;
       }
       const foundSub = subCats.find(s => s.name.toLowerCase() === categorySlug || s.id === categorySlug);
       if (foundSub) {
-        setDynamicCat({
+        const metaObj = {
           name: foundSub.name,
           displayName: foundSub.name,
           icon: foundSub.icon ?? undefined,
-        });
+        };
+        setDynamicCat(metaObj);
+        try { sessionStorage.setItem(`ts_cat_meta_${categorySlug}`, JSON.stringify(metaObj)); } catch {}
         return;
       }
       setCatNotFound(true);
@@ -166,17 +182,32 @@ export default function CategoryPage() {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [activeTabBrand, setActiveTabBrand] = useState<string>("all");
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<string>("battery");
-  const [displayProducts, setDisplayProducts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [displayProducts, setDisplayProducts] = useState<any[]>(() => {
+    try {
+      const cached = sessionStorage.getItem(`ts_cat_prods_${categorySlug}`);
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => displayProducts.length === 0);
   const [subBrands, setSubBrands] = useState<{ brand: string; slug: string; logo: string | null; image: string | null }[]>([]);
 
   const { addItem } = useCart();
   const topPicksScrollRef = useRef<HTMLDivElement | null>(null);
   const brandsScrollRef = useRef<HTMLDivElement | null>(null);
 
-
   useEffect(() => {
-    setLoading(true);
+    try {
+      const cachedProds = sessionStorage.getItem(`ts_cat_prods_${categorySlug}`);
+      if (cachedProds) {
+        const parsed = JSON.parse(cachedProds);
+        if (parsed.length > 0) {
+          setDisplayProducts(parsed);
+          setLoading(false);
+        }
+      }
+    } catch {}
+
     catalogApi.listCategories()
       .then(cats => cats.find(c => c.name.toLowerCase() === categorySlug.toLowerCase())?.name ?? null)
       .catch(() => null)
@@ -193,12 +224,28 @@ export default function CategoryPage() {
           }));
           const shuffled = mapped.sort(() => Math.random() - 0.5);
           setDisplayProducts(shuffled);
+          try { sessionStorage.setItem(`ts_cat_prods_${categorySlug}`, JSON.stringify(shuffled)); } catch {}
         } catch { /* ignore */ } finally { setLoading(false); }
       });
   }, [categorySlug]);
 
   if (catNotFound) { notFound(); return null; }
-  if (!meta) return null; // still loading dynamic meta
+  
+  if (!meta) {
+    return (
+      <div className="min-h-screen bg-background text-foreground font-sans p-6 sm:p-12 animate-pulse">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="h-10 w-48 bg-zinc-200 dark:bg-zinc-800 rounded-xl" />
+          <div className="h-5 w-96 bg-zinc-100 dark:bg-zinc-900 rounded-lg" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-64 bg-zinc-100 dark:bg-zinc-900 rounded-2xl" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function handleAdd(id: string) {
     const product = displayProducts.find(p => p.id === id);

@@ -672,6 +672,7 @@ export default function Navbar() {
                       >
                         <Link
                           href={href}
+                          prefetch={true}
                           className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-250 flex items-center whitespace-nowrap ${
                             isActive ? "text-white z-10 font-extrabold" : "text-zinc-400 hover:text-white font-semibold"
                           }`}
