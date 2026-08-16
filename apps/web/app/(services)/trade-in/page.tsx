@@ -368,6 +368,24 @@ export default function TradeInPage() {
       .catch(() => {});
   }, []);
 
+  // Preload critical condition & fulfillment WebP images into browser cache for instant 0ms rendering
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const preloadList = [
+      "/conditions/grade_a.webp",
+      "/conditions/grade_b.webp",
+      "/conditions/grade_c.webp",
+      "/conditions/grade_f.webp",
+      "/conditions/abcf_grades_guide.webp",
+      "/fulfillment/royal_mail_shipping.webp",
+      "/fulfillment/store_dropoff.webp",
+    ];
+    preloadList.forEach((src) => {
+      const img = new window.Image();
+      img.src = src;
+    });
+  }, []);
+
   // Admin-managed "Quick Check" diagnostic questions (Phase 3), grouped by category
   const [remoteQuestions, setRemoteQuestions] = useState<Record<string, TradeInQuestion[]>>({});
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
@@ -2133,6 +2151,8 @@ export default function TradeInPage() {
                                                 src={optImg}
                                                 alt={opt.label}
                                                 fill
+                                                priority
+                                                unoptimized
                                                 sizes="(max-width: 640px) 90vw, 45vw"
                                                 className={`object-cover object-center transition-transform duration-500 group-hover:scale-105 ${
                                                   isSelected ? "scale-105" : "opacity-95"
@@ -2471,7 +2491,7 @@ export default function TradeInPage() {
                                   disabled={imageUploading}
                                   className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-6 py-5 flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
                                 >
-                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
                                     {imageUploading ? (
                                       <div className="h-5 w-5 border-2 border-zinc-300 dark:border-zinc-700 border-t-zinc-700 dark:border-t-zinc-200 rounded-full animate-spin" />
                                     ) : (
@@ -2490,7 +2510,7 @@ export default function TradeInPage() {
                                   disabled={imageUploading}
                                   className="border-2 border-dashed border-zinc-300 dark:border-zinc-800 hover:border-zinc-950 dark:hover:border-white rounded-2xl p-4 sm:p-6 py-5 flex flex-col items-center justify-center gap-2 sm:gap-3 transition-all bg-zinc-50 dark:bg-zinc-900 hover:bg-white dark:hover:bg-zinc-950 group disabled:opacity-60 disabled:pointer-events-none"
                                 >
-                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:bg-white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
+                                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-sm flex items-center justify-center group-hover:bg-zinc-950 dark:group-hover:white group-hover:border-zinc-950 dark:group-hover:border-white transition-all">
                                     <Camera className="h-5 w-5 text-zinc-400 dark:text-zinc-500 group-hover:text-white dark:group-hover:text-zinc-950 transition-colors" />
                                   </div>
                                   <div className="text-center">
@@ -2722,6 +2742,8 @@ export default function TradeInPage() {
                                             src={m.image}
                                             alt={m.title}
                                             fill
+                                            priority
+                                            unoptimized
                                             sizes="(max-width: 640px) 45vw, 240px"
                                             className={`object-cover transition-transform duration-500 group-hover:scale-105 ${
                                               isSelected ? "scale-105" : "opacity-90"
