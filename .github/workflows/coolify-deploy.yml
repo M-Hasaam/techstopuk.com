@@ -165,6 +165,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh variable set RUN_MIGRATION_ALWAYS --body "false" || echo "Variable update skipped or not created yet"
+          echo "===================================================="
+          echo " ✅ Migration Check PASSED -> RUN_MIGRATION_ALWAYS reset to 'false'"
+          echo "===================================================="
+          echo "### 🟢 DB Migration Check Passed" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`false\` (Reset on Success) |" >> $GITHUB_STEP_SUMMARY
 
       - name: Set RUN_MIGRATION_ALWAYS flag on failure
         if: failure()
@@ -172,6 +179,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh variable set RUN_MIGRATION_ALWAYS --body "true" || echo "Variable update skipped or not created yet"
+          echo "===================================================="
+          echo " ❌ Migration Check FAILED -> RUN_MIGRATION_ALWAYS set to 'true'"
+          echo "===================================================="
+          echo "### 🔴 DB Migration Check Failed" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`true\` (Set on Failure) |" >> $GITHUB_STEP_SUMMARY
 
   # ----------------------------------------------------
   # 0.5B. SKIP DB MIGRATION CHECK (~1s - NO / Bypass Branch)
