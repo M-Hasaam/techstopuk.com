@@ -119,13 +119,7 @@ export default function CategoryPage() {
   const categorySlug = (params?.category as string)?.toLowerCase();
 
   // All category content comes from the API — admin panel is the single source of truth
-  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string; icon?: string } | null>(() => {
-    try {
-      const cached = sessionStorage.getItem(`ts_cat_meta_${categorySlug}`);
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return null;
-  });
+  const [dynamicCat, setDynamicCat] = useState<{ name: string; displayName?: string; description?: string; icon?: string } | null>(null);
   const [catNotFound, setCatNotFound] = useState(false);
 
   useEffect(() => {
@@ -182,21 +176,9 @@ export default function CategoryPage() {
   const [addedIds, setAddedIds] = useState<Set<string>>(new Set());
   const [activeTabBrand, setActiveTabBrand] = useState<string>("all");
   const [selectedDiagnostic, setSelectedDiagnostic] = useState<string>("battery");
-  const [displayProducts, setDisplayProducts] = useState<any[]>(() => {
-    try {
-      const cached = sessionStorage.getItem(`ts_cat_prods_${categorySlug}`);
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
-  const [loading, setLoading] = useState(() => displayProducts.length === 0);
-  const [subBrands, setSubBrands] = useState<{ brand: string; slug: string; logo: string | null; image: string | null }[]>(() => {
-    try {
-      const cached = sessionStorage.getItem(`ts_cat_brands_${categorySlug}`);
-      if (cached) return JSON.parse(cached);
-    } catch {}
-    return [];
-  });
+  const [displayProducts, setDisplayProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [subBrands, setSubBrands] = useState<{ brand: string; slug: string; logo: string | null; image: string | null }[]>([]);
 
   const { addItem } = useCart();
   const topPicksScrollRef = useRef<HTMLDivElement | null>(null);

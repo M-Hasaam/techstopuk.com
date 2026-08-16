@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import Script from "next/script";
 import { Geist, Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../context/auth-context";
@@ -62,23 +63,14 @@ export default async function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
+        <Script
+          id="ts-theme-enforce"
           nonce={nonce}
-          // Browsers deliberately return "" for the `nonce` IDL property once
-          // a script element is connected to the DOM (to stop the value being
-          // read back out by injected scripts) — the real `nonce` *attribute*
-          // in the rendered HTML is correct and CSP still validates against
-          // it. React's dev-mode hydration diff compares the property, not
-          // the attribute, so it flags a false-positive mismatch here. This
-          // only ever appears in `next dev`; it doesn't affect production
-          // behavior or security.
-          suppressHydrationWarning
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  // Dark mode is disabled site-wide — force light regardless of any
-                  // stale/tampered 'ts-theme' value in localStorage.
                   localStorage.setItem('ts-theme', 'light');
                   document.documentElement.setAttribute('data-theme', 'light');
                   document.documentElement.classList.remove('dark');
