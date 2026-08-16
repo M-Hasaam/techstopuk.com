@@ -681,7 +681,7 @@ export default function Navbar() {
                             <motion.div
                               layoutId="activeCategoryTab"
                               className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
-                              transition={{ type: "spring", stiffness: 350, damping: 28 }}
+                              transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
                             />
                           )}
                           {label}
@@ -784,6 +784,7 @@ export default function Navbar() {
                       >
                         <Link
                           href={href}
+                          prefetch={true}
                           className={`relative px-2.5 xl:px-4 py-2 rounded-full flex items-center gap-1.5 whitespace-nowrap transition-colors duration-250 ${
                             isActive
                               ? "bg-accent text-white shadow-sm font-extrabold"
