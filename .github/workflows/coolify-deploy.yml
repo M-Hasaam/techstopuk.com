@@ -59,16 +59,50 @@ jobs:
               - 'turbo.json'
 
   # ----------------------------------------------------
+  # 0.4. EVALUATE MIGRATION CHECK NECESSITY (~1s)
+  # Decision Node in GUI Graph: Checks if Prisma folder changed or RUN_MIGRATION_ALWAYS flag is true
+  # ----------------------------------------------------
+  eval-migration:
+    name: Check Migration Needed?
+    needs: changes
+    if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.eval.outputs.needed }}
+      prisma_changed: ${{ steps.eval.outputs.prisma_changed }}
+      flag_active: ${{ steps.eval.outputs.flag_active }}
+    steps:
+      - name: Evaluate Decision & Print Environment Variables
+        id: eval
+        run: |
+          PRISMA="${{ needs.changes.outputs.prisma }}"
+          FLAG="${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
+          EVENT="${{ github.event_name }}"
+
+          echo "===================================================="
+          echo " Prisma Folder Edited : $PRISMA"
+          echo " RUN_MIGRATION_ALWAYS  : $FLAG"
+          echo " Event Type           : $EVENT"
+          echo "===================================================="
+
+          if [ "$PRISMA" = "true" ] || [ "$FLAG" = "true" ] || [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "needed=true" >> $GITHUB_OUTPUT
+            echo "➡️ DECISION: Migration check NEEDED -> Routing to DB Migration Check"
+          else
+            echo "needed=false" >> $GITHUB_OUTPUT
+            echo "⚡ DECISION: Migration check BYPASSED -> Routing directly to Deploy API App"
+          fi
+          echo "prisma_changed=$PRISMA" >> $GITHUB_OUTPUT
+          echo "flag_active=$FLAG" >> $GITHUB_OUTPUT
+
+  # ----------------------------------------------------
   # 0.5. PRISMA DB MIGRATION CHECK (~18s)
-  # Smart Logic:
-  # - Only runs if prisma/ folder changed OR RUN_MIGRATION_ALWAYS is true
-  # - If it fails, sets RUN_MIGRATION_ALWAYS=true in GitHub Repo Vars to force future checks
-  # - If it passes, resets RUN_MIGRATION_ALWAYS=false
+  # Only executes if Check Migration Needed? node outputs needed=true
   # ----------------------------------------------------
   check-migrations:
-    name: DB Migration Check (prisma:${{ needs.changes.outputs.prisma || 'false' }}, flag:${{ vars.RUN_MIGRATION_ALWAYS || 'false' }})
-    needs: changes
-    if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && (needs.changes.outputs.prisma == 'true' || vars.RUN_MIGRATION_ALWAYS == 'true' || github.event_name == 'workflow_dispatch')
+    name: DB Migration Check
+    needs: [changes, eval-migration]
+    if: needs.eval-migration.outputs.needed == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -92,11 +126,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Log Migration Check Parameters
-        run: |
-          echo "Prisma Folder Changed : ${{ needs.changes.outputs.prisma }}"
-          echo "RUN_MIGRATION_ALWAYS  : ${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -210,7 +239,7 @@ jobs:
   # ----------------------------------------------------
   deploy-api:
     name: Deploy API App
-    needs: [changes, check-migrations]
+    needs: [changes, eval-migration, check-migrations]
     if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && always() && needs.check-migrations.result != 'failure'
     runs-on: ubuntu-latest
     steps:
