@@ -144,6 +144,23 @@ export class ScraperDataService {
             take: limit,
         });
 
+        const runningRuns = runs.filter(r => r.status === 'RUNNING');
+        if (runningRuns.length > 1) {
+            // Keep only the newest active run; mark older orphaned "RUNNING" rows as FAILED
+            const staleIds = runningRuns.slice(1).map(r => r.id);
+            await this.prisma.scraperRun.updateMany({
+                where: { id: { in: staleIds } },
+                data: { status: 'FAILED', finishedAt: new Date(), errorMessage: 'Superseded by newer scraper run' },
+            }).catch(() => {});
+            // Re-fetch runs after cleanup
+            const freshRuns = await this.prisma.scraperRun.findMany({
+                orderBy: { startedAt: 'desc' },
+                take: limit,
+            });
+            runs.length = 0;
+            runs.push(...freshRuns);
+        }
+
         const running = runs.find(r => r.status === 'RUNNING');
         if (!running) return runs.map(r => ({ ...r, currentProgress: null as number | null, totalVariants: null as number | null }));
 

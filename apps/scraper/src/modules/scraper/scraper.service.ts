@@ -253,12 +253,11 @@ export class ScraperService implements OnApplicationBootstrap {
         // Only touch rows that have actually exceeded the admin-configured stuck
         // threshold (same config the manual "stuck run cleanup" in apps/api uses).
         if (!isResume) {
-            const thresholdHours = await this.getStuckThresholdHours();
             const { count: stuckCount } = await this.prisma.scraperRun.updateMany({
-                where: { status: 'RUNNING', startedAt: { lt: new Date(Date.now() - thresholdHours * 60 * 60 * 1000) } },
-                data:  { status: 'FAILED', finishedAt: new Date(), errorMessage: 'Run timed out — marked failed automatically' },
+                where: { status: 'RUNNING' },
+                data:  { status: 'FAILED', finishedAt: new Date(), errorMessage: 'Superseded by a newer scraper run' },
             });
-            if (stuckCount > 0) this.logger.warn(`Marked ${stuckCount} stuck run(s) as FAILED.`);
+            if (stuckCount > 0) this.logger.warn(`Marked ${stuckCount} previous run(s) as FAILED/superseded.`);
         }
 
         const run = await this.prisma.scraperRun.create({
