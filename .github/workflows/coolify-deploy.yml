@@ -63,7 +63,7 @@ jobs:
   # Decision Node in GUI Graph: Checks if Prisma folder changed or RUN_MIGRATION_ALWAYS flag is true
   # ----------------------------------------------------
   eval-migration:
-    name: Check Migration Needed?
+    name: Check Migration Needed? (flag=${{ vars.RUN_MIGRATION_ALWAYS || 'false' }})
     needs: changes
     if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -87,13 +87,24 @@ jobs:
 
           if [ "$PRISMA" = "true" ] || [ "$FLAG" = "true" ] || [ "$EVENT" = "workflow_dispatch" ]; then
             echo "needed=true" >> $GITHUB_OUTPUT
+            echo "DECISION=NEEDED" >> $GITHUB_OUTPUT
             echo "➡️ DECISION: Migration check NEEDED -> Routing to DB Migration Check"
           else
             echo "needed=false" >> $GITHUB_OUTPUT
+            echo "DECISION=BYPASSED" >> $GITHUB_OUTPUT
             echo "⚡ DECISION: Migration check BYPASSED -> Routing directly to Deploy API App"
           fi
           echo "prisma_changed=$PRISMA" >> $GITHUB_OUTPUT
           echo "flag_active=$FLAG" >> $GITHUB_OUTPUT
+
+      - name: Render GUI Summary Table
+        run: |
+          echo "### 🔍 Migration Routing Summary" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Prisma Folder Edited** | \`${{ needs.changes.outputs.prisma }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RUN_MIGRATION_ALWAYS** | \`${{ vars.RUN_MIGRATION_ALWAYS || 'false' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Routing Decision** | \`${{ steps.eval.outputs.needed == 'true' && 'YES (Run DB Check)' || 'NO (Fast Bypass)' }}\` |" >> $GITHUB_STEP_SUMMARY
 
   # ----------------------------------------------------
   # 0.5A. PRISMA DB MIGRATION CHECK (~18s - YES Branch)
