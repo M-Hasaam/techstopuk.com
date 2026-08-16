@@ -356,33 +356,42 @@ export default function TradeInPage() {
   // at all in the step-by-step wizard, only via the free-text search box.
   const [otherDevices, setOtherDevices] = useState<{ name: string; brand: string; category: string }[]>([]);
   useEffect(() => {
-    // The admin-curated "Other Search Devices" list is the only source for this — no
-    // static fallback. If the call fails, this just stays empty rather than showing
-    // stale/unmanaged data the admin has no way to edit or remove.
+    try {
+      const cached = sessionStorage.getItem("ts_other_devices");
+      if (cached) { setOtherDevices(JSON.parse(cached)); return; }
+    } catch {}
     catalogApi.listTradeInModels()
-      .then(items => setOtherDevices(items))
+      .then(items => {
+        setOtherDevices(items);
+        try { sessionStorage.setItem("ts_other_devices", JSON.stringify(items)); } catch {}
+      })
       .catch(() => {});
   }, []);
 
-  // Admin-managed "Quick Check" diagnostic questions (Phase 3), grouped by category —
-  // questionsLoaded gates Phase 3 so it doesn't mistake "not fetched yet" for
-  // "this category has no questions" and skip straight to the offer step.
+  // Admin-managed "Quick Check" diagnostic questions (Phase 3), grouped by category
   const [remoteQuestions, setRemoteQuestions] = useState<Record<string, TradeInQuestion[]>>({});
   const [questionsLoaded, setQuestionsLoaded] = useState(false);
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_tradein_questions");
+      if (cached) {
+        setRemoteQuestions(JSON.parse(cached));
+        setQuestionsLoaded(true);
+        return;
+      }
+    } catch {}
+
     tradeInQuestionsApi.list()
       .then(items => {
         const byCategory: Record<string, TradeInQuestion[]> = {};
         for (const q of items) (byCategory[q.category] ??= []).push(q);
         setRemoteQuestions(byCategory);
+        try { sessionStorage.setItem("ts_tradein_questions", JSON.stringify(byCategory)); } catch {}
       })
       .catch(() => {})
       .finally(() => setQuestionsLoaded(true));
   }, []);
   const [dynamicModelData, setDynamicModelData] = useState<{ model: string; tradeInMode: 'auto' | 'manual_price' | 'unpriced'; attributeOptions?: { label: string; options: string[] }[] }[]>([]);
-  // Real per-device attributes (e.g. RAM for a specific MacBook) pulled from the catalog entry
-  // the customer actually selected — takes priority over the generic per-category spec list
-  // below so search-picked and wizard-picked devices show identical, accurate specs.
   const [catalogAttributeOptions, setCatalogAttributeOptions] = useState<{ label: string; options: string[] }[]>([]);
 
   // Custom / unlisted device state
@@ -416,8 +425,6 @@ export default function TradeInPage() {
       .catch(() => {});
   }, [state.category, state.brand]);
 
-  // Fetch AI-generated specs for all unlisted/unpriced devices — gives device-specific options
-  // (e.g. Xiaomi Redmi Note 13 → Storage: 128GB/256GB, RAM: 6GB/8GB vs generic Phone options)
   useEffect(() => {
     if (!state.model || !state.brand || state.tradeInMode !== 'unpriced') { setAiSpecs([]); return; }
     setAiSpecs([]);
@@ -432,20 +439,20 @@ export default function TradeInPage() {
   const [catalogCatsLoaded, setCatalogCatsLoaded] = useState(false);
   const [catFallbackImages, setCatFallbackImages] = useState<Record<string, string>>({});
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_tradein_sellable_cats");
+      if (cached) {
+        setCatalogCats(JSON.parse(cached));
+        setCatalogCatsLoaded(true);
+        return;
+      }
+    } catch {}
+
     catalogApi.listCategories()
       .then(cats => {
         const sellable = cats.filter(c => c.isSellable);
         setCatalogCats(sellable);
-        // For categories with no DB image, fetch a random product image as fallback
-        sellable.filter(c => !c.image).forEach(c => {
-          productsApi.list({ category: c.name, limit: 12 })
-            .then(r => {
-              const pool = r.items.flatMap(p => p.images ?? []);
-              const img = pool[Math.floor(Math.random() * pool.length)];
-              if (img) setCatFallbackImages(prev => ({ ...prev, [c.slug]: img }));
-            })
-            .catch(() => {});
-        });
+        try { sessionStorage.setItem("ts_tradein_sellable_cats", JSON.stringify(sellable)); } catch {}
       })
       .catch(() => {})
       .finally(() => setCatalogCatsLoaded(true));

@@ -74,6 +74,15 @@ export default function DeviceSearchBox({
   const [fuseInstance, setFuseInstance] = useState<Fuse<TradeInModel>>(() => new Fuse<TradeInModel>([], FUSE_OPTIONS));
 
   useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_device_search_index");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setFuseInstance(new Fuse(parsed, FUSE_OPTIONS));
+        return;
+      }
+    } catch {}
+
     Promise.all([
       fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3002"}/device-catalog?forTradeIn=true`)
         .then(r => r.json()),
@@ -101,7 +110,9 @@ export default function DeviceSearchBox({
       const catalogKeys = new Set(catalogModels.map(key));
       const dbOnly = dbModels.filter(m => !catalogKeys.has(key(m)));
 
-      setFuseInstance(new Fuse([...catalogModels, ...dbOnly], FUSE_OPTIONS));
+      const combined = [...catalogModels, ...dbOnly];
+      setFuseInstance(new Fuse(combined, FUSE_OPTIONS));
+      try { sessionStorage.setItem("ts_device_search_index", JSON.stringify(combined)); } catch {}
     }).catch(() => {});
   }, []);
 
