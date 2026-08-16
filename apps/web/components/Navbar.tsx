@@ -6,7 +6,7 @@ import {
   RefreshCw, Wrench, Package, Settings, LogOut, LogIn, Sun, Moon, MoreHorizontal,
   HelpCircle, ArrowLeft, AlignLeft, ChevronUp
 } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, LayoutGroup } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "../context/auth-context";
@@ -644,48 +644,49 @@ export default function Navbar() {
               <div className="bg-zinc-950/90 backdrop-blur-xl border border-white/10 shadow-2xl rounded-full p-1.5 flex items-center gap-2 xl:gap-6 max-w-[min(96vw,1400px)] overflow-x-auto scrollbar-hide">
                 
                 {/* Category Links */}
-                <nav
-                  className="flex items-center gap-1 text-xs font-bold relative"
-                  onMouseLeave={scheduleClose}
-                >
-                  {[
-                    { label: "All Products", href: "/", slug: "all-products" },
-                    ...shopCategories
-                  ].map(({ label, href, slug }) => {
-                    const isActive = href === "/" ? pathname === "/" : pathname?.startsWith(href);
-                    let catLabel = slug ? (categoryDisplayNames[slug] ?? shopCategories.find(c => c.slug === slug)?.label ?? slug) : "";
-                    let desc = slug ? categoryDescriptions[slug] : "";
-                    const brands = slug ? (categoryBrands[slug] ?? []) : [];
-                    let hasContent = slug === "other" ? otherSubcats.length > 0 : brands.length > 0;
+                <LayoutGroup id="navbar-category-tabs">
+                  <nav
+                    className="flex items-center gap-1 text-xs font-bold relative"
+                    onMouseLeave={scheduleClose}
+                  >
+                    {[
+                      { label: "All Products", href: "/", slug: "all-products" },
+                      ...shopCategories
+                    ].map(({ label, href, slug }) => {
+                      const isActive = href === "/" ? pathname === "/" : pathname?.startsWith(href);
+                      let catLabel = slug ? (categoryDisplayNames[slug] ?? shopCategories.find(c => c.slug === slug)?.label ?? slug) : "";
+                      let desc = slug ? categoryDescriptions[slug] : "";
+                      const brands = slug ? (categoryBrands[slug] ?? []) : [];
+                      let hasContent = slug === "other" ? otherSubcats.length > 0 : brands.length > 0;
 
-                    if (slug === "all-products") {
-                      catLabel = "All Products";
-                      desc = "Browse our complete catalog of certified refurbished tech and new devices.";
-                      hasContent = true;
-                    }
+                      if (slug === "all-products") {
+                        catLabel = "All Products";
+                        desc = "Browse our complete catalog of certified refurbished tech and new devices.";
+                        hasContent = true;
+                      }
 
-                    return (
-                      <div
-                        key={label}
-                        className="relative shrink-0"
-                        onMouseEnter={() => slug ? openDropdown(slug) : setHoveredCat(null)}
-                      >
-                        <Link
-                          href={href}
-                          prefetch={true}
-                          className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-200 flex items-center whitespace-nowrap font-bold ${
-                            isActive ? "text-white z-10" : "text-zinc-400 hover:text-white"
-                          }`}
+                      return (
+                        <div
+                          key={label}
+                          className="relative shrink-0"
+                          onMouseEnter={() => slug ? openDropdown(slug) : setHoveredCat(null)}
                         >
-                          {isActive && (
-                            <motion.div
-                              layoutId="activeCategoryTab"
-                              className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
-                              transition={{ type: "spring", stiffness: 220, damping: 24, mass: 0.8 }}
-                            />
-                          )}
-                          {label}
-                        </Link>
+                          <Link
+                            href={href}
+                            prefetch={true}
+                            className={`relative px-2.5 xl:px-4 py-2 rounded-full transition-colors duration-200 flex items-center whitespace-nowrap font-bold ${
+                              isActive ? "text-white z-10" : "text-zinc-400 hover:text-white"
+                            }`}
+                          >
+                            {isActive && (
+                              <motion.div
+                                layoutId="activeCategoryTab"
+                                className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
+                                transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+                              />
+                            )}
+                            {label}
+                          </Link>
 
                         {/* Dropdown Card */}
                         <AnimatePresence>
@@ -754,6 +755,7 @@ export default function Navbar() {
                     );
                   })}
                 </nav>
+                </LayoutGroup>
 
                 <div className="w-px h-5 bg-white/10" />
 
