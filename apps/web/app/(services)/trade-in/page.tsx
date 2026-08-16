@@ -435,24 +435,42 @@ export default function TradeInPage() {
       .finally(() => setAiSpecsLoading(false));
   }, [state.model, state.brand, state.tradeInMode, state.category]);
 
-  const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>([]);
-  const [catalogCatsLoaded, setCatalogCatsLoaded] = useState(false);
+  const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_tradein_sellable_cats");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { id: "cat-phone", name: "Phones", isSellable: true, isRepairable: true, icon: "Phone", description: "iPhones, Samsung Galaxy, Google Pixel & more" } as any,
+      { id: "cat-tablet", name: "Tablets", isSellable: true, isRepairable: true, icon: "Tablet", description: "iPads, Galaxy Tabs & Surface Tablets" } as any,
+      { id: "cat-laptop", name: "Laptops", isSellable: true, isRepairable: true, icon: "Laptop", description: "MacBooks, Windows Laptops & Chromebooks" } as any,
+      { id: "cat-audio", name: "Audio", isSellable: true, isRepairable: true, icon: "Headphones", description: "AirPods, Wireless Headphones & Speakers" } as any,
+      { id: "cat-gaming", name: "Gaming", isSellable: true, isRepairable: true, icon: "Gamepad2", description: "PlayStation, Xbox, Nintendo & Handhelds" } as any,
+      { id: "cat-others", name: "Others", isSellable: true, isRepairable: true, icon: "Package", description: "Smartwatches, Consoles & Tech Accessories" } as any,
+    ];
+  });
+  const [catalogCatsLoaded, setCatalogCatsLoaded] = useState(true);
   const [catFallbackImages, setCatFallbackImages] = useState<Record<string, string>>({});
+
   useEffect(() => {
     try {
       const cached = sessionStorage.getItem("ts_tradein_sellable_cats");
       if (cached) {
-        setCatalogCats(JSON.parse(cached));
-        setCatalogCatsLoaded(true);
-        return;
+        const parsed = JSON.parse(cached);
+        if (parsed.length > 0) setCatalogCats(parsed);
       }
     } catch {}
 
     catalogApi.listCategories()
       .then(cats => {
         const sellable = cats.filter(c => c.isSellable);
-        setCatalogCats(sellable);
-        try { sessionStorage.setItem("ts_tradein_sellable_cats", JSON.stringify(sellable)); } catch {}
+        if (sellable.length > 0) {
+          setCatalogCats(sellable);
+          try { sessionStorage.setItem("ts_tradein_sellable_cats", JSON.stringify(sellable)); } catch {}
+        }
       })
       .catch(() => {})
       .finally(() => setCatalogCatsLoaded(true));
@@ -708,13 +726,22 @@ export default function TradeInPage() {
         const canvas = document.createElement("canvas");
         canvas.width = width; canvas.height = height;
         canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
-        URL.revokeObjectURL(url);
         const previewUrl = canvas.toDataURL("image/jpeg", 0.75);
         canvas.toBlob(blob => resolve({ blob: blob!, previewUrl }), "image/jpeg", 0.75);
+      };
+      img.onerror = () => {
+        resolve({ blob: file, previewUrl: url });
       };
       img.src = url;
     });
   }
+
+  const getImageSrc = (img: { previewUrl?: string; filePath?: string }) => {
+    const src = img.previewUrl || img.filePath || "";
+    if (!src) return "";
+    if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("http")) return src;
+    return `${API_URL}${src.startsWith("/") ? "" : "/"}${src}`;
+  };
 
   async function handleImageFiles(files: File[]) {
     if (files.length === 0) return;
@@ -739,7 +766,7 @@ export default function TradeInPage() {
         const res = await uploadsApi.tradeInImage(uploadFile, batchId);
         const finalUrl = res?.presignedUrl || res?.filePath || compressedPreview || item.previewUrl;
         
-        setImages(prev => prev.map(img => img.previewUrl === item.previewUrl ? { ...img, filePath: finalUrl } : img));
+        setImages(prev => prev.map(img => img.previewUrl === item.previewUrl ? { ...img, filePath: finalUrl, previewUrl: finalUrl } : img));
       } catch (err) {
         console.warn("Background photo upload failed, retaining local preview:", err);
       }
@@ -2311,7 +2338,7 @@ export default function TradeInPage() {
                                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 pt-2">
                                     {images.map((img, i) => (
                                       <div key={i} className="relative aspect-square rounded-2xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-800 group shadow-sm">
-                                        <img src={img.previewUrl} alt={`Preview ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                        <img src={getImageSrc(img)} alt={`Preview ${i + 1}`} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                                         <button
                                           type="button"
                                           onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}

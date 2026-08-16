@@ -51,8 +51,42 @@ export class SupportService {
   // ─── Chats ─────────────────────────────────────────────────────────────────
 
   async createChat(guestName: string, guestEmail?: string, orderRef?: string) {
+    const trimmedName = guestName.trim();
+    const trimmedEmail = guestEmail?.trim() || null;
+
+    // 1. Re-use existing active open chat for the same customer if available
+    const existingOpen = await this.prisma.supportChat.findFirst({
+      where: {
+        status: 'open',
+        OR: [
+          ...(trimmedEmail ? [{ guestEmail: trimmedEmail }] : []),
+          { guestName: trimmedName },
+        ],
+      },
+      orderBy: { updatedAt: 'desc' },
+      include: { messages: { orderBy: { createdAt: 'asc' } } },
+    });
+
+    if (existingOpen) {
+      return existingOpen;
+    }
+
+    // 2. Auto-close any orphaned empty chats (0 messages) for this user to keep admin list clean
+    await this.prisma.supportChat.updateMany({
+      where: {
+        status: 'open',
+        OR: [
+          ...(trimmedEmail ? [{ guestEmail: trimmedEmail }] : []),
+          { guestName: trimmedName },
+        ],
+        messages: { none: {} },
+      },
+      data: { status: 'closed' },
+    });
+
+    // 3. Create fresh chat session
     return this.prisma.supportChat.create({
-      data: { guestName, guestEmail, orderRef },
+      data: { guestName: trimmedName, guestEmail: trimmedEmail, orderRef },
       include: { messages: true },
     });
   }
@@ -67,6 +101,17 @@ export class SupportService {
   }
 
   async getAllChats() {
+    // Auto-close empty orphaned open chats older than 5 minutes
+    const fiveMinsAgo = new Date(Date.now() - 5 * 60 * 1000);
+    await this.prisma.supportChat.updateMany({
+      where: {
+        status: 'open',
+        createdAt: { lt: fiveMinsAgo },
+        messages: { none: {} },
+      },
+      data: { status: 'closed' },
+    });
+
     return this.prisma.supportChat.findMany({
       orderBy: { updatedAt: 'desc' },
       include: { messages: { orderBy: { createdAt: 'desc' }, take: 1 } },

@@ -1,6 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
-import Script from "next/script";
 import { Geist, Geist_Mono, Inter, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "../context/auth-context";
@@ -49,12 +47,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html
@@ -62,11 +59,9 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${plusJakartaSans.variable} h-full antialiased overflow-x-hidden`}
       suppressHydrationWarning
     >
-      <head>
-        <Script
+      <body className="min-h-full flex flex-col overflow-x-hidden w-full m-0 p-0">
+        <script
           id="ts-theme-enforce"
-          nonce={nonce}
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -79,8 +74,6 @@ export default async function RootLayout({
             `
           }}
         />
-      </head>
-      <body className="min-h-full flex flex-col overflow-x-hidden w-full m-0 p-0">
         <AuthProvider>
           <CartProvider>
             <Navbar />

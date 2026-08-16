@@ -73,6 +73,9 @@ export default function AccordionGallery({
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const pauseTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => { setIsMounted(true); }, []);
+
   // Per-tile image load state — shows a shimmer until the image paints, and a
   // plain icon (never a broken-image glyph) if there's no image or it fails to load.
   const [loadedIdx, setLoadedIdx] = useState<Set<number>>(new Set());
@@ -160,7 +163,9 @@ export default function AccordionGallery({
             onMouseEnter={() => handleHover(index)}
             onClick={() => handleTileClick(index)}
             style={{
-              flex: `${currentFlex} 1 0%`,
+              flexGrow: currentFlex,
+              flexShrink: 1,
+              flexBasis: "0%",
               borderRadius: `${radius}px`,
               transition: `flex ${duration}s cubic-bezier(0.25, 1, 0.5, 1), filter ${duration}s cubic-bezier(0.25, 1, 0.5, 1)`,
             }}
@@ -185,12 +190,10 @@ export default function AccordionGallery({
                     sizes="(max-width: 768px) 100vw, 20vw"
                     priority={index === 0}
                     ref={(el) => {
-                      // On client-side route transitions the browser can serve this image
-                      // from cache before React's onLoad listener is attached, so `load`
-                      // never fires and the tile stays stuck invisible even though the
-                      // image is fully decoded. Catch that case as soon as the node mounts.
-                      if (el && el.complete && el.naturalWidth > 0) {
-                        setLoadedIdx((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+                      if (isMounted && el && el.complete && el.naturalWidth > 0) {
+                        requestAnimationFrame(() => {
+                          setLoadedIdx((prev) => (prev.has(index) ? prev : new Set(prev).add(index)));
+                        });
                       }
                     }}
                     onLoad={() => setLoadedIdx((prev) => new Set(prev).add(index))}

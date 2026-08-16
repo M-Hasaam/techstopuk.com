@@ -118,22 +118,66 @@ export default function RepairPage() {
     contact: { name: "", email: "", phone: "", address: "", postcode: "" },
   });
 
-  const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>([]);
-  const [catFallbackImages, setCatFallbackImages] = useState<Record<string, string>>({});
-  const [stores, setStores] = useState<Store[]>([]);
+  const [catalogCats, setCatalogCats] = useState<CatalogCategory[]>(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_repair_cats");
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return [
+      { id: "cat-phone", name: "Phones", slug: "phones", isActive: true, isRepairable: true, icon: "Phone", description: "iPhones, Samsung Galaxy & Google Pixel" } as any,
+      { id: "cat-tablet", name: "Tablets", slug: "tablets", isActive: true, isRepairable: true, icon: "Tablet", description: "iPads, Galaxy Tabs & Surface Tablets" } as any,
+      { id: "cat-laptop", name: "Laptops", slug: "laptops", isActive: true, isRepairable: true, icon: "Laptop", description: "MacBooks, Windows Laptops & Chromebooks" } as any,
+      { id: "cat-gaming", name: "Gaming", slug: "gaming", isActive: true, isRepairable: true, icon: "Gamepad2", description: "PlayStation, Xbox, Nintendo & Handhelds" } as any,
+    ];
+  });
+  const [catFallbackImages, setCatFallbackImages] = useState<Record<string, string>>(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_repair_cat_imgs");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return {};
+  });
+  const [stores, setStores] = useState<Store[]>(() => {
+    try {
+      const cached = sessionStorage.getItem("ts_stores_cache");
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return [];
+  });
+
   useEffect(() => {
+    try {
+      const cachedCats = sessionStorage.getItem("ts_repair_cats");
+      if (cachedCats) setCatalogCats(JSON.parse(cachedCats));
+      const cachedImgs = sessionStorage.getItem("ts_repair_cat_imgs");
+      if (cachedImgs) setCatFallbackImages(JSON.parse(cachedImgs));
+      const cachedStores = sessionStorage.getItem("ts_stores_cache");
+      if (cachedStores) setStores(JSON.parse(cachedStores));
+    } catch {}
+
     catalogApi.listCategories()
       .then(cats => {
         const active = cats.filter(c => c.isActive !== false);
         const displayCats = active.length > 0 ? active : cats;
         setCatalogCats(displayCats);
+        try { sessionStorage.setItem("ts_repair_cats", JSON.stringify(displayCats)); } catch {}
+
         displayCats.forEach(c => {
           productsApi.list({ category: c.name, limit: 12 })
             .then(r => {
               const pool = r.items.flatMap(p => p.images ?? []);
               if (c.image) pool.push(c.image);
               const img = pool[Math.floor(Math.random() * pool.length)];
-              if (img) setCatFallbackImages(prev => ({ ...prev, [c.slug]: img }));
+              if (img) {
+                setCatFallbackImages(prev => {
+                  const next = { ...prev, [c.slug]: img };
+                  try { sessionStorage.setItem("ts_repair_cat_imgs", JSON.stringify(next)); } catch {}
+                  return next;
+                });
+              }
             })
             .catch(() => {});
         });
@@ -144,7 +188,6 @@ export default function RepairPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitRef, setSubmitRef] = useState("");
   const [submitError, setSubmitError] = useState("");
-
 
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
@@ -198,7 +241,12 @@ export default function RepairPage() {
       }
     }
 
-    storesApi.list().then(setStores).catch(() => {});
+    storesApi.list()
+      .then(s => {
+        setStores(s);
+        try { sessionStorage.setItem("ts_stores_cache", JSON.stringify(s)); } catch {}
+      })
+      .catch(() => {});
   }, []);
 
   // Auto-open wizard once auth resolves and there is a pending repair device.
@@ -289,28 +337,48 @@ export default function RepairPage() {
         const previewUrl = canvas.toDataURL("image/jpeg", 0.75);
         canvas.toBlob(blob => resolve({ blob: blob!, previewUrl }), "image/jpeg", 0.75);
       };
+      img.onerror = () => {
+        resolve({ blob: file, previewUrl: url });
+      };
       img.src = url;
     });
   }
 
+  const getImageSrc = (img: { previewUrl?: string; filePath?: string }) => {
+    const src = img.previewUrl || img.filePath || "";
+    if (!src) return "";
+    if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("http")) return src;
+    return `${API_URL}${src.startsWith("/") ? "" : "/"}${src}`;
+  };
+
   async function handleImageFiles(files: File[]) {
     if (files.length === 0) return;
-    setImageUploading(true);
-    try {
-      const results = await Promise.all(
-        files.slice(0, 6 - images.length).map(async (file) => {
-          const { blob, previewUrl } = await compressToBlob(file);
-          const uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-          const { filePath } = await uploadsApi.repairImage(uploadFile, batchId);
-          return { filePath, previewUrl };
-        })
-      );
-      setImages(prev => [...prev, ...results].slice(0, 6));
-    } catch {
-      // silently ignore upload errors
-    } finally {
-      setImageUploading(false);
-    }
+    const availableSlots = 6 - images.length;
+    if (availableSlots <= 0) return;
+
+    const validFiles = files.slice(0, availableSlots);
+
+    // 1. Instantly create local object URLs and add to state for zero-lag shutter response
+    const instantItems = validFiles.map(file => {
+      const previewUrl = URL.createObjectURL(file);
+      return { file, previewUrl, filePath: previewUrl };
+    });
+
+    setImages(prev => [...prev, ...instantItems.map(i => ({ filePath: i.filePath, previewUrl: i.previewUrl }))].slice(0, 6));
+
+    // 2. Compress and upload to storage asynchronously in the background
+    instantItems.forEach(async (item) => {
+      try {
+        const { blob, previewUrl: compressedPreview } = await compressToBlob(item.file);
+        const uploadFile = new File([blob], item.file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+        const res = await uploadsApi.repairImage(uploadFile, batchId);
+        const finalUrl = res?.presignedUrl || res?.filePath || compressedPreview || item.previewUrl;
+        
+        setImages(prev => prev.map(img => img.previewUrl === item.previewUrl ? { ...img, filePath: finalUrl, previewUrl: finalUrl } : img));
+      } catch (err) {
+        console.warn("Background repair photo upload failed, retaining local preview:", err);
+      }
+    });
   }
 
   const guardedOpen = (action: () => void) => {
@@ -1022,7 +1090,7 @@ export default function RepairPage() {
                                     <div className="grid grid-cols-3 gap-2">
                                       {images.map((img, i) => (
                                         <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-zinc-200">
-                                          <img src={img.previewUrl} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
+                                          <img src={getImageSrc(img)} alt={`Preview ${i + 1}`} className="w-full h-full object-cover" />
                                           <button
                                             type="button"
                                             onClick={() => setImages(prev => prev.filter((_, idx) => idx !== i))}

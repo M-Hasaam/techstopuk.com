@@ -196,7 +196,14 @@ export default function HelpPage() {
 
   useEffect(() => { setIsMounted(true); }, []);
 
-
+  useEffect(() => {
+    if (drawerType) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [drawerType]);
 
   useEffect(() => {
     fetch(`${API_URL}/support/helplines`)
@@ -234,12 +241,15 @@ export default function HelpPage() {
     socket.on("connect", () => { setChatConnected(true); socket.emit("joinChat", id); });
     socket.on("disconnect", () => setChatConnected(false));
     socket.on("chatHistory", (chat: { messages: ChatMsg[] }) => {
-      setChatMessages(chat.messages ?? []);
+      if (chat && Array.isArray(chat.messages) && chat.messages.length > 0) {
+        setChatMessages(chat.messages);
+      }
     });
     socket.on("newMessage", (msg: ChatMsg) => {
       setChatMessages(prev => [...prev, msg]);
     });
     socket.on("chatClosed", () => {
+      try { sessionStorage.removeItem("ts_active_chat_id"); } catch {}
       setChatMessages(prev => [...prev, { sender: "bot", body: "This chat has been closed by our team. Thank you for contacting TechStop!" } as ChatMsg]);
     });
   }, []);
@@ -247,6 +257,14 @@ export default function HelpPage() {
   async function startChatSession(name: string, email: string, orderRef?: string) {
     setChatStarting(true);
     try {
+      const savedChatId = typeof window !== "undefined" ? sessionStorage.getItem("ts_active_chat_id") : null;
+      if (savedChatId) {
+        setChatId(savedChatId);
+        setChatStep("chat");
+        connectSocket(savedChatId);
+        return;
+      }
+
       const res = await fetch(`${API_URL}/support/chats`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -254,8 +272,13 @@ export default function HelpPage() {
       });
       const chat = await res.json();
       setChatId(chat.id);
+      try { sessionStorage.setItem("ts_active_chat_id", chat.id); } catch {}
       setChatStep("chat");
-      setChatMessages([{ sender: "bot", body: `Hi ${name}! You're now connected to our support team. Please describe your issue and an agent will be with you shortly.` } as ChatMsg]);
+      setChatMessages(
+        chat.messages && chat.messages.length > 0
+          ? chat.messages
+          : [{ sender: "bot", body: `Hi ${name}! You're now connected to our support team. Please describe your issue and our team will be with you shortly.` } as ChatMsg]
+      );
       connectSocket(chat.id);
     } catch {
       alert("Could not start chat. Please try again.");
@@ -409,55 +432,82 @@ export default function HelpPage() {
       <main className="flex-1 relative pb-20">
 
         {/* Hero */}
-        <section className="relative pt-32 pb-20 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-950 dark:bg-black overflow-hidden">
+        <section className="relative pt-24 lg:pt-28 pb-16 lg:pb-24 border-b border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-950 dark:bg-black overflow-hidden">
           {/* Ambient Mesh Gradient Background */}
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div className="absolute w-[600px] h-[600px] bg-red-600/20 blur-[120px] rounded-full top-[-10%] opacity-60" />
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay" />
           </div>
 
-          <div className="relative z-10 mx-auto max-w-5xl px-4 text-center flex flex-col items-center">
+          <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center text-left">
+              
+              {/* Left Column: Headlines and Buttons */}
+              <div className="lg:col-span-7 min-w-0 flex flex-col items-start">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6 backdrop-blur-sm">
+                  <Circle className="h-2 w-2 fill-emerald-400 text-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest">Live support · within 24 hours</span>
+                </div>
 
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 mb-6 backdrop-blur-sm">
-              <Circle className="h-2 w-2 fill-emerald-400 text-emerald-400 animate-pulse" />
-              <span className="text-[11px] font-bold text-zinc-300 uppercase tracking-widest">Live support · within 24 hours</span>
-            </div>
+                <h1 className="font-sans text-4xl sm:text-5xl lg:text-6xl font-black tracking-tighter text-white mb-6 leading-tight uppercase">
+                  How can we <span className="font-serif italic font-light lowercase text-red-500 tracking-normal">help?</span>
+                </h1>
+                
+                <p className="text-zinc-400 font-medium mb-8 max-w-xl text-sm sm:text-base md:text-lg leading-relaxed">
+                  Experience lightning-fast support. Whether you need to track an order, process a return, or get technical advice, our team is ready.
+                </p>
 
-            <h1 className="font-sans text-[clamp(2.5rem,6vw,4rem)] font-black tracking-tighter text-white mb-8 drop-shadow-sm uppercase">
-              How can we <span className="font-serif italic font-light lowercase text-red-500 tracking-normal">help?</span>
-            </h1>
-            
-            <p className="text-zinc-400 font-medium mb-12 max-w-xl mx-auto text-base md:text-lg leading-relaxed">
-              Experience lightning-fast support. Whether you need to track an order, process a return, or get technical advice, our team is ready.
-            </p>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3.5 mb-2 w-full max-w-xl">
+                  <button
+                    onClick={handleOpenChat}
+                    className="w-full sm:flex-1 h-14 sm:h-15 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-black rounded-2xl flex items-center justify-center gap-3 transition-all text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-red-950/40 border border-red-500/30 hover:scale-[1.02] active:scale-[0.98] shrink-0"
+                  >
+                    <MessageCircle className="h-5 w-5" strokeWidth={2.5} />
+                    <span>Start Live Chat</span>
+                  </button>
 
-            <div className="flex flex-wrap items-center justify-center gap-4 mb-8 w-full max-w-2xl">
-              <button
-                onClick={handleOpenChat}
-                className="group relative h-16 flex-1 min-w-[250px] bg-white text-zinc-950 hover:bg-zinc-200 font-black rounded-2xl flex items-center justify-center gap-3 transition-all text-sm uppercase tracking-widest shadow-xl hover:-translate-y-1 overflow-hidden"
-              >
-                <div className="absolute inset-0 bg-gradient-to-r from-red-600 to-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <MessageCircle className="h-5 w-5 relative z-10 group-hover:text-white transition-colors duration-300" />
-                <span className="relative z-10 group-hover:text-white transition-colors duration-300">Start Live Chat</span>
-              </button>
+                  {(helplines.length > 0 ? helplines : [
+                    { id: "leicester-store-helpline", label: "LEICESTER STORE HELPLINE", number: "+447343055398" }
+                  ]).map((hl) => (
+                    <a
+                      key={hl.id}
+                      href={`tel:${hl.number.replace(/\s/g, "")}`}
+                      className="w-full sm:flex-1 h-14 sm:h-15 rounded-2xl border border-white/15 bg-white/10 hover:bg-white/15 transition-all shadow-md flex items-center justify-center gap-3.5 px-4 hover:scale-[1.02] active:scale-[0.98] shrink-0"
+                    >
+                      <div className="h-9 w-9 rounded-xl bg-white/15 flex items-center justify-center text-white shrink-0">
+                        <Phone className="h-4 w-4" strokeWidth={2.5} />
+                      </div>
+                      <div className="text-left flex flex-col justify-center min-w-0">
+                        <span className="text-[9px] text-zinc-300 font-bold uppercase tracking-wider leading-none mb-1 truncate">{hl.label}</span>
+                        <span className="font-extrabold text-xs sm:text-sm text-white uppercase tracking-wider leading-none truncate">{hl.number}</span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
 
-              {helplines.map((hl) => (
-                <a
-                  key={hl.id}
-                  href={`tel:${hl.number.replace(/\s/g, "")}`}
-                  className="group relative h-16 flex-1 min-w-[250px] rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl hover:bg-white/10 hover:border-white/20 transition-all shadow-xl hover:-translate-y-1 overflow-hidden flex items-center justify-center gap-4 px-6"
-                >
-                  <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors duration-300">
-                    <Phone className="h-4 w-4 text-zinc-300 group-hover:text-white transition-colors" />
+              {/* Right Column: High-tech 3D Customer Support Hero Image */}
+              <div className="lg:col-span-5 relative flex justify-center items-center mt-6 lg:mt-0">
+                <div className="relative w-full max-w-md aspect-[4/3] rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl bg-zinc-900 group">
+                  <img
+                    src="/images/help_hero_support.png"
+                    alt="TechStop Customer Support"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent" />
+                  <div className="absolute bottom-4 left-4 right-4 p-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-500 shrink-0">
+                      <ShieldCheck className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 text-left">
+                      <p className="text-xs font-black text-white uppercase tracking-wider">24/7 Expert Support</p>
+                      <p className="text-[11px] font-semibold text-zinc-400 truncate">Dedicated UK Customer Service Team</p>
+                    </div>
                   </div>
-                  <div className="text-left flex flex-col justify-center min-w-0">
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-[0.2em] leading-none mb-1 group-hover:text-red-200 transition-colors truncate">{hl.label}</span>
-                    <span className="font-bold text-sm text-white uppercase tracking-wider leading-none truncate">{hl.number}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
+                </div>
+              </div>
 
+            </div>
           </div>
         </section>
 
@@ -666,43 +716,54 @@ export default function HelpPage() {
         </section>
 
         {/* Premium Support CTA (Contacts) */}
-        <section className="py-24 relative overflow-hidden bg-zinc-950 dark:bg-black rounded-[3rem] my-12 mx-4 lg:mx-auto max-w-6xl shadow-2xl">
-          <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <div className="absolute w-[600px] h-[600px] bottom-[-20%] left-[-10%] bg-red-600/20 blur-[120px] rounded-full" />
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay" />
-          </div>
+        <section className="py-10 md:py-16 relative overflow-hidden my-10 px-4 sm:px-6 w-full flex justify-center items-center">
+          <div className="relative bg-[#120808] border border-red-950/60 p-6 sm:p-9 rounded-[2.25rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden text-center max-w-md w-full min-w-0 mx-auto">
+            {/* Red Ambient Glow inside container */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-red-600/20 blur-[90px] rounded-full pointer-events-none" />
 
-          <div className="mx-auto max-w-4xl px-4 relative z-10 text-center">
-            <h2 className="font-sans text-4xl font-black tracking-tighter text-white mb-4 uppercase">
-              Still need <span className="text-red-500">assistance?</span>
-            </h2>
-            <p className="text-zinc-400 font-semibold mb-12 max-w-xl mx-auto text-sm md:text-base">
-              Our support team is available around the clock to help you with any issues, large or small.
-            </p>
+            <div className="relative z-10">
+              <h2 className="font-sans text-2xl sm:text-4xl font-black tracking-tight text-white mb-2 leading-none uppercase">
+                STILL NEED <br />
+                <span className="text-red-500 font-extrabold">ASSISTANCE?</span>
+              </h2>
+              <p className="text-zinc-400 font-medium text-xs sm:text-sm mb-6 sm:mb-8 leading-relaxed max-w-xs mx-auto">
+                Our support team is available around the clock to help you with any issues, large or small.
+              </p>
 
-            <div className="grid md:grid-cols-2 gap-4 max-w-3xl mx-auto text-left">
-              {supportEmail && (
-                <a href={`mailto:${supportEmail}`} className="group relative bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem] hover:bg-white/10 hover:border-white/20 transition-all duration-300 flex items-center gap-5">
-                  <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-red-500 transition-all shadow-lg">
-                    <Mail className="h-5 w-5" />
+              <div className="space-y-3 sm:space-y-3.5 text-left">
+                <a
+                  href={`mailto:${supportEmail || "techstopuk@outlook.com"}`}
+                  className="w-full bg-[#201010]/80 hover:bg-[#2a1414] border border-red-900/30 hover:border-red-600/40 p-3.5 sm:p-4.5 rounded-2xl transition-all duration-300 flex items-center gap-3.5 sm:gap-4 group shadow-lg"
+                >
+                  <div className="h-10 sm:h-11 w-10 sm:w-11 rounded-xl bg-white/10 group-hover:bg-red-600 flex items-center justify-center text-white shrink-0 transition-all">
+                    <Mail className="h-4 sm:h-5 w-4 sm:w-5" />
                   </div>
-                  <div>
-                    <p className="text-[10px] text-white/50 font-black uppercase tracking-widest mb-1">Email Support</p>
-                    <p className="text-lg font-black text-white">{supportEmail}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] sm:text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">EMAIL SUPPORT</p>
+                    <p className="text-xs sm:text-base font-bold text-white truncate group-hover:text-red-400 transition-colors">
+                      {supportEmail || "techstopuk@outlook.com"}
+                    </p>
                   </div>
                 </a>
-              )}
-              {helplines.map((hl) => (
-                <a key={hl.id} href={`tel:${hl.number.replace(/\s/g, "")}`} className="group relative bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem] hover:bg-white/10 hover:border-white/20 transition-all duration-300 flex items-center gap-5">
-                  <div className="h-12 w-12 rounded-xl bg-white/10 flex items-center justify-center text-white group-hover:scale-110 group-hover:bg-red-500 transition-all shadow-lg">
-                    <Phone className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-white/50 font-black uppercase tracking-widest mb-1">{hl.label}</p>
-                    <p className="text-lg font-black text-white">{hl.number}</p>
-                  </div>
-                </a>
-              ))}
+
+                {(helplines.length > 0 ? helplines : [
+                  { id: "leicester-store-helpline", label: "LEICESTER STORE HELPLINE", number: "+447343055398" }
+                ]).map((hl) => (
+                  <a
+                    key={hl.id}
+                    href={`tel:${hl.number.replace(/\s/g, "")}`}
+                    className="w-full bg-[#201010]/80 hover:bg-[#2a1414] border border-red-900/30 hover:border-red-600/40 p-3.5 sm:p-4.5 rounded-2xl transition-all duration-300 flex items-center gap-3.5 sm:gap-4 group shadow-lg"
+                  >
+                    <div className="h-10 sm:h-11 w-10 sm:w-11 rounded-xl bg-white/10 group-hover:bg-red-600 flex items-center justify-center text-white shrink-0 transition-all">
+                      <Phone className="h-4 sm:h-5 w-4 sm:w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[9px] sm:text-[10px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">{hl.label.toUpperCase()}</p>
+                      <p className="text-xs sm:text-base font-bold text-white truncate group-hover:text-red-400 transition-colors">{hl.number}</p>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -824,10 +885,15 @@ export default function HelpPage() {
             >
               <div className="p-6 border-b border-zinc-200/50 dark:border-zinc-800/50 flex items-center justify-between bg-zinc-50/50 dark:bg-zinc-900/30">
                 <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-[1.25rem] flex items-center justify-center shadow-lg shadow-zinc-900/10">
-                    {drawerType === "article" && <HelpCircle className="h-6 w-6" />}
-                    {drawerType === "chat" && <MessageCircle className="h-6 w-6" />}
-                  </div>
+                  {drawerType === "chat" ? (
+                    <div className="h-16 w-16 rounded-2xl overflow-hidden shadow-xl border border-white/20 shrink-0 bg-zinc-900 ring-2 ring-red-500/20">
+                      <img src="/images/help_live_chat.png" alt="Support Chat" className="w-full h-full object-cover scale-115" />
+                    </div>
+                  ) : (
+                    <div className="h-14 w-14 bg-zinc-950 dark:bg-white text-white dark:text-zinc-950 rounded-2xl flex items-center justify-center shadow-lg shadow-zinc-900/10">
+                      <HelpCircle className="h-6 w-6" />
+                    </div>
+                  )}
                   <div className="text-left">
                     <h3 className="font-black text-lg text-zinc-950 dark:text-white tracking-tight">
                       {drawerType === "article" && "Help Guide"}
@@ -960,15 +1026,20 @@ export default function HelpPage() {
                     )}
 
                     {/* Still need help? */}
-                    <div className="mt-8 p-5 rounded-2xl bg-zinc-950 dark:bg-zinc-900 border border-zinc-800">
-                      <p className="text-sm font-black text-white mb-1">Still need help?</p>
-                      <p className="text-xs text-zinc-400 font-semibold mb-4">Our support team typically responds within 24 hours.</p>
-                      <button
-                        onClick={() => setDrawerType("chat")}
-                        className="flex items-center gap-2 px-5 py-2.5 bg-white text-zinc-950 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-zinc-200 transition-colors"
-                      >
-                        <MessageCircle className="h-3.5 w-3.5" /> Start Live Chat
-                      </button>
+                    <div className="mt-8 p-5 rounded-2xl bg-zinc-950 dark:bg-zinc-900 border border-zinc-800 flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-black text-white mb-1">Still need help?</p>
+                        <p className="text-xs text-zinc-400 font-semibold mb-3">Our support team typically responds within 24 hours.</p>
+                        <button
+                          onClick={() => setDrawerType("chat")}
+                          className="flex items-center gap-2 px-4 py-2 bg-white text-zinc-950 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-zinc-200 transition-colors"
+                        >
+                          <MessageCircle className="h-3.5 w-3.5" /> Start Live Chat
+                        </button>
+                      </div>
+                      <div className="h-16 w-16 rounded-xl overflow-hidden shrink-0 border border-white/10 shadow-md bg-zinc-800 hidden sm:block">
+                        <img src="/images/help_live_chat.png" alt="Live Chat" className="w-full h-full object-cover" />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -980,11 +1051,15 @@ export default function HelpPage() {
                     {chatStep === "form" && (
                       <form onSubmit={handleStartChat} className="space-y-4 max-w-sm mx-auto pt-4">
                         <div className="text-center mb-6">
-                          <div className="h-14 w-14 rounded-2xl bg-zinc-950 dark:bg-zinc-800 flex items-center justify-center mx-auto mb-3">
-                            <MessageCircle className="h-6 w-6 text-accent" />
+                          <div className="relative w-20 h-20 mx-auto mb-3 rounded-2xl overflow-hidden shadow-xl border border-white/10 bg-zinc-900 group">
+                            <img
+                              src="/images/help_live_chat.png"
+                              alt="Live Support"
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
                           </div>
-                          <h3 className="font-bold text-zinc-950 dark:text-white text-lg">Start a live chat</h3>
-                          <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">Our team typically responds within 24 hours.</p>
+                          <h3 className="font-extrabold text-zinc-950 dark:text-white text-xl">Start a live chat</h3>
+                          <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-1 font-semibold">Our team typically responds within 24 hours.</p>
                         </div>
                         {chatOrderRef && (
                           <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700">
@@ -1030,18 +1105,22 @@ export default function HelpPage() {
                         <div className="flex items-center gap-2 mb-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
                           <Circle className={`h-2 w-2 ${chatConnected ? "fill-emerald-500 text-emerald-500" : "fill-zinc-300 text-zinc-300"}`} />
                           <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-                            {chatConnected ? "Connected · Agent will respond shortly" : "Connecting…"}
+                            {chatConnected ? "Connected · Support team will respond shortly" : "Connecting…"}
                           </span>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        <div className="flex-1 overflow-y-auto space-y-4 pr-1 overscroll-contain touch-pan-y">
                           {chatMessages.map((msg, i) => {
                             const isCustomer = msg.sender === "customer";
                             const body = msg.body ?? msg.text ?? "";
                             return (
                               <div key={msg.id ?? i} className={`flex ${isCustomer ? "justify-end" : "justify-start"}`}>
                                 <div className={`flex gap-3 max-w-[85%] ${isCustomer ? "flex-row-reverse" : "flex-row"}`}>
-                                  <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-black ${isCustomer ? "bg-zinc-800 text-white" : "bg-accent text-white"}`}>
-                                    {isCustomer ? <User className="h-4 w-4" /> : "TS"}
+                                  <div className="h-8 w-8 rounded-full overflow-hidden shrink-0 border border-white/10 shadow-sm bg-zinc-800 flex items-center justify-center text-xs font-black text-white">
+                                    {isCustomer ? (
+                                      <User className="h-4 w-4" />
+                                    ) : (
+                                      <img src="/images/help_live_chat.png" alt="TS" className="w-full h-full object-cover" />
+                                    )}
                                   </div>
                                   <div className={`p-4 rounded-2xl text-xs md:text-sm font-semibold leading-relaxed ${isCustomer ? "bg-black dark:bg-zinc-800 text-white rounded-tr-none" : "bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-tl-none border border-zinc-200 dark:border-zinc-800"}`}>
                                     {body}

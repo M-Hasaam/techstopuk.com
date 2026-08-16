@@ -682,7 +682,7 @@ export default function Navbar() {
                               <motion.div
                                 layoutId="activeCategoryTab"
                                 className="absolute inset-0 bg-accent rounded-full -z-10 shadow-sm"
-                                transition={{ type: "spring", stiffness: 300, damping: 30, mass: 0.8 }}
+                                transition={{ type: "tween", duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
                               />
                             )}
                             {label}
@@ -863,9 +863,8 @@ export default function Navbar() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="lg:hidden fixed inset-x-0 z-40 bg-black/40"
-              style={{ top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }}
+              transition={{ duration: 0.22, ease: "linear" }}
+              className="lg:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
               onClick={() => setIsOpen(false)}
             />
             <motion.div
@@ -873,9 +872,9 @@ export default function Navbar() {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="lg:hidden fixed left-0 z-50 w-[82%] max-w-xs border-r border-b border-white/10 bg-[#0a0a0a] overflow-y-auto text-white shadow-2xl will-change-transform"
-              style={{ top: headerHeight, height: `calc(100vh - ${headerHeight}px)` }}
+              transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:hidden fixed top-0 bottom-0 left-0 z-50 w-[82%] max-w-xs border-r border-white/10 bg-[#0a0a0a] overflow-y-auto text-white shadow-2xl"
+              style={{ transform: "translateZ(0)", willChange: "transform" }}
             >
             <div className="px-4 py-6 space-y-1 flex flex-col min-h-full">
               {/* Close Button Header */}
