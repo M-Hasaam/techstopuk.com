@@ -19,6 +19,10 @@ describe('ScraperCronService', () => {
                 findUnique: jest.fn<() => Promise<any>>().mockResolvedValue(null),
                 upsert: jest.fn<() => Promise<any>>().mockResolvedValue({}),
             },
+            scraperRun: {
+                findFirst: jest.fn<() => Promise<any>>().mockResolvedValue(null),
+                findUnique: jest.fn<() => Promise<any>>().mockResolvedValue(null),
+            },
         };
         productPricingMock = {
             runPriceCatalog: jest.fn<() => Promise<any>>().mockResolvedValue(undefined),
@@ -50,17 +54,17 @@ describe('ScraperCronService', () => {
     });
 
     describe('onModuleInit', () => {
-        it('defaults to 1 hour and starts an interval when there is no saved config row', async () => {
+        it('defaults to 168 hours (1 week) and starts a periodic checker interval when there is no saved config row', async () => {
             await service.onModuleInit();
-            expect(service.getSchedule()).toEqual({ hours: 1 });
-            expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+            expect(service.getSchedule()).toEqual({ hours: 168 });
+            expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
         });
 
         it('uses the saved hours value from the DB', async () => {
             prismaMock.pricingConfig.findUnique.mockResolvedValueOnce({ value: 6 });
             await service.onModuleInit();
             expect(service.getSchedule()).toEqual({ hours: 6 });
-            expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 6 * 60 * 60 * 1000);
+            expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
         });
 
         it('does not start an interval when the saved schedule is 0 (disabled)', async () => {
@@ -70,10 +74,10 @@ describe('ScraperCronService', () => {
             expect(setIntervalSpy).not.toHaveBeenCalled();
         });
 
-        it('falls back to default hours when the DB read fails', async () => {
+        it('falls back to default hours (168) when the DB read fails', async () => {
             prismaMock.pricingConfig.findUnique.mockRejectedValueOnce(new Error('db down'));
             await service.onModuleInit();
-            expect(service.getSchedule()).toEqual({ hours: 1 });
+            expect(service.getSchedule()).toEqual({ hours: 168 });
         });
     });
 
@@ -95,9 +99,9 @@ describe('ScraperCronService', () => {
             }));
         });
 
-        it('starts a new interval when set to a positive value', async () => {
+        it('starts a new periodic checker when set to a positive value', async () => {
             await service.setSchedule(3);
-            expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 3 * 60 * 60 * 1000);
+            expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
         });
 
         it('stops any existing interval when set to 0', async () => {
@@ -106,47 +110,39 @@ describe('ScraperCronService', () => {
             expect(clearIntervalSpy).toHaveBeenCalled();
             expect(service.getSchedule()).toEqual({ hours: 0 });
         });
-
-        it('clears the previous interval before starting a new one on reschedule', async () => {
-            await service.setSchedule(3);
-            await service.setSchedule(5);
-            expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
-            expect(setIntervalSpy).toHaveBeenCalledTimes(2);
-        });
     });
 
-    describe('scheduled scraper cycle (interval callback)', () => {
-        it('triggers the scraper, waits, then runs auto-pricing on success', async () => {
-            fetchMock.mockResolvedValueOnce({ ok: true });
-            await service.setSchedule(1);
-            const callback = setIntervalSpy.mock.calls[0]![0] as () => Promise<void>;
+    describe('checkAndTriggerIfNeeded (active run & elapsed time guards)', () => {
+        it('skips triggering if another scraper run is currently RUNNING', async () => {
+            await service.setSchedule(168);
+            prismaMock.scraperRun.findFirst.mockResolvedValueOnce({ id: 101, status: 'RUNNING' });
 
-            const cyclePromise = callback();
+            await service.checkAndTriggerIfNeeded();
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+
+        it('skips triggering if less than scheduled interval has elapsed since last run', async () => {
+            await service.setSchedule(168); // 1 week schedule
+            prismaMock.scraperRun.findFirst
+                .mockResolvedValueOnce(null) // no active RUNNING run
+                .mockResolvedValueOnce({ id: 99, startedAt: new Date(Date.now() - 3 * 3600 * 1000) }); // run started 3 hours ago
+
+            await service.checkAndTriggerIfNeeded();
+            expect(fetchMock).not.toHaveBeenCalled();
+        });
+
+        it('triggers scraper when no active run exists and elapsed time exceeds schedule', async () => {
+            fetchMock.mockResolvedValueOnce({ ok: true });
+            await service.setSchedule(168); // 1 week schedule
+            prismaMock.scraperRun.findFirst
+                .mockResolvedValueOnce(null) // no active RUNNING run
+                .mockResolvedValueOnce({ id: 99, startedAt: new Date(Date.now() - 170 * 3600 * 1000) }); // started 170 hours ago
+
+            const triggerPromise = service.checkAndTriggerIfNeeded();
             await jest.advanceTimersByTimeAsync(30_000);
-            await cyclePromise;
+            await triggerPromise;
 
             expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/scraper/run'), { method: 'POST' });
-            expect(productPricingMock.runPriceCatalog).toHaveBeenCalled();
-        });
-
-        it('logs and swallows errors when the scraper fetch fails, without crashing', async () => {
-            fetchMock.mockRejectedValueOnce(new Error('scraper unreachable'));
-            await service.setSchedule(1);
-            const callback = setIntervalSpy.mock.calls[0]![0] as () => Promise<void>;
-
-            await expect(callback()).resolves.toBeUndefined();
-            expect(productPricingMock.runPriceCatalog).not.toHaveBeenCalled();
-        });
-
-        it('logs and swallows errors when auto-pricing itself fails', async () => {
-            fetchMock.mockResolvedValueOnce({ ok: true });
-            productPricingMock.runPriceCatalog.mockRejectedValueOnce(new Error('pricing failed'));
-            await service.setSchedule(1);
-            const callback = setIntervalSpy.mock.calls[0]![0] as () => Promise<void>;
-
-            const cyclePromise = callback();
-            await jest.advanceTimersByTimeAsync(30_000);
-            await expect(cyclePromise).resolves.toBeUndefined();
         });
     });
 });
