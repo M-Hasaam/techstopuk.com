@@ -27,14 +27,9 @@ const storageOrigin = process.env.GARAGE_PUBLIC_URL
   : "https://storage.techstopuk.com";
 
 function buildCsp(nonce: string): string {
-  const isDev = process.env.NODE_ENV !== "production";
-
-  // 'unsafe-eval'/'unsafe-inline' here are only for Next's dev-server Fast
-  // Refresh — unrelated to which API URL is configured, so this is the one
-  // directive that's genuinely keyed off NODE_ENV rather than env vars.
-  const scriptSrc = isDev
-    ? `script-src 'self' 'unsafe-eval' 'unsafe-inline' https://js.stripe.com`
-    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://js.stripe.com`;
+  // 'self' + 'unsafe-inline' + 'unsafe-eval' allows Next.js static bundle chunks,
+  // RSC streaming scripts, and Stripe JS to load in production without browser CSP blocks.
+  const scriptSrc = `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com`;
 
   return [
     `default-src 'self'`,
@@ -46,11 +41,11 @@ function buildCsp(nonce: string): string {
     // CSS background URLs don't show up in a source grep the way <img> tags do).
     // blob: is needed for local object-URL previews of user-uploaded photos
     // (trade-in/repair device photo pickers) before the file finishes uploading.
-    `img-src 'self' data: blob: ${storageOrigin} https://picsum.photos https://grainy-gradients.vercel.app`,
+    `img-src 'self' data: blob: ${storageOrigin} https://picsum.photos https://grainy-gradients.vercel.app https://*.techstopuk.com`,
     `font-src 'self'`,
     // storageOrigin is needed here (not just in img-src) because uploads go
     // directly from the browser to storage via a presigned PUT URL.
-    `connect-src 'self' ${apiHttpOrigin} ${apiWsOrigin} ${storageOrigin} https://api.stripe.com`,
+    `connect-src 'self' ${apiHttpOrigin} ${apiWsOrigin} ${storageOrigin} https://api.techstopuk.com wss://api.techstopuk.com https://*.techstopuk.com wss://*.techstopuk.com https://api.stripe.com`,
     // maps.google.com's embed URL redirects to www.google.com/maps/embed —
     // CSP frame-src is checked against the final URL after redirects, so
     // both hosts are needed even though stores are only ever configured

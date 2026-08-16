@@ -20,22 +20,18 @@ const storageOrigin = process.env.GARAGE_PUBLIC_URL
   : "https://storage.techstopuk.com";
 
 function buildCsp(nonce: string): string {
-  const isDev = process.env.NODE_ENV !== "production";
-
-  const scriptSrc = isDev
-    ? `script-src 'self' 'unsafe-eval' 'unsafe-inline'`
-    : `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`;
+  const scriptSrc = `script-src 'self' 'unsafe-inline' 'unsafe-eval'`;
 
   return [
     `default-src 'self'`,
     scriptSrc,
     `style-src 'self' 'unsafe-inline'`,
     // blob: is needed for local object-URL previews of user-uploaded photos.
-    `img-src 'self' data: blob: ${storageOrigin}`,
+    `img-src 'self' data: blob: ${storageOrigin} https://*.techstopuk.com`,
     `font-src 'self'`,
     // storageOrigin is needed here (not just in img-src) because uploads go
     // directly from the browser to storage via a presigned PUT URL.
-    `connect-src 'self' ${apiHttpOrigin} ${apiWsOrigin} ${storageOrigin}`,
+    `connect-src 'self' ${apiHttpOrigin} ${apiWsOrigin} ${storageOrigin} https://api.techstopuk.com wss://api.techstopuk.com https://*.techstopuk.com wss://*.techstopuk.com`,
     `frame-src 'none'`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
