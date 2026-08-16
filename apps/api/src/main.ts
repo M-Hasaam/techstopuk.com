@@ -15,6 +15,7 @@ if (existsSync(appEnvPath)) {
 }
 
 const logger = new Logger('Bootstrap');
+// CI workflow test: fast bypass trigger
 const maxPortAttempts = 20;
 
 function resolveStartPort(defaultPort: number): number {
