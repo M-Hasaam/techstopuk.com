@@ -6,6 +6,10 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+  variables: write
+
 jobs:
   # ----------------------------------------------------
   # 0. DETECT PATH CHANGES
@@ -17,6 +21,7 @@ jobs:
       web: ${{ steps.filter.outputs.web }}
       admin: ${{ steps.filter.outputs.admin }}
       api: ${{ steps.filter.outputs.api }}
+      prisma: ${{ steps.filter.outputs.prisma }}
       scraper: ${{ steps.filter.outputs.scraper }}
     steps:
       - name: Checkout Code
@@ -45,6 +50,8 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'turbo.json'
+            prisma:
+              - 'apps/api/prisma/**'
             scraper:
               - 'apps/scraper/**'
               - 'packages/**'
@@ -54,11 +61,15 @@ jobs:
 
   # ----------------------------------------------------
   # 0.5. PRISMA DB MIGRATION CHECK (~18s)
+  # Smart Logic:
+  # - Only runs if prisma/ folder changed OR RUN_MIGRATION_ALWAYS is true
+  # - If it fails, sets RUN_MIGRATION_ALWAYS=true in GitHub Repo Vars to force future checks
+  # - If it passes, resets RUN_MIGRATION_ALWAYS=false
   # ----------------------------------------------------
   check-migrations:
     name: DB Migration Check
     needs: changes
-    if: needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch'
+    if: (needs.changes.outputs.api == 'true' || github.event_name == 'workflow_dispatch') && (needs.changes.outputs.prisma == 'true' || vars.RUN_MIGRATION_ALWAYS == 'true' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,6 +105,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Check schema is in sync with migrations
+        id: migration_check
         env:
           DATABASE_URL: postgresql://prisma:prisma@localhost:5432/shadow
           SHADOW_DATABASE_URL: postgresql://prisma:prisma@localhost:5432/shadow
@@ -102,6 +114,20 @@ jobs:
             --from-migrations ./prisma/migrations \
             --to-schema ./prisma/schema.prisma \
             --exit-code
+
+      - name: Clear RUN_MIGRATION_ALWAYS flag on success
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh variable set RUN_MIGRATION_ALWAYS --body "false" || echo "Variable update skipped or not created yet"
+
+      - name: Set RUN_MIGRATION_ALWAYS flag on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh variable set RUN_MIGRATION_ALWAYS --body "true" || echo "Variable update skipped or not created yet"
 
   # ----------------------------------------------------
   # 1. WEB APP DEPLOYMENT (apps/web)
