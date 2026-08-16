@@ -82,22 +82,35 @@ export default function CameraCaptureModal({
   function capture() {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
+
+    const MAX_DIM = 1080;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > MAX_DIM || h > MAX_DIM) {
+      if (w > h) { h = Math.round(h * MAX_DIM / w); w = MAX_DIM; }
+      else { w = Math.round(w * MAX_DIM / h); h = MAX_DIM; }
+    }
+
     const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    ctx.drawImage(video, 0, 0, w, h);
+
+    if (continuous) {
+      setFlash(true);
+      setTimeout(() => setFlash(false), 150);
+    }
+
     canvas.toBlob(blob => {
       if (!blob) return;
       onCapture(new File([blob], `capture-${Date.now()}.jpg`, { type: "image/jpeg" }));
-      if (continuous) {
-        setFlash(true);
-        setTimeout(() => setFlash(false), 200);
-      } else {
+      if (!continuous) {
         handleClose();
       }
-    }, "image/jpeg", 0.9);
+    }, "image/jpeg", 0.85);
   }
 
   if (!open) return null;

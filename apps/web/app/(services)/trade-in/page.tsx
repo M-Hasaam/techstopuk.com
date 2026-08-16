@@ -718,29 +718,32 @@ export default function TradeInPage() {
 
   async function handleImageFiles(files: File[]) {
     if (files.length === 0) return;
-    setImageUploading(true);
-    try {
-      const results = await Promise.all(
-        files.slice(0, 6 - images.length).map(async (file) => {
-          const { blob, previewUrl } = await compressToBlob(file);
-          let filePath = previewUrl;
-          try {
-            const uploadFile = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
-            const res = await uploadsApi.tradeInImage(uploadFile, batchId);
-            if (res?.presignedUrl) filePath = res.presignedUrl;
-            else if (res?.filePath) filePath = res.filePath;
-          } catch (uploadErr) {
-            console.warn("Background upload failed, falling back to local preview:", uploadErr);
-          }
-          return { filePath, previewUrl };
-        })
-      );
-      setImages(prev => [...prev, ...results].slice(0, 6));
-    } catch (err) {
-      console.error("Error processing captured photos:", err);
-    } finally {
-      setImageUploading(false);
-    }
+    const availableSlots = 6 - images.length;
+    if (availableSlots <= 0) return;
+
+    const validFiles = files.slice(0, availableSlots);
+
+    // 1. Instantly create local object URLs and add to state for zero-lag shutter response
+    const instantItems = validFiles.map(file => {
+      const previewUrl = URL.createObjectURL(file);
+      return { file, previewUrl, filePath: previewUrl };
+    });
+
+    setImages(prev => [...prev, ...instantItems.map(i => ({ filePath: i.filePath, previewUrl: i.previewUrl }))].slice(0, 6));
+
+    // 2. Compress and upload to storage asynchronously in the background
+    instantItems.forEach(async (item) => {
+      try {
+        const { blob, previewUrl: compressedPreview } = await compressToBlob(item.file);
+        const uploadFile = new File([blob], item.file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+        const res = await uploadsApi.tradeInImage(uploadFile, batchId);
+        const finalUrl = res?.presignedUrl || res?.filePath || compressedPreview || item.previewUrl;
+        
+        setImages(prev => prev.map(img => img.previewUrl === item.previewUrl ? { ...img, filePath: finalUrl } : img));
+      } catch (err) {
+        console.warn("Background photo upload failed, retaining local preview:", err);
+      }
+    });
   }
 
   async function fetchAiPrice() {
