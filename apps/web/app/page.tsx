@@ -1,5 +1,7 @@
 "use client";
 
+// testing git connection and local changes
+
 import React, { useState, useEffect, useRef } from "react";
 
 // Custom hook to trigger lazy fetching and auto-refetching on browser back-button navigation (bfcache)
